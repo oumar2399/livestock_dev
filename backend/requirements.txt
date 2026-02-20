@@ -1,0 +1,21 @@
+# Framework web
+fastapi
+uvicorn[standard]
+
+# Base de données
+sqlalchemy
+psycopg2-binary
+alembic
+geoalchemy2
+
+# Validation données
+pydantic
+pydantic-settings
+
+# Authentification
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+
+# Utilitaires
+python-dotenv
