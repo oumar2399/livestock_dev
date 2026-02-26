@@ -48,7 +48,7 @@ class AlertCreate(AlertBase):
       "severity": "warning",
       "title": "Activité réduite",
       "message": "Activité 40% sous baseline depuis 6h",
-      "metadata": {
+      "alert_metadata": {
         "current_activity": 0.6,
         "baseline": 1.0,
         "duration_hours": 6

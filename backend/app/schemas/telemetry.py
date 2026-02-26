@@ -42,8 +42,12 @@ class TelemetryResponse(TelemetryBase):
     animal_id: Optional[int] = None  # Peut être NULL si device pas assigné
     activity_state: Optional[str] = None
     
+    # Ajouté :
+    battery: int = Field(..., alias="battery_level", serialization_alias="battery")
+
     class Config:
         orm_mode = True
+        populate_by_name = True  # Ajouté
 
 class TelemetryLatest(BaseModel):
     """Dernière position d'un animal (vue optimisée)"""

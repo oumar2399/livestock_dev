@@ -34,17 +34,6 @@ async def list_animals(
 ):
     """
     Liste tous les animaux avec pagination
-    
-    **Utilisé par dashboard pour afficher troupeau**
-    
-    Query params:
-    - farm_id: Filtrer animaux d'une ferme (optionnel)
-    - status: Filtrer par statut (active, sick, sold, deceased)
-    - page: Numéro de page (défaut 1)
-    - page_size: Animaux par page (défaut 50, max 100)
-    
-    Returns:
-        Liste paginée animaux avec total
     """
     
     # Base query
@@ -63,20 +52,40 @@ async def list_animals(
     offset = (page - 1) * page_size
     animals = query.offset(offset).limit(page_size).all()
     
-    # Enrichir avec dernière position (optionnel)
+    # Convertir en AnimalResponse (avec from_orm)
+    animal_responses = []
     for animal in animals:
+        # Dernière position (optionnel)
         last_telemetry = db.query(Telemetry).filter(
             Telemetry.animal_id == animal.id
         ).order_by(Telemetry.time.desc()).first()
         
-        if last_telemetry:
-            animal.last_latitude = last_telemetry.latitude
-            animal.last_longitude = last_telemetry.longitude
-            animal.last_update = last_telemetry.time
+        # Créer dict avec toutes les infos
+        animal_dict = {
+            "id": animal.id,
+            "farm_id": animal.farm_id,
+            "name": animal.name,
+            "official_id": animal.official_id,
+            "species": animal.species,
+            "breed": animal.breed,
+            "sex": animal.sex,
+            "birth_date": animal.birth_date,
+            "weight": animal.weight,
+            "photo_url": animal.photo_url,
+            "assigned_device": animal.assigned_device,
+            "status": animal.status,
+            "created_at": animal.created_at,
+            "updated_at": animal.updated_at,
+            "last_latitude": last_telemetry.latitude if last_telemetry else None,
+            "last_longitude": last_telemetry.longitude if last_telemetry else None,
+            "last_update": last_telemetry.time if last_telemetry else None
+        }
+        
+        animal_responses.append(AnimalResponse(**animal_dict))
     
     return AnimalList(
         total=total,
-        animals=animals,
+        animals=animal_responses,
         page=page,
         page_size=page_size
     )
@@ -92,15 +101,6 @@ async def get_animal(
 ):
     """
     Obtenir détails d'un animal spécifique
-    
-    Path params:
-    - animal_id: ID de l'animal
-    
-    Returns:
-        Détails complets animal
-        
-    Raises:
-        404: Animal non trouvé
     """
     animal = db.query(Animal).filter(Animal.id == animal_id).first()
     
@@ -112,12 +112,28 @@ async def get_animal(
         Telemetry.animal_id == animal_id
     ).order_by(Telemetry.time.desc()).first()
     
-    if last_telemetry:
-        animal.last_latitude = last_telemetry.latitude
-        animal.last_longitude = last_telemetry.longitude
-        animal.last_update = last_telemetry.time
+    # Créer dict complet
+    animal_dict = {
+        "id": animal.id,
+        "farm_id": animal.farm_id,
+        "name": animal.name,
+        "official_id": animal.official_id,
+        "species": animal.species,
+        "breed": animal.breed,
+        "sex": animal.sex,
+        "birth_date": animal.birth_date,
+        "weight": animal.weight,
+        "photo_url": animal.photo_url,
+        "assigned_device": animal.assigned_device,
+        "status": animal.status,
+        "created_at": animal.created_at,
+        "updated_at": animal.updated_at,
+        "last_latitude": last_telemetry.latitude if last_telemetry else None,
+        "last_longitude": last_telemetry.longitude if last_telemetry else None,
+        "last_update": last_telemetry.time if last_telemetry else None
+    }
     
-    return animal
+    return AnimalResponse(**animal_dict)
 
 # ============================================================
 # POST /api/v1/animals - Créer animal

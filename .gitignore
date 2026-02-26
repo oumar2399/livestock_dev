@@ -1,3 +1,6 @@
 # Fichier d'environnement
-./backend/.env
-./backend/app/__pycache__/
+backend/.env
+backend/venv/
+__pycache__/
+.vscode/
+*.pyc

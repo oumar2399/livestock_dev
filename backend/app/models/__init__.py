@@ -9,6 +9,7 @@ from app.models.animal import Animal
 from app.models.telemetry import Telemetry
 from app.models.alert import Alert
 from app.models.farm import Farm
+from app.models.geofence import Geofence
 
 # À ajouter plus tard :
 # from app.models.farm import Farm
@@ -21,5 +22,6 @@ __all__ = [
     "Farm",
     "Animal", 
     "Telemetry",
-    "Alert"
+    "Alert",
+    "Geofence",
 ]

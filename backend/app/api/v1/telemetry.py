@@ -207,26 +207,12 @@ async def get_telemetry_history(
 # ============================================================
 
 def calculate_activity_state(activity: float) -> str:
-    """
-    Détermine état activité basé sur valeur accéléromètre
-    
-    Valeurs typiques bovins:
-    - Couché/repos : 0.0 - 0.5g
-    - Debout calme : 0.5 - 1.2g
-    - Marche : 1.2 - 2.5g
-    - Course/panic : > 2.5g
-    
-    Args:
-        activity: Valeur accéléromètre en g
-    
-    Returns:
-        État: 'lying', 'standing', 'walking', 'running'
-    """
-    if activity < 0.5:
+    """Activity nette (gravité soustraite) en g"""
+    if activity < 0.15:
         return "lying"
-    elif activity < 1.2:
+    elif activity < 0.5:
         return "standing"
-    elif activity < 2.5:
+    elif activity < 1.0:
         return "walking"
     else:
         return "running"
