@@ -5,7 +5,7 @@ Exécuter : python -m scripts.seed_data
 import sys
 from pathlib import Path
 
-from backend.app.models.farm import Farm
+from app.models.farm import Farm
 
 # Ajouter parent directory au path Python
 sys.path.append(str(Path(__file__).parent.parent))
@@ -30,6 +30,51 @@ def clear_data(db: Session):
     # db.query(User).delete()   # Garde users pour login
     db.commit()
     print("✅ Données supprimées")
+    
+def seed_farm(db: Session):
+    """Créer ferme de test"""
+    print("\n🏡 Création ferme...")
+    
+    # Vérifier si ferme existe déjà
+    existing_farm = db.query(Farm).filter(Farm.id == 1).first()
+    if existing_farm:
+        print(f"  ℹ️  Ferme existante : {existing_farm.name}")
+        return existing_farm
+    
+    # Créer user test (si n'existe pas)
+    user = db.query(User).filter(User.id == 1).first()
+    if not user:
+        print("  → Création user test...")
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        user = User(
+            email="test@livestock.com",
+            password_hash=pwd_context.hash("password123"),
+            name="Test User",
+            role="farmer"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        print(f"  ✓ User créé : {user.email}")
+    
+    # Créer ferme
+    from geoalchemy2 import WKTElement
+    
+    farm = Farm(
+        owner_id=user.id,
+        name="Ferme de Test",
+        address="123 Rue de la Ferme, 75000 Paris",
+        location=WKTElement('POINT(2.3522 48.8566)', srid=4326),
+        size_hectares=50.0
+    )
+    db.add(farm)
+    db.commit()
+    db.refresh(farm)
+    
+    print(f"  ✓ Ferme créée : {farm.name} (ID: {farm.id})")
+    return farm
 
 def seed_animals(db: Session):
     """Créer animaux de test"""
@@ -182,7 +227,7 @@ def seed_alerts(db: Session, animals: list):
         title="Activité réduite",
         message="Activité 35% en dessous de la baseline depuis 6 heures",
         triggered_at=datetime.utcnow() - timedelta(hours=2),
-        metadata={
+        alert_metadata={
             "current_activity": 0.65,
             "baseline_activity": 1.0,
             "duration_hours": 6
@@ -198,7 +243,7 @@ def seed_alerts(db: Session, animals: list):
         message="Niveau batterie capteur M5-002 : 15%",
         triggered_at=datetime.utcnow() - timedelta(days=1),
         resolved_at=datetime.utcnow() - timedelta(hours=20),
-        metadata={"battery_level": 15}
+        alert_metadata={"battery_level": 15}
     )
     
     # Alerte 3 : Température élevée (critique)
@@ -209,7 +254,7 @@ def seed_alerts(db: Session, animals: list):
         title="Fièvre détectée",
         message="Température corporelle élevée : 39.8°C (normale 38.5°C)",
         triggered_at=datetime.utcnow() - timedelta(minutes=30),
-        metadata={
+        alert_metadata={
             "temperature": 39.8,
             "baseline": 38.5,
             "deviation": 1.3
@@ -235,19 +280,23 @@ def main():
         if response.lower() == 'y':
             clear_data(db)
         
-        # 2. Créer animaux
+        # 2. Créer ferme AVANT animaux ← AJOUTÉ
+        farm = seed_farm(db)
+        
+        # 3. Créer animaux
         animals = seed_animals(db)
         
-        # 3. Créer télémétrie
+        # 4. Créer télémétrie
         seed_telemetry(db, animals)
         
-        # 4. Créer alertes
+        # 5. Créer alertes
         seed_alerts(db, animals)
         
         print("\n" + "=" * 60)
         print("✅ SEED DATA TERMINÉ AVEC SUCCÈS !")
         print("=" * 60)
         print("\n📊 Résumé:")
+        print(f"  • 1 ferme")
         print(f"  • {len(animals)} animaux")
         print(f"  • ~{144 * len([a for a in animals if a.assigned_device])} entrées télémétrie")
         print(f"  • 3 alertes")
