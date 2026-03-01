@@ -14,6 +14,7 @@ from app.schemas.animal import (
     AnimalResponse,
     AnimalList
 )
+from app.core.dependencies import require_authenticated, require_farmer
 
 router = APIRouter(
     prefix="/animals",
@@ -30,7 +31,8 @@ async def list_animals(
     status: Optional[str] = Query(None, description="Filtrer par statut"),
     page: int = Query(1, ge=1, description="Numéro page"),
     page_size: int = Query(50, ge=1, le=100, description="Taille page"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_authenticated),
 ):
     """
     Liste tous les animaux avec pagination
@@ -97,7 +99,8 @@ async def list_animals(
 @router.get("/{animal_id}", response_model=AnimalResponse)
 async def get_animal(
     animal_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_authenticated),
 ):
     """
     Obtenir détails d'un animal spécifique
@@ -142,7 +145,8 @@ async def get_animal(
 @router.post("/", response_model=AnimalResponse, status_code=201)
 async def create_animal(
     animal_data: AnimalCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_farmer),
 ):
     """
     Créer un nouvel animal
@@ -194,7 +198,8 @@ async def create_animal(
 async def update_animal(
     animal_id: int,
     animal_data: AnimalUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_farmer),
 ):
     """
     Modifier un animal existant
@@ -241,7 +246,8 @@ async def update_animal(
 @router.delete("/{animal_id}", status_code=204)
 async def delete_animal(
     animal_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_farmer),
 ):
     """
     Supprimer un animal

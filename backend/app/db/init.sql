@@ -142,28 +142,6 @@ CREATE INDEX idx_devices_farm ON devices(farm_id);
 CREATE INDEX idx_devices_status ON devices(status);
 
 -- ============================================================
--- DONNÉES DE TEST (optionnel - pour développement)
--- ============================================================
-
--- -- User test
--- INSERT INTO users (email, password_hash, name, role) 
--- VALUES ('test@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqVqL2xQQy', 'Test User', 'farmer')
--- ON CONFLICT (email) DO NOTHING;
--- -- Mot de passe = "password123" (hashé avec bcrypt)
-
--- -- Farm test
--- INSERT INTO farms (owner_id, name, location)
--- SELECT 1, 'Ferme Test', ST_SetSRID(ST_MakePoint(2.3522, 48.8566), 4326)
--- WHERE EXISTS (SELECT 1 FROM users WHERE id = 1)
--- ON CONFLICT DO NOTHING;
-
--- -- Animal test
--- INSERT INTO animals (farm_id, name, official_id, assigned_device)
--- SELECT 1, 'Test Cow', 'FR001', 'M5-001'
--- WHERE EXISTS (SELECT 1 FROM farms WHERE id = 1)
--- ON CONFLICT (official_id) DO NOTHING;
-
--- ============================================================
 -- VUES UTILES (requêtes fréquentes pré-calculées)
 -- ============================================================
 

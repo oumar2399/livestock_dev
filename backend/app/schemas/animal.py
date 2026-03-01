@@ -102,7 +102,9 @@ class AnimalResponse(AnimalBase):
         """
         Configuration Pydantic
         """
-        orm_mode = True  # Permet conversion depuis modèle SQLAlchemy
+        model_config = {
+            "from_attributes": True
+        }  # Permet conversion depuis modèle SQLAlchemy
         # Équivalent : AnimalResponse.from_orm(db_animal)
 
 # ============================================================
