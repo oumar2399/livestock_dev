@@ -11,6 +11,7 @@ from app.db.database import get_db
 from app.models.telemetry import Telemetry
 from app.models.animal import Animal
 from app.schemas.telemetry import TelemetryCreate, TelemetryResponse, TelemetryLatest
+from app.core.dependencies import require_authenticated, require_farmer
 
 # Créer router (groupe de routes)
 router = APIRouter(
@@ -25,7 +26,8 @@ router = APIRouter(
 @router.post("/", response_model=TelemetryResponse, status_code=201)
 async def receive_telemetry(
     data: TelemetryCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_farmer),
 ):
     """
     Recevoir données capteur M5Stack
@@ -107,7 +109,8 @@ async def receive_telemetry(
 async def get_latest_telemetry(
     limit: int = Query(10, ge=1, le=100, description="Nombre de résultats"),
     animal_id: Optional[int] = Query(None, description="Filtrer par animal"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_authenticated),
 ):
     """
     Obtenir dernières positions des animaux
@@ -170,7 +173,8 @@ async def get_latest_telemetry(
 async def get_telemetry_history(
     animal_id: int,
     hours: int = Query(24, ge=1, le=168, description="Nombre d'heures historique (max 7 jours)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_authenticated),
 ):
     """
     Obtenir historique télémétrie d'un animal

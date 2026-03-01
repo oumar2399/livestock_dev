@@ -73,8 +73,9 @@ class AlertResponse(AlertBase):
     # Infos animal (jointure)
     animal_name: Optional[str] = None
     
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }
 
 class AlertList(BaseModel):
     """Liste alertes avec filtres"""

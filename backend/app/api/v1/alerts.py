@@ -15,6 +15,7 @@ from app.schemas.alert import (
     AlertUpdate,
     AlertSeverity
 )
+from app.core.dependencies import require_authenticated, require_farmer
 
 router = APIRouter(
     prefix="/alerts",
@@ -31,7 +32,8 @@ async def list_alerts(
     severity: Optional[AlertSeverity] = Query(None, description="Filtrer par gravité"),
     animal_id: Optional[int] = Query(None, description="Filtrer par animal"),
     limit: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_authenticated),
 ):
     """
     Liste alertes avec filtres
@@ -101,7 +103,8 @@ async def list_alerts(
 async def update_alert(
     alert_id: int,
     update_data: AlertUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_authenticated),
 ):
     """
     Acquitter ou résoudre une alerte
