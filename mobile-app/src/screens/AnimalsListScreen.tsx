@@ -15,6 +15,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -43,11 +44,11 @@ import {
 // ─── Filtres statut ───────────────────────────────────────────────────────────
 
 const STATUS_FILTERS: { label: string; value: AnimalStatus | 'all' }[] = [
-  { label: 'Tous', value: 'all' },
-  { label: 'Actif', value: 'active' },
-  { label: 'Malade', value: 'sick' },
-  { label: 'Vendu', value: 'sold' },
-  { label: 'Décédé', value: 'deceased' },
+  { label: 'All', value: 'all' },
+  { label: 'Active', value: 'active' },
+  { label: 'Sick', value: 'sick' },
+  { label: 'Sold', value: 'sold' },
+  { label: 'Deceased', value: 'deceased' },
 ];
 
 // ─── Carte animal ─────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
     : telemetry.activity < 0.5 ? 'standing'
     : telemetry.activity < 1.0 ? 'walking' : 'running'
     : null;
+
 
   const behaviorColor = activityStateColor(activityState as any);
 
@@ -112,7 +114,7 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
             </View>
           ) : (
             <Text style={styles.offlineText}>
-              {animal.last_update ? `Vu ${timeAgo(animal.last_update)}` : 'Jamais vu'}
+              {animal.last_update ? `Seen ${timeAgo(animal.last_update)}` : 'Never seen'}
             </Text>
           )}
 
@@ -173,12 +175,25 @@ export default function AnimalsListScreen() {
     navigation.navigate('AnimalDetail', { animalId });
   };
 
-  if (isLoading && !data) return <LoadingState message="Chargement du troupeau…" />;
-  if (isError && !data) return <ErrorState message="Impossible de charger les animaux" onRetry={refetch} />;
+  if (isLoading && !data) return <LoadingState message="Loading..." />;
+  if (isError && !data) return <ErrorState message="Can't load the animals" onRetry={refetch} />;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Troupeau" subtitle={`${data?.total ?? 0} animaux`} />
+      <ScreenHeader
+        title="Herd"
+        subtitle={`${data?.total ?? 0} animals`}
+        onBack={() => navigation.dispatch(DrawerActions.openDrawer())}
+        backIcon="menu-outline"
+        rightAction={
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => navigation.navigate('AnimalForm')}
+          >
+            <Ionicons name="add" size={22} color={Colors.primary} />
+          </TouchableOpacity>
+        }
+      />
 
       {/* Recherche */}
       <View style={styles.searchContainer}>
@@ -186,7 +201,7 @@ export default function AnimalsListScreen() {
           <Ionicons name="search-outline" size={18} color={Colors.text.muted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Rechercher par nom ou numéro…"
+            placeholder="Search by name or ID"
             placeholderTextColor={Colors.text.muted}
             value={search}
             onChangeText={setSearch}
@@ -242,11 +257,11 @@ export default function AnimalsListScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="paw-outline"
-            title="Aucun animal trouvé"
+            title="No animal found"
             message={
               search
-                ? `Aucun résultat pour "${search}"`
-                : 'Aucun animal dans ce statut'
+                ? `No results for "${search}"`
+                : 'No animals in this status'
             }
           />
         }
@@ -370,4 +385,10 @@ const styles = StyleSheet.create({
   offlineText: { fontSize: Typography.xs, color: Colors.text.muted },
   batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   batteryText: { fontSize: Typography.xs, fontWeight: '600' },
+  addBtn: {
+    width: 36, height: 36, borderRadius: Radius.full,
+    backgroundColor: Colors.primary + '20',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.primary + '50',
+  },
 });

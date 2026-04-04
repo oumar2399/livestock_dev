@@ -61,7 +61,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "API_BASE_URL": "http://10.97.21.247:8000/api/v1"
+      "API_BASE_URL": "https://theresa-unhidden-dispiritedly.ngrok-free.dev/api/v1"
     }
   }
 }

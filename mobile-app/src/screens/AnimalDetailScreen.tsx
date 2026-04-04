@@ -11,6 +11,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,11 +19,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VictoryChart, VictoryArea, VictoryAxis, VictoryTheme, VictoryBar } from 'victory-native';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { AnimalsStackParamList, ActivityState, TelemetryRecord } from '../types';
 import { useAnimal } from '../hooks/useAnimals';
 import { useTelemetryHistory } from '../hooks/useTelemetry';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
+import apiClient from '../api/client';
 import {
   animalStatusColor,
   animalStatusLabel,
@@ -56,13 +59,12 @@ const PERIOD_OPTIONS = [
 ];
 
 // ─── Graphique activité ────────────────────────────────────────────────────────
-
 function ActivityChart({ records }: { records: TelemetryRecord[] }) {
   if (!records.length) {
     return (
       <View style={styles.noDataChart}>
         <Ionicons name="bar-chart-outline" size={32} color={Colors.text.muted} />
-        <Text style={styles.noDataText}>Pas de données disponibles</Text>
+        <Text style={styles.noDataText}>No data available</Text>
       </View>
     );
   }
@@ -154,11 +156,35 @@ type RouteProps = RouteProp<AnimalsStackParamList, 'AnimalDetail'>;
 
 export default function AnimalDetailScreen() {
   const route = useRoute<RouteProps>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { animalId } = route.params;
 
   const [historyHours, setHistoryHours] = useState(24);
+
+  const handleDelete = (animalName: string) => {
+    Alert.alert(
+      'Delete Animal',
+      `Delete ${animalName} ? All its data (telemetry, alerts) will be permanently deleted.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`/animals/${animalId}`);
+              queryClient.invalidateQueries({ queryKey: ['animals'] });
+              navigation.navigate('AnimalsList');
+            } catch {
+              Alert.alert('Error', 'Failed to delete the animal');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const animalQuery = useAnimal(animalId);
   const historyQuery = useTelemetryHistory(animalId, historyHours);
@@ -172,9 +198,9 @@ export default function AnimalDetailScreen() {
     historyQuery.refetch();
   };
 
-  if (animalQuery.isLoading) return <LoadingState message="Chargement de la fiche…" />;
+  if (animalQuery.isLoading) return <LoadingState message="Loading animal profile…" />;
   if (animalQuery.isError || !animal) {
-    return <ErrorState message="Animal introuvable" onRetry={() => animalQuery.refetch()} />;
+    return <ErrorState message="Animal not found" onRetry={() => animalQuery.refetch()} />;
   }
 
   const statusColor = animalStatusColor(animal.status);
@@ -187,6 +213,14 @@ export default function AnimalDetailScreen() {
         title={animal.name}
         subtitle={`${animal.official_id ? `#${animal.official_id} · ` : ''}${animal.breed ?? animal.species}`}
         onBack={() => navigation.goBack()}
+        rightAction={
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => (navigation as any).navigate('AnimalForm', { animalId: animal.id })}
+          >
+            <Ionicons name="create-outline" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+        }
       />
 
       <ScrollView
@@ -237,7 +271,7 @@ export default function AnimalDetailScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="location-outline" size={18} color={Colors.primary} />
-            <Text style={styles.cardTitle}>Position GPS</Text>
+            <Text style={styles.cardTitle}>GPS Position</Text>
             {isLive && <View style={styles.liveDot} />}
           </View>
           <Text style={styles.coordText}>
@@ -245,8 +279,8 @@ export default function AnimalDetailScreen() {
           </Text>
           <Text style={styles.coordMeta}>
             {animal.last_update
-              ? `Dernière mise à jour : ${timeAgo(animal.last_update)}`
-              : 'Aucune position enregistrée'}
+              ? `Last updated : ${timeAgo(animal.last_update)}`
+              : 'No position recorded'}
           </Text>
         </View>
 
@@ -256,21 +290,21 @@ export default function AnimalDetailScreen() {
             <Ionicons name="information-circle-outline" size={18} color={Colors.primary} />
             <Text style={styles.cardTitle}>Informations</Text>
           </View>
-          <InfoRow label="Identifiant" value={animal.official_id ?? '–'} icon="barcode-outline" />
-          <InfoRow label="Espèce" value={animal.species} icon="paw-outline" />
-          <InfoRow label="Race" value={animal.breed ?? '–'} icon="leaf-outline" />
-          <InfoRow label="Sexe" value={animalSexLabel(animal.sex)} icon="male-female-outline" />
-          <InfoRow label="Âge" value={animalAge(animal.birth_date)} icon="calendar-outline" />
-          <InfoRow label="Poids" value={formatWeight(animal.weight)} icon="scale-outline" />
-          <InfoRow label="Appareil" value={animal.assigned_device ?? 'Non assigné'} icon="hardware-chip-outline" />
-          <InfoRow label="Enregistré le" value={formatDate(animal.created_at)} icon="time-outline" last />
+          <InfoRow label="Identifier" value={animal.official_id ?? '–'} icon="barcode-outline" />
+          <InfoRow label="Species" value={animal.species} icon="paw-outline" />
+          <InfoRow label="Breed" value={animal.breed ?? '–'} icon="leaf-outline" />
+          <InfoRow label="Gender" value={animalSexLabel(animal.sex)} icon="male-female-outline" />
+          <InfoRow label="Age" value={animalAge(animal.birth_date)} icon="calendar-outline" />
+          <InfoRow label="Weight" value={formatWeight(animal.weight)} icon="scale-outline" />
+          <InfoRow label="Device" value={animal.assigned_device ?? 'Not assigned'} icon="hardware-chip-outline" />
+          <InfoRow label="Registered on" value={formatDate(animal.created_at)} icon="time-outline" last />
         </View>
 
         {/* ── Activité ─────────────────────────────── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="pulse-outline" size={18} color={Colors.primary} />
-            <Text style={styles.cardTitle}>Activité</Text>
+            <Text style={styles.cardTitle}>Activity</Text>
             {/* Sélecteur période */}
             <View style={styles.periodSelector}>
               {PERIOD_OPTIONS.map((opt) => (
@@ -294,10 +328,9 @@ export default function AnimalDetailScreen() {
               ))}
             </View>
           </View>
-
           {historyQuery.isLoading ? (
             <View style={styles.chartLoading}>
-              <Text style={styles.chartLoadingText}>Chargement des données…</Text>
+              <Text style={styles.chartLoadingText}>Loading data…</Text>
             </View>
           ) : (
             <ActivityChart records={records} />
@@ -309,7 +342,7 @@ export default function AnimalDetailScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="bar-chart-outline" size={18} color={Colors.primary} />
-              <Text style={styles.cardTitle}>Répartition comportements</Text>
+              <Text style={styles.cardTitle}>Behavior Distribution</Text>
             </View>
             <BehaviorDistribution records={records} />
           </View>
@@ -320,21 +353,31 @@ export default function AnimalDetailScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="hardware-chip-outline" size={18} color={Colors.primary} />
-              <Text style={styles.cardTitle}>Dernière mesure capteur</Text>
+              <Text style={styles.cardTitle}>Latest Sensor Reading</Text>
             </View>
-            <InfoRow label="Activité brute" value={`${latestRecord.activity.toFixed(3)} g`} icon="pulse-outline" />
+            <InfoRow label="Raw Activity" value={`${latestRecord.activity.toFixed(3)} g`} icon="pulse-outline" />
             {latestRecord.temperature && (
-              <InfoRow label="Température" value={formatTemperature(latestRecord.temperature)} icon="thermometer-outline" />
+              <InfoRow label="Temperature" value={formatTemperature(latestRecord.temperature)} icon="thermometer-outline" />
             )}
             {latestRecord.speed !== null && (
-              <InfoRow label="Vitesse GPS" value={latestRecord.speed != null ? `${latestRecord.speed.toFixed(1)} km/h` : '–'} icon="speedometer-outline" />
+              <InfoRow label="GPS Speed" value={latestRecord.speed != null ? `${latestRecord.speed.toFixed(1)} km/h` : '–'} icon="speedometer-outline" />
             )}
             {latestRecord.satellites !== null && (
               <InfoRow label="Satellites" value={String(latestRecord.satellites ?? '–')} icon="planet-outline" />
             )}
-            <InfoRow label="Batterie" value={`${latestRecord.battery}%`} icon="battery-half-outline" last />
+            <InfoRow label="Battery" value={`${latestRecord.battery}%`} icon="battery-half-outline" last />
           </View>
         )}
+
+        {/* ── Bouton supprimer ─────────────────────────────────────── */}
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => handleDelete(animal.name)}
+        >
+          <Ionicons name="trash-outline" size={18} color={Colors.severity.critical} />
+          <Text style={styles.deleteBtnText}>Delete this animal</Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </View>
   );
@@ -436,4 +479,20 @@ const styles = StyleSheet.create({
   },
   behaviorBarFill: { height: '100%', borderRadius: Radius.full },
   behaviorPct: { width: 36, fontSize: Typography.sm, fontWeight: '700', textAlign: 'right' },
+  editBtn: {
+    width: 36, height: 36, borderRadius: Radius.full,
+    backgroundColor: Colors.primary + '20',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.primary + '50',
+  },
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: Spacing.sm, marginTop: Spacing.md,
+    padding: Spacing.md, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.severity.critical + '50',
+    backgroundColor: Colors.severity.critical + '10',
+  },
+  deleteBtnText: {
+    color: Colors.severity.critical, fontSize: Typography.sm, fontWeight: '600',
+  },
 });

@@ -22,10 +22,11 @@ interface ScreenHeaderProps {
   title: string;
   subtitle?: string;
   onBack?: () => void;
+  backIcon?: 'chevron-back' | 'menu-outline'; // ← par défaut, ☰ si menu
   rightAction?: React.ReactNode;
 }
 
-export function ScreenHeader({ title, subtitle, onBack, rightAction }: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, onBack, backIcon = 'chevron-back', rightAction }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -33,7 +34,7 @@ export function ScreenHeader({ title, subtitle, onBack, rightAction }: ScreenHea
       <View style={styles.headerLeft}>
         {onBack && (
           <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={12}>
-            <Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
+            <Ionicons name={backIcon} size={24} color={Colors.text.primary} />
           </TouchableOpacity>
         )}
         <View>

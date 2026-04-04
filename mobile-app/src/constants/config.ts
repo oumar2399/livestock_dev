@@ -5,7 +5,7 @@ export const Config = {
   // URL backend FastAPI
   // Développement local : adresse IP de votre machine sur le réseau WiFi
   // Production : URL de votre serveur (ex: https://api.votre-domaine.com)
-  API_BASE_URL: 'http://10.97.21.247:8000/api/v1',
+  API_BASE_URL: 'https://theresa-unhidden-dispiritedly.ngrok-free.dev/api/v1',
 
   // Timeouts (ms)
   REQUEST_TIMEOUT: 15_000,

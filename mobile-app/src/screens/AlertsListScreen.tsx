@@ -1,5 +1,5 @@
 /**
- * AlertsListScreen - Gestion alertes
+ * AlertsListScreen - Gestion alerts
  * Filtres : active/résolues, sévérité (info/warning/critical)
  * Actions : Acquitter, Résoudre
  * Polling 15s - GET /alerts
@@ -44,15 +44,15 @@ import {
 type StatusFilter = 'active' | 'resolved' | 'all';
 
 const STATUS_OPTIONS: { label: string; value: StatusFilter }[] = [
-  { label: 'Actives', value: 'active' },
-  { label: 'Toutes', value: 'all' },
-  { label: 'Résolues', value: 'resolved' },
+  { label: 'Active', value: 'active' },
+  { label: 'All', value: 'all' },
+  { label: 'Resolved', value: 'resolved' },
 ];
 
 const SEVERITY_OPTIONS: { label: string; value: AlertSeverity | 'all' }[] = [
-  { label: 'Tout', value: 'all' },
-  { label: 'Critique', value: 'critical' },
-  { label: 'Attention', value: 'warning' },
+  { label: 'All', value: 'all' },
+  { label: 'Critical', value: 'critical' },
+  { label: 'Warning', value: 'warning' },
   { label: 'Info', value: 'info' },
 ];
 
@@ -97,7 +97,7 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
           </View>
 
           <Text style={styles.alertAnimal}>
-            {alert.animal_name ?? 'Inconnu'} · {alertTypeLabel(alert.type)}
+            {alert.animal_name ?? 'Unknown'} · {alertTypeLabel(alert.type)}
           </Text>
           <Text style={styles.alertTime}>{timeAgo(alert.triggered_at)}</Text>
         </View>
@@ -115,19 +115,18 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
           {alert.message && (
             <Text style={styles.alertMessage}>{alert.message}</Text>
           )}
-
           <View style={styles.alertTimes}>
             <View style={styles.alertTimeRow}>
               <Ionicons name="alert-circle-outline" size={13} color={Colors.text.muted} />
               <Text style={styles.alertTimeText}>
-                Déclenchée : {formatDateTime(alert.triggered_at)}
+                Triggered : {formatDateTime(alert.triggered_at)}
               </Text>
             </View>
             {alert.acknowledged_at && (
               <View style={styles.alertTimeRow}>
                 <Ionicons name="eye-outline" size={13} color={Colors.primary} />
                 <Text style={[styles.alertTimeText, { color: Colors.primary }]}>
-                  Acquittée : {formatDateTime(alert.acknowledged_at)}
+                  Acknowledged : {formatDateTime(alert.acknowledged_at)}
                 </Text>
               </View>
             )}
@@ -135,7 +134,7 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
               <View style={styles.alertTimeRow}>
                 <Ionicons name="checkmark-circle-outline" size={13} color={Colors.status.healthy} />
                 <Text style={[styles.alertTimeText, { color: Colors.status.healthy }]}>
-                  Résolue : {formatDateTime(alert.resolved_at)}
+                  RResolved : {formatDateTime(alert.resolved_at)}
                 </Text>
               </View>
             )}
@@ -160,7 +159,7 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
                 disabled={isProcessing}
               >
                 <Ionicons name="checkmark-outline" size={15} color={Colors.primary} />
-                <Text style={[styles.actionBtnText, { color: Colors.primary }]}>Résolu</Text>
+                <Text style={[styles.actionBtnText, { color: Colors.primary }]}>Resolved</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -202,9 +201,9 @@ export default function AlertsListScreen() {
       'Résoudre l\'alerte',
       'Confirmer que ce problème est résolu ?',
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Résoudre',
+          text: 'Resolve',
           style: 'destructive',
           onPress: () => resolve(id),
         },
@@ -212,14 +211,14 @@ export default function AlertsListScreen() {
     );
   };
 
-  if (isLoading && !data) return <LoadingState message="Chargement des alertes…" />;
-  if (isError && !data) return <ErrorState message="Impossible de charger les alertes" onRetry={refetch} />;
+  if (isLoading && !data) return <LoadingState message="Loading alerts…" />;
+  if (isError && !data) return <ErrorState message="Can't load alerts" onRetry={refetch} />;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScreenHeader
-        title="Alertes"
-        subtitle={unresolvedCount > 0 ? `${unresolvedCount} non résolue${unresolvedCount > 1 ? 's' : ''}` : 'Tout est calme'}
+        title="Alerts"
+        subtitle={unresolvedCount > 0 ? `${unresolvedCount} unresolved${unresolvedCount > 1 ? 's' : ''}` : 'All clear'}
       />
 
       {/* Filtres statut */}
@@ -262,7 +261,7 @@ export default function AlertsListScreen() {
         })}
       </View>
 
-      {/* Liste alertes */}
+      {/* Liste alerts */}
       <FlatList
         data={alerts}
         keyExtractor={(item) => String(item.id)}
@@ -290,11 +289,11 @@ export default function AlertsListScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="notifications-outline"
-            title="Aucune alerte"
+            title="No alerts"
             message={
               statusFilter === 'active'
-                ? 'Tout va bien, aucune alerte active !'
-                : 'Aucune alerte dans cette catégorie'
+                ? 'All good, no active alerts!'
+                : 'No alerts in this category'
             }
           />
         }

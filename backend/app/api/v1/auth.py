@@ -39,6 +39,11 @@ from app.schemas.auth import (
     UserUpdateRole,
 )
 
+from pydantic import BaseModel
+
+class PasswordReset(BaseModel):
+    password: str
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -94,6 +99,21 @@ async def login(
 
     return _make_token_response(user)
 
+@router.put("/users/{user_id}/password")
+async def reset_password(
+    user_id: int,
+    data: PasswordReset,  # ← Pydantic model = OK
+    current_user = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    if len(data.password) < 6:
+        raise HTTPException(status_code=400, detail="Mot de passe min 6 caractères")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    user.password_hash = hash_password(data.password)
+    db.commit()
+    return {"message": f"Mot de passe de {user.email} réinitialisé"}
 
 # ─── POST /auth/login/form ────────────────────────────────────────────────────
 # Compatible OAuth2PasswordRequestForm (Swagger UI "Authorize" button)
