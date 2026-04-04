@@ -1,34 +1,51 @@
 /**
  * MainNavigator - Bottom tab navigation
- * 5 onglets : Dashboard, Carte, Animaux, Alertes, Profil
- * Badge dynamique sur l'onglet Alertes (unresolved_count)
+ * ☰ hamburger en haut à gauche sur tous les écrans principaux
+ * ← retour sur écrans profonds (AnimalDetail, AnimalForm)
  */
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 
 import { MainTabParamList, AnimalsStackParamList, AlertsStackParamList } from '../types';
 import { Colors, Spacing, Typography } from '../constants/config';
 import { useActiveAlerts } from '../hooks/useAlerts';
 
-// Screens
-import DashboardScreen from '../screens/DashboardScreen';
-import MapScreen from '../screens/MapScreen';
+import DashboardScreen  from '../screens/DashboardScreen';
+import MapScreen        from '../screens/MapScreen';
 import AnimalsListScreen from '../screens/AnimalsListScreen';
 import AnimalDetailScreen from '../screens/AnimalDetailScreen';
-import AlertsListScreen from '../screens/AlertsListScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import AnimalFormScreen  from '../screens/AnimalFormScreen';
+import AlertsListScreen  from '../screens/AlertsListScreen';
+import ProfileScreen     from '../screens/ProfileScreen';
 
-// ─── Stacks imbriqués ─────────────────────────────────────────────────────────
+// ─── Bouton hamburger ─────────────────────────────────────────────────────────
+
+function HamburgerButton() {
+  const navigation = useNavigation<any>();
+  return (
+    <TouchableOpacity
+      onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+      hitSlop={12}
+      style={{ padding: 4, marginLeft: 8 }}
+    >
+      <Ionicons name="menu-outline" size={26} color={Colors.text.primary} />
+    </TouchableOpacity>
+  );
+}
+
+// ─── Stacks ───────────────────────────────────────────────────────────────────
 
 const AnimalsStack = createNativeStackNavigator<AnimalsStackParamList>();
 function AnimalsNavigator() {
   return (
     <AnimalsStack.Navigator screenOptions={{ headerShown: false }}>
-      <AnimalsStack.Screen name="AnimalsList" component={AnimalsListScreen} />
+      <AnimalsStack.Screen name="AnimalsList"  component={AnimalsListScreen} />
       <AnimalsStack.Screen name="AnimalDetail" component={AnimalDetailScreen} />
+      <AnimalsStack.Screen name="AnimalForm"   component={AnimalFormScreen} />
     </AnimalsStack.Navigator>
   );
 }
@@ -42,8 +59,7 @@ function AlertsNavigator() {
   );
 }
 
-// ─── Badge composant ──────────────────────────────────────────────────────────
-
+// ─── Badge aleres ────────────────────────────────────────────────────────────
 function AlertsBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
@@ -57,6 +73,12 @@ function AlertsBadge({ count }: { count: number }) {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+const TAB_TITLES: Record<string, string> = {
+  Dashboard: 'Dashboard',
+  Alerts:    'Alerts',
+  Profile:   'Profile',
+};
+
 export default function MainNavigator() {
   const { data: alertsData } = useActiveAlerts();
   const unresolvedCount = alertsData?.unresolved_count ?? 0;
@@ -64,42 +86,81 @@ export default function MainNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: false,
+        // Header natif avec ☰ pour Dashboard, Alerts, Profile
+        headerShown: !!TAB_TITLES[route.name],
+        headerStyle: styles.tabHeader,
+        headerTitleStyle: styles.tabHeaderTitle,
+        headerShadowVisible: false,
+        headerTitle: TAB_TITLES[route.name] ?? '',
+        headerLeft: () => <HamburgerButton />,
+
+        // Tab bar
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.text.muted,
         tabBarLabelStyle: styles.tabLabel,
         tabBarIcon: ({ color, size, focused }) => {
           const icons: Record<string, [string, string]> = {
-            Dashboard: ['grid', 'grid-outline'],
-            Map: ['map', 'map-outline'],
-            Animals: ['paw', 'paw-outline'],
-            Alerts: ['notifications', 'notifications-outline'],
-            Profile: ['person', 'person-outline'],
+            Dashboard: ['grid',          'grid-outline'],
+            Map:       ['map',           'map-outline'],
+            Animals:   ['paw',           'paw-outline'],
+            Alerts:    ['notifications', 'notifications-outline'],
+            Profile:   ['person',        'person-outline'],
           };
           const [active, inactive] = icons[route.name] ?? ['help-circle', 'help-circle-outline'];
           return <Ionicons name={(focused ? active : inactive) as any} size={size} color={color} />;
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: 'Accueil' }} />
-      <Tab.Screen name="Map" component={MapScreen} options={{ tabBarLabel: 'Carte' }} />
-      <Tab.Screen name="Animals" component={AnimalsNavigator} options={{ tabBarLabel: 'Troupeau' }} />
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{ tabBarLabel: 'Home' }}
+      />
+      {/* Map : header géré par MapScreen lui-même (overlay transparent) */}
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={{ tabBarLabel: 'Map', headerShown: false }}
+      />
+      {/* Troupeau : header géré par AnimalsListScreen (ScreenHeader component) */}
+      <Tab.Screen
+        name="Animals"
+        component={AnimalsNavigator}
+        options={{ tabBarLabel: 'Herd', headerShown: false }}
+      />
       <Tab.Screen
         name="Alerts"
         component={AlertsNavigator}
         options={{
-          tabBarLabel: 'Alertes',
+          tabBarLabel: 'Alerts',
           tabBarBadge: unresolvedCount > 0 ? unresolvedCount : undefined,
           tabBarBadgeStyle: styles.tabBadge,
         }}
       />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'Profil' }} />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ tabBarLabel: 'Profile' }}
+      />
     </Tab.Navigator>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  tabHeader: {
+    backgroundColor: Colors.bg.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.default,
+    elevation: 0,
+  },
+  tabHeaderTitle: {
+    fontSize: Typography.md,
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
   tabBar: {
     backgroundColor: Colors.bg.card,
     borderTopColor: Colors.border.default,

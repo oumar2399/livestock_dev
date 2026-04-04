@@ -7,10 +7,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
-from datetime import datetime, UTC
+from datetime import datetime
 
 # Import routes
-from app.api.v1 import telemetry, animals, alerts, auth  # ← auth ajouté
+from app.api.v1 import telemetry, animals, alerts, auth, devices  # ← devices added
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,10 +67,10 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_requests(request, call_next):
-    start_time = datetime.now(UTC)
+    start_time = datetime.utcnow()
     logger.info(f"→ {request.method} {request.url.path}")
     response = await call_next(request)
-    duration = (datetime.now(UTC) - start_time).total_seconds()
+    duration = (datetime.utcnow() - start_time).total_seconds()
     logger.info(
         f"← {request.method} {request.url.path} "
         f"Status: {response.status_code} "
@@ -86,12 +86,12 @@ async def root():
         "message": "🐄 Livestock Monitoring API v2.0",
         "status": "running",
         "docs": "/docs",
-        "timestamp": datetime.now(UTC).isoformat()
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.get("/health", tags=["root"])
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now(UTC).isoformat()}
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
 
@@ -102,8 +102,9 @@ app.include_router(auth.router, prefix=API_V1_PREFIX, tags=["auth"])
 
 # Données (protégées - voir protection dans chaque router)
 app.include_router(telemetry.router, prefix=API_V1_PREFIX, tags=["telemetry"])
-app.include_router(animals.router, prefix=API_V1_PREFIX, tags=["animals"])
-app.include_router(alerts.router, prefix=API_V1_PREFIX, tags=["alerts"])
+app.include_router(animals.router,   prefix=API_V1_PREFIX, tags=["animals"])
+app.include_router(alerts.router,    prefix=API_V1_PREFIX, tags=["alerts"])
+app.include_router(devices.router,   prefix=API_V1_PREFIX, tags=["devices"])
 
 # ─── Gestion erreurs globales ─────────────────────────────────────────────────
 

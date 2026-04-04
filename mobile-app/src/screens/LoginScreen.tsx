@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   ActivityIndicator,
 } from 'react-native';
@@ -41,9 +42,18 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
     >
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing['2xl'] },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       {/* Logo */}
       <View style={styles.logoSection}>
         <View style={styles.logoCircle}>
@@ -139,6 +149,8 @@ export default function LoginScreen() {
       <Text style={styles.footer}>
         Backend : FastAPI + PostgreSQL · Master Recherche Japon
       </Text>
+
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -149,6 +161,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.bg.primary,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.base,
     justifyContent: 'center',
   },
@@ -238,12 +253,9 @@ const styles = StyleSheet.create({
   bypassText: { fontSize: Typography.xs, color: Colors.text.muted },
 
   footer: {
-    position: 'absolute',
-    bottom: Spacing.lg,
-    left: 0,
-    right: 0,
     textAlign: 'center',
     fontSize: Typography.xs,
     color: Colors.text.muted,
+    marginTop: Spacing.xl,
   },
 });

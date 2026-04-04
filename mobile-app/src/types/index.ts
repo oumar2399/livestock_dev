@@ -1,9 +1,7 @@
 // ─── Types 100% calqués sur les schémas Pydantic du backend ─────────────────
-// Référence : schemas/animal.py, alert.py, telemetry.py
 
 // ─── Animal ───────────────────────────────────────────────────────────────────
 
-/** Correspond à AnimalResponse (schemas/animal.py) */
 export interface Animal {
   id: number;
   farm_id: number;
@@ -12,14 +10,13 @@ export interface Animal {
   species: string;
   breed: string | null;
   sex: 'M' | 'F' | null;
-  birth_date: string | null;       // "YYYY-MM-DD"
+  birth_date: string | null;
   weight: number | null;
   photo_url: string | null;
-  assigned_device: string | null;  // ex: "M5-001"
+  assigned_device: string | null;
   status: AnimalStatus;
-  created_at: string;              // ISO datetime
+  created_at: string;
   updated_at: string;
-  // Calculés depuis dernière télémétrie
   last_latitude: number | null;
   last_longitude: number | null;
   last_update: string | null;
@@ -27,7 +24,6 @@ export interface Animal {
 
 export type AnimalStatus = 'active' | 'sick' | 'sold' | 'deceased';
 
-/** Correspond à AnimalList */
 export interface AnimalList {
   total: number;
   animals: Animal[];
@@ -60,10 +56,8 @@ export interface AnimalUpdate {
 
 // ─── Telemetry ────────────────────────────────────────────────────────────────
 
-/** États calculés par calculate_activity_state() dans telemetry.py */
 export type ActivityState = 'lying' | 'standing' | 'walking' | 'running';
 
-/** Correspond à TelemetryResponse */
 export interface TelemetryRecord {
   time: string;
   device_id: string;
@@ -73,13 +67,12 @@ export interface TelemetryRecord {
   altitude: number | null;
   speed: number | null;
   satellites: number | null;
-  activity: number;                // accéléromètre en g
+  activity: number;
   activity_state: ActivityState | null;
-  temperature: number | null;      // °C
-  battery: number;                 // 0-100 (alias battery_level)
+  temperature: number | null;
+  battery: number;
 }
 
-/** Correspond à TelemetryLatest - vue optimisée pour carte temps réel */
 export interface TelemetryLatest {
   animal_id: number;
   animal_name: string;
@@ -108,7 +101,6 @@ export interface TelemetryCreate {
 export type AlertType = 'health' | 'geofence' | 'battery' | 'offline' | 'custom';
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 
-/** Correspond à AlertResponse */
 export interface Alert {
   id: number;
   animal_id: number;
@@ -123,7 +115,6 @@ export interface Alert {
   resolved_at: string | null;
 }
 
-/** Correspond à AlertList */
 export interface AlertList {
   total: number;
   alerts: Alert[];
@@ -157,7 +148,7 @@ export interface TelemetryLatestParams {
   animal_id?: number;
 }
 
-// ─── Auth (préparé pour implémentation future JWT) ────────────────────────────
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export interface LoginCredentials {
   username: string;
@@ -176,6 +167,7 @@ export type RootStackParamList = {
   Main: undefined;
 };
 
+// Onglets du bas (inchangés)
 export type MainTabParamList = {
   Dashboard: undefined;
   Map: undefined;
@@ -184,11 +176,27 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
+// Stack animaux (AnimalForm ajouté)
 export type AnimalsStackParamList = {
   AnimalsList: undefined;
   AnimalDetail: { animalId: number };
+  AnimalForm: { animalId?: number } | undefined;
 };
 
 export type AlertsStackParamList = {
   AlertsList: undefined;
+};
+
+// Drawer (menu latéral)
+export type DrawerParamList = {
+  HomeTabs: undefined;        // Wraps les bottom tabs
+  Farm: undefined;
+  Users: undefined;
+  Devices: undefined;
+  Geofence: undefined;
+  Reports: undefined;
+  VetOptions: undefined;
+  Settings: undefined;
+  Chatbot: undefined;         // À venir
+  Marketplace: undefined;     // À venir
 };

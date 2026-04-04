@@ -50,9 +50,13 @@ export function useAlerts(
 
 /**
  * Alertes non résolues uniquement (pour badge onglet)
+ * refetchInterval court pour badge réactif
  */
 export function useActiveAlerts() {
-  return useAlerts({ resolved: false, limit: 50 });
+  return useAlerts({ resolved: false, limit: 50 }, {
+    refetchInterval: 10_000,   // 10s — plus réactif que 15s
+    staleTime: 0,              // toujours re-fetch pour badge précis
+  });
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

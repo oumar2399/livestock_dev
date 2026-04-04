@@ -105,7 +105,7 @@ function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: Telemetr
             </Text>
           </View>
         ) : (
-          <Text style={styles.noSignal}>Hors ligne</Text>
+          <Text style={styles.noSignal}>Offline</Text>
         )}
         <Text style={[styles.statusText, { color: statusColor }]}>
           {animalStatusLabel(animal.status)}
@@ -163,8 +163,8 @@ export default function DashboardScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <View>
-          <Text style={styles.headerGreeting}>Bonjour 👋</Text>
-          <Text style={styles.headerTitle}>Tableau de bord</Text>
+          <Text style={styles.headerGreeting}>Hello 👋</Text>
+          <Text style={styles.headerTitle}>Dashboard</Text>
         </View>
         <TouchableOpacity
           style={styles.alertsBtn}
@@ -194,7 +194,7 @@ export default function DashboardScreen() {
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>
             <StatCard
-              label="Total animaux"
+              label="All Animals"
               value={totalAnimals}
               icon="paw-outline"
               color={Colors.primary}
@@ -202,7 +202,7 @@ export default function DashboardScreen() {
             />
             <View style={styles.statGap} />
             <StatCard
-              label="Appareils en ligne"
+              label="Devices Online"
               value={devicesOnline}
               icon="wifi-outline"
               color={Colors.status.healthy}
@@ -211,7 +211,7 @@ export default function DashboardScreen() {
           </View>
           <View style={[styles.statsRow, { marginTop: Spacing.sm }]}>
             <StatCard
-              label="Malades"
+              label="Sick Animals"
               value={sickAnimals}
               icon="medical-outline"
               color={sickAnimals > 0 ? Colors.severity.warning : Colors.text.muted}
@@ -219,7 +219,7 @@ export default function DashboardScreen() {
             />
             <View style={styles.statGap} />
             <StatCard
-              label="Alertes critiques"
+              label="Critical Alerts"
               value={criticalAlerts}
               icon="warning-outline"
               color={criticalAlerts > 0 ? Colors.severity.critical : Colors.text.muted}
@@ -231,13 +231,13 @@ export default function DashboardScreen() {
         {/* ── Alertes actives ───────────────────────── */}
         <View style={styles.section}>
           <SectionTitle
-            title={`Alertes actives ${unresolvedCount > 0 ? `(${unresolvedCount})` : ''}`}
-            action={{ label: 'Voir tout', onPress: () => navigation.navigate('Alerts') }}
+            title={`Active Alerts ${unresolvedCount > 0 ? `(${unresolvedCount})` : ''}`}
+            action={{ label: 'View All', onPress: () => navigation.navigate('Alerts') }}
           />
           {alerts.length === 0 ? (
             <View style={styles.allGoodCard}>
               <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-              <Text style={styles.allGoodText}>Aucune alerte active — tout va bien !</Text>
+              <Text style={styles.allGoodText}>No active alerts — everything is good!</Text>
             </View>
           ) : (
             alerts.slice(0, 3).map((alert) => (
@@ -249,14 +249,14 @@ export default function DashboardScreen() {
         {/* ── Troupeau ─────────────────────────────── */}
         <View style={styles.section}>
           <SectionTitle
-            title="Troupeau récent"
-            action={{ label: 'Voir tout', onPress: () => navigation.navigate('Animals') }}
+            title="Recent Herd"
+            action={{ label: 'View All', onPress: () => navigation.navigate('Animals') }}
           />
           {animals.length === 0 ? (
             <EmptyState
               icon="paw-outline"
-              title="Aucun animal"
-              message="Ajoutez vos premiers animaux"
+              title="No Animals"
+              message="Add your first animals"
             />
           ) : (
             <View style={styles.animalsList}>
@@ -286,8 +286,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: Spacing.base,
     paddingBottom: Spacing.md,
+    height: 90,
+      //backgroundColor: "#FF0000" // red,
   },
-  headerGreeting: { fontSize: Typography.sm, color: Colors.text.secondary },
+  headerGreeting: { fontSize: Typography.xl, color: Colors.text.secondary },
   headerTitle: {
     fontSize: Typography['2xl'],
     fontWeight: '800',
@@ -324,7 +326,7 @@ const styles = StyleSheet.create({
 
   section: { paddingHorizontal: Spacing.base, marginTop: Spacing.xl },
 
-  // Alertes
+  // Alerts
   allGoodCard: {
     flexDirection: 'row',
     alignItems: 'center',

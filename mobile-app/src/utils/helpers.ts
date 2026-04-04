@@ -19,10 +19,10 @@ import { Colors } from '../constants/config';
 /** Label lisible du statut animal */
 export function animalStatusLabel(status: AnimalStatus): string {
   const labels: Record<AnimalStatus, string> = {
-    active: 'Actif',
-    sick: 'Malade',
-    sold: 'Vendu',
-    deceased: 'Décédé',
+    active: 'Active',
+    sick: 'Sick',
+    sold: 'Sold',
+    deceased: 'Deceased',
   };
   return labels[status] ?? status;
 }
@@ -67,10 +67,10 @@ export function isRecentUpdate(lastUpdate: string | null, maxMinutes = 30): bool
 export function activityStateLabel(state: ActivityState | null | undefined): string {
   if (!state) return '–';
   const labels: Record<ActivityState, string> = {
-    lying: 'Couché',
-    standing: 'Debout',
-    walking: 'En marche',
-    running: 'En course',
+    lying: 'Lying',
+    standing: 'Standing',
+    walking: 'Walking',
+    running: 'Running',
   };
   return labels[state];
 }
@@ -94,7 +94,7 @@ export function activityStateIcon(state: ActivityState | null | undefined): stri
 
 /**
  * Couleur batterie
- * Seuils cohérents avec alertes backend :
+ * Seuils cohérents avec alerts backend :
  * - Warning <20% (alert type "battery" severity "warning")
  * - Critical <10% (alert type "battery" severity "critical")
  */
@@ -112,16 +112,16 @@ export function batteryIcon(level: number): string {
   return 'battery-dead';
 }
 
-// ─── Alertes ──────────────────────────────────────────────────────────────────
+// ─── Alerts ──────────────────────────────────────────────────────────────────
 
 /** Label lisible du type d'alerte */
 export function alertTypeLabel(type: AlertType): string {
   const labels: Record<AlertType, string> = {
-    health: 'Santé',
-    geofence: 'Géofencing',
-    battery: 'Batterie',
-    offline: 'Hors ligne',
-    custom: 'Personnalisé',
+    health: 'Health',
+    geofence: 'Geofencing',
+    battery: 'Battery',
+    offline: 'Offline',
+    custom: 'Custom',
   };
   return labels[type] ?? type;
 }
@@ -144,11 +144,12 @@ export function alertSeverityColor(severity: AlertSeverity): string {
 }
 
 /** Label sévérité */
+
 export function alertSeverityLabel(severity: AlertSeverity): string {
   const labels: Record<AlertSeverity, string> = {
     info: 'Info',
-    warning: 'Attention',
-    critical: 'Critique',
+    warning: 'Warning',
+    critical: 'Critical',
   };
   return labels[severity];
 }
