@@ -42,6 +42,7 @@ export const telemetryApi = {
     animalId: number,
     hours: number = 24,
   ): Promise<TelemetryRecord[]> => {
+    console.log(`[telemetryApi] getHistory called — animalId:${animalId} hours:${hours}`);
     const { data } = await apiClient.get<TelemetryRecord[]>(
       `${BASE}/history/${animalId}`,
       { params: { hours } },

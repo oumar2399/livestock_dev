@@ -1,6 +1,7 @@
 # Fichier d'environnement
 backend/.env
 backend/venv/
+backend/ml/data/*.csv
 __pycache__/
 .vscode/
 *.pyc

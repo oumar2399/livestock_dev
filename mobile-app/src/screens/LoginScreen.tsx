@@ -60,7 +60,7 @@ export default function LoginScreen() {
           <Text style={styles.logoEmoji}>🐄</Text>
         </View>
         <Text style={styles.appName}>Livestock Monitor</Text>
-        <Text style={styles.appTagline}>Surveillance intelligente de troupeau</Text>
+        <Text style={styles.appTagline}>Intelligent herd monitoring</Text>
       </View>
 
       {/* Form */}
@@ -69,7 +69,7 @@ export default function LoginScreen() {
         <View style={styles.noteBanner}>
           <Ionicons name="information-circle-outline" size={16} color={Colors.status.warning} />
           <Text style={styles.noteText}>
-            Authentification en cours d'implémentation backend
+            Authentication in progress on the backend
           </Text>
         </View>
 
@@ -80,7 +80,7 @@ export default function LoginScreen() {
             <Ionicons name="mail-outline" size={18} color={Colors.text.muted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="votre@email.com"
+              placeholder="your@email.com"
               placeholderTextColor={Colors.text.muted}
               value={email}
               onChangeText={setEmail}
@@ -93,7 +93,7 @@ export default function LoginScreen() {
 
         {/* Password */}
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Mot de passe</Text>
+          <Text style={styles.fieldLabel}>Password</Text>
           <View style={styles.inputWrapper}>
             <Ionicons name="lock-closed-outline" size={18} color={Colors.text.muted} style={styles.inputIcon} />
             <TextInput
@@ -133,7 +133,7 @@ export default function LoginScreen() {
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.loginBtnText}>Se connecter</Text>
+            <Text style={styles.loginBtnText}>Connexion</Text>
           )}
         </TouchableOpacity>
 
@@ -141,13 +141,13 @@ export default function LoginScreen() {
         {__DEV__ && (
           <TouchableOpacity style={styles.bypassBtn} onPress={handleDevBypass}>
             <Ionicons name="code-slash-outline" size={14} color={Colors.text.muted} />
-            <Text style={styles.bypassText}>Mode développement (bypass auth)</Text>
+            <Text style={styles.bypassText}>Development mode (bypass auth)</Text>
           </TouchableOpacity>
         )}
       </View>
 
       <Text style={styles.footer}>
-        Backend : FastAPI + PostgreSQL · Master Recherche Japon
+        Backend : FastAPI + PostgreSQL
       </Text>
 
       </ScrollView>

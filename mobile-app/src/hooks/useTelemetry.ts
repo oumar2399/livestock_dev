@@ -59,7 +59,7 @@ export function useTelemetryHistory(
   return useQuery({
     queryKey: telemetryKeys.history(animalId, hours),
     queryFn: () => telemetryApi.getHistory(animalId, hours),
-    staleTime: Config.STALE_TIME_LONG,
+    staleTime: 0,
     enabled: animalId > 0,
     ...options,
   });
