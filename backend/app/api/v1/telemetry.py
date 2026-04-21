@@ -86,7 +86,7 @@ async def receive_telemetry(
     point_wkt      = f"POINT({data.longitude} {data.latitude})"
 
     telemetry = Telemetry(
-        time=datetime.utcnow(),
+        time=data.timestamp or datetime.utcnow(),
         animal_id=animal.id,
         device_id=data.device_id,
         location=point_wkt,
@@ -95,10 +95,35 @@ async def receive_telemetry(
         altitude=data.altitude,
         speed=data.speed,
         satellites=data.satellites,
+
+        # Activité (rétrocompat)
         activity=data.activity,
-        activity_state=activity_state,
+        activity_std=data.activity_std,
+        activity_state=data.activity_state or activity_state,
+
+        # 3 axes (NEW — None si firmware v1.3)
+        accel_x_mean=data.accel_x_mean,
+        accel_x_std=data.accel_x_std,
+        accel_x_min=data.accel_x_min,
+        accel_x_max=data.accel_x_max,
+
+        accel_y_mean=data.accel_y_mean,
+        accel_y_std=data.accel_y_std,
+        accel_y_min=data.accel_y_min,
+        accel_y_max=data.accel_y_max,
+
+        accel_z_mean=data.accel_z_mean,
+        accel_z_std=data.accel_z_std,
+        accel_z_min=data.accel_z_min,
+        accel_z_max=data.accel_z_max,
+
+        # Metadata fenêtre (NEW)
+        sample_rate=data.sample_rate,
+        window_samples=data.window_samples,
+
         temperature=data.temperature,
         battery_level=data.battery,
+        signal_strength=data.signal_strength,
     )
 
     db.add(telemetry)

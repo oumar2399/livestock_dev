@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 
 # Import routes
-from app.api.v1 import telemetry, animals, alerts, auth, devices  # ← devices added
+from app.api.v1 import telemetry, animals, alerts, auth, devices, activity
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,6 +105,7 @@ app.include_router(telemetry.router, prefix=API_V1_PREFIX, tags=["telemetry"])
 app.include_router(animals.router,   prefix=API_V1_PREFIX, tags=["animals"])
 app.include_router(alerts.router,    prefix=API_V1_PREFIX, tags=["alerts"])
 app.include_router(devices.router,   prefix=API_V1_PREFIX, tags=["devices"])
+app.include_router(activity.router, prefix=API_V1_PREFIX, tags=["activity"])
 
 # ─── Gestion erreurs globales ─────────────────────────────────────────────────
 
