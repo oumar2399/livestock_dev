@@ -1,0 +1,830 @@
+[
+  {
+    "window_seconds": 15,
+    "purity_threshold": 0.7,
+    "n_windows_total": 582,
+    "n_windows_active": 68,
+    "n_windows_resting": 514,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 468,
+          "n_test": 114,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9907
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 408,
+          "n_test": 174,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.8958
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 477,
+          "n_test": 105,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 492,
+          "n_test": 90,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9583
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 547,
+          "n_test": 35,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9167
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 518,
+          "n_test": 64,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.95
+        }
+      ],
+      "overall_balanced_accuracy": 0.9413,
+      "mean_per_fold_accuracy": 0.9353,
+      "std_per_fold_accuracy": 0.0373,
+      "ci_95_low": 0.8961,
+      "ci_95_high": 0.9744,
+      "ci_95_margin": 0.0392,
+      "wilcoxon_stat": 21.0,
+      "wilcoxon_p": 0.0156,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.805     0.912     0.855        68\n     Resting      0.988     0.971     0.979       514\n\n    accuracy                          0.964       582\n   macro avg      0.897     0.941     0.917       582\nweighted avg      0.967     0.964     0.965       582\n",
+      "confusion_matrix": [
+        [
+          62,
+          6
+        ],
+        [
+          15,
+          499
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  },
+  {
+    "window_seconds": 15,
+    "purity_threshold": 0.8,
+    "n_windows_total": 509,
+    "n_windows_active": 47,
+    "n_windows_resting": 462,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 408,
+          "n_test": 101,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9948
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 347,
+          "n_test": 162,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.8777
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 419,
+          "n_test": 90,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9375
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 440,
+          "n_test": 69,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9904
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 479,
+          "n_test": 30,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9038
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 452,
+          "n_test": 57,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9273
+        }
+      ],
+      "overall_balanced_accuracy": 0.9519,
+      "mean_per_fold_accuracy": 0.9386,
+      "std_per_fold_accuracy": 0.0467,
+      "ci_95_low": 0.8896,
+      "ci_95_high": 0.9876,
+      "ci_95_margin": 0.049,
+      "wilcoxon_stat": 21.0,
+      "wilcoxon_p": 0.0156,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.746     0.936     0.830        47\n     Resting      0.993     0.968     0.980       462\n\n    accuracy                          0.965       509\n   macro avg      0.870     0.952     0.905       509\nweighted avg      0.970     0.965     0.966       509\n",
+      "confusion_matrix": [
+        [
+          44,
+          3
+        ],
+        [
+          15,
+          447
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  },
+  {
+    "window_seconds": 15,
+    "purity_threshold": 0.9,
+    "n_windows_total": 457,
+    "n_windows_active": 32,
+    "n_windows_resting": 425,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 367,
+          "n_test": 90,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 303,
+          "n_test": 154,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.97
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 380,
+          "n_test": 77,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9375
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 397,
+          "n_test": 60,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.875
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 433,
+          "n_test": 24,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.913
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 405,
+          "n_test": 52,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9891
+        }
+      ],
+      "overall_balanced_accuracy": 0.921,
+      "mean_per_fold_accuracy": 0.9474,
+      "std_per_fold_accuracy": 0.048,
+      "ci_95_low": 0.897,
+      "ci_95_high": 0.9978,
+      "ci_95_margin": 0.0504,
+      "wilcoxon_stat": 21.0,
+      "wilcoxon_p": 0.0156,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.667     0.875     0.757        32\n     Resting      0.990     0.967     0.979       425\n\n    accuracy                          0.961       457\n   macro avg      0.829     0.921     0.868       457\nweighted avg      0.968     0.961     0.963       457\n",
+      "confusion_matrix": [
+        [
+          28,
+          4
+        ],
+        [
+          14,
+          411
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  },
+  {
+    "window_seconds": 30,
+    "purity_threshold": 0.7,
+    "n_windows_total": 230,
+    "n_windows_active": 18,
+    "n_windows_resting": 212,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 185,
+          "n_test": 45,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9778
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 151,
+          "n_test": 79,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9872
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 194,
+          "n_test": 36,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 200,
+          "n_test": 30,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.8571
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 215,
+          "n_test": 15,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.8462
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 205,
+          "n_test": 25,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        }
+      ],
+      "overall_balanced_accuracy": 0.9002,
+      "mean_per_fold_accuracy": 0.928,
+      "std_per_fold_accuracy": 0.0688,
+      "ci_95_low": 0.8558,
+      "ci_95_high": 1.0003,
+      "ci_95_margin": 0.0722,
+      "wilcoxon_stat": 21.0,
+      "wilcoxon_p": 0.0156,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.682     0.833     0.750        18\n     Resting      0.986     0.967     0.976       212\n\n    accuracy                          0.957       230\n   macro avg      0.834     0.900     0.863       230\nweighted avg      0.962     0.957     0.958       230\n",
+      "confusion_matrix": [
+        [
+          15,
+          3
+        ],
+        [
+          7,
+          205
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  },
+  {
+    "window_seconds": 30,
+    "purity_threshold": 0.8,
+    "n_windows_total": 196,
+    "n_windows_active": 12,
+    "n_windows_resting": 184,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 156,
+          "n_test": 40,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.975
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 126,
+          "n_test": 70,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9928
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 164,
+          "n_test": 32,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 173,
+          "n_test": 23,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.8333
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 184,
+          "n_test": 12,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.8333
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 177,
+          "n_test": 19,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        }
+      ],
+      "overall_balanced_accuracy": 0.9058,
+      "mean_per_fold_accuracy": 0.9391,
+      "std_per_fold_accuracy": 0.0824,
+      "ci_95_low": 0.8526,
+      "ci_95_high": 1.0256,
+      "ci_95_margin": 0.0865,
+      "wilcoxon_stat": 21.0,
+      "wilcoxon_p": 0.0156,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.714     0.833     0.769        12\n     Resting      0.989     0.978     0.984       184\n\n    accuracy                          0.969       196\n   macro avg      0.852     0.906     0.876       196\nweighted avg      0.972     0.969     0.970       196\n",
+      "confusion_matrix": [
+        [
+          10,
+          2
+        ],
+        [
+          4,
+          180
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  },
+  {
+    "window_seconds": 30,
+    "purity_threshold": 0.9,
+    "n_windows_total": 163,
+    "n_windows_active": 7,
+    "n_windows_resting": 156,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 128,
+          "n_test": 35,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 99,
+          "n_test": 64,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9531
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 140,
+          "n_test": 23,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 146,
+          "n_test": 17,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.75
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 153,
+          "n_test": 10,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 149,
+          "n_test": 14,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9615
+        }
+      ],
+      "overall_balanced_accuracy": 0.8443,
+      "mean_per_fold_accuracy": 0.9441,
+      "std_per_fold_accuracy": 0.0974,
+      "ci_95_low": 0.8419,
+      "ci_95_high": 1.0463,
+      "ci_95_margin": 0.1022,
+      "wilcoxon_stat": 21.0,
+      "wilcoxon_p": 0.0156,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.556     0.714     0.625         7\n     Resting      0.987     0.974     0.981       156\n\n    accuracy                          0.963       163\n   macro avg      0.771     0.844     0.803       163\nweighted avg      0.968     0.963     0.965       163\n",
+      "confusion_matrix": [
+        [
+          5,
+          2
+        ],
+        [
+          4,
+          152
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  },
+  {
+    "window_seconds": 60,
+    "purity_threshold": 0.7,
+    "n_windows_total": 90,
+    "n_windows_active": 3,
+    "n_windows_resting": 87,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 72,
+          "n_test": 18,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9444
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 57,
+          "n_test": 33,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9697
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 71,
+          "n_test": 19,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.5
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 82,
+          "n_test": 8,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 83,
+          "n_test": 7,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 85,
+          "n_test": 5,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        }
+      ],
+      "overall_balanced_accuracy": 0.6552,
+      "mean_per_fold_accuracy": 0.9023,
+      "std_per_fold_accuracy": 0.1984,
+      "ci_95_low": 0.6942,
+      "ci_95_high": 1.1105,
+      "ci_95_margin": 0.2082,
+      "wilcoxon_stat": 15.0,
+      "wilcoxon_p": 0.0312,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.333     0.333     0.333         3\n     Resting      0.977     0.977     0.977        87\n\n    accuracy                          0.956        90\n   macro avg      0.655     0.655     0.655        90\nweighted avg      0.956     0.956     0.956        90\n",
+      "confusion_matrix": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          85
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  },
+  {
+    "window_seconds": 60,
+    "purity_threshold": 0.8,
+    "n_windows_total": 71,
+    "n_windows_active": 3,
+    "n_windows_resting": 68,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 57,
+          "n_test": 14,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.8571
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 43,
+          "n_test": 28,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9643
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 58,
+          "n_test": 13,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 0.5
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 63,
+          "n_test": 8,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 67,
+          "n_test": 4,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 67,
+          "n_test": 4,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        }
+      ],
+      "overall_balanced_accuracy": 0.6446,
+      "mean_per_fold_accuracy": 0.8869,
+      "std_per_fold_accuracy": 0.1975,
+      "ci_95_low": 0.6797,
+      "ci_95_high": 1.0941,
+      "ci_95_margin": 0.2072,
+      "wilcoxon_stat": 15.0,
+      "wilcoxon_p": 0.0312,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.250     0.333     0.286         3\n     Resting      0.970     0.956     0.963        68\n\n    accuracy                          0.930        71\n   macro avg      0.610     0.645     0.624        71\nweighted avg      0.940     0.930     0.934        71\n",
+      "confusion_matrix": [
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          65
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  },
+  {
+    "window_seconds": 60,
+    "purity_threshold": 0.9,
+    "n_windows_total": 53,
+    "n_windows_active": 2,
+    "n_windows_resting": 51,
+    "loao_metrics": {
+      "fold_results": [
+        {
+          "test_animal": "cow1",
+          "n_train": 43,
+          "n_test": 10,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow2",
+          "n_train": 29,
+          "n_test": 24,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 0.9583
+        },
+        {
+          "test_animal": "cow3",
+          "n_train": 47,
+          "n_test": 6,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow4",
+          "n_train": 47,
+          "n_test": 6,
+          "classes_in_test": [
+            "Active",
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow5",
+          "n_train": 50,
+          "n_test": 3,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        },
+        {
+          "test_animal": "cow6",
+          "n_train": 49,
+          "n_test": 4,
+          "classes_in_test": [
+            "Resting"
+          ],
+          "balanced_accuracy": 1.0
+        }
+      ],
+      "overall_balanced_accuracy": 0.9902,
+      "mean_per_fold_accuracy": 0.993,
+      "std_per_fold_accuracy": 0.017,
+      "ci_95_low": 0.9752,
+      "ci_95_high": 1.0109,
+      "ci_95_margin": 0.0179,
+      "wilcoxon_stat": 21.0,
+      "wilcoxon_p": 0.0156,
+      "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.667     1.000     0.800         2\n     Resting      1.000     0.980     0.990        51\n\n    accuracy                          0.981        53\n   macro avg      0.833     0.990     0.895        53\nweighted avg      0.987     0.981     0.983        53\n",
+      "confusion_matrix": [
+        [
+          2,
+          0
+        ],
+        [
+          1,
+          50
+        ]
+      ],
+      "class_names": [
+        "Active",
+        "Resting"
+      ]
+    }
+  }
+]

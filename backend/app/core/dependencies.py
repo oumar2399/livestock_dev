@@ -3,7 +3,8 @@ Dépendances FastAPI - Auth JWT
 - HTTPBearer pour Swagger UI (affiche juste un champ "token")
 - get_current_user : obligatoire
 - get_current_user_optional : optionnel (pas d'erreur si absent)
-- require_roles(*roles) : vérification rôle
+- require_roles(*roles) : vérification rôle plateforme (legacy / admin users)
+- access.* : isolation multi-ferme via farm_memberships
 """
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,6 +14,18 @@ from typing import Optional
 from app.db.database import get_db
 from app.models.user import User
 from app.core.security import decode_token
+from app.core import access
+
+# Re-export access helpers for route handlers
+get_accessible_farm_ids = access.get_accessible_farm_ids
+has_permission = access.has_permission
+require_farm = access.require_farm
+require_animal_access = access.require_animal_access
+require_device_farm_patch = access.require_device_farm_patch
+is_platform_admin = access.is_platform_admin
+resolve_farm_scope = access.resolve_farm_scope
+assert_device_visible = access.assert_device_visible
+effective_permissions = access.effective_permissions
 
 # ─── HTTPBearer scheme ────────────────────────────────────────────────────────
 # Affiche UN SEUL champ "token" dans Swagger (pas username/password/client_id)

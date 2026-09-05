@@ -11,7 +11,9 @@
     "splash": {
       "backgroundColor": "#0D1B2A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "jp.research.livestock",
@@ -54,14 +56,12 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "extra": {
-      "API_BASE_URL": "https://theresa-unhidden-dispiritedly.ngrok-free.dev/api/v1"
     }
   }
 }

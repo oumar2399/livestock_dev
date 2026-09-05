@@ -23,6 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import apiClient from '../api/client';
+import { useFarmStore } from '../store/farmStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ const DEFAULT_FORM: FormData = {
   status: 'active',
   assigned_device: '',
   species: 'bovine',
-  farm_id: 1,
+  farm_id: 0,
 };
 
 // ─── Composants UI ────────────────────────────────────────────────────────────
@@ -133,6 +134,7 @@ export default function AnimalFormScreen() {
   const navigation  = useNavigation<any>();
   const route       = useRoute<any>();
   const queryClient = useQueryClient();
+  const currentFarmId = useFarmStore((state) => state.currentFarmId);
 
   const animalId: number | undefined = route.params?.animalId;
   const isEdit = !!animalId;
@@ -141,6 +143,12 @@ export default function AnimalFormScreen() {
   const [loading, setLoading]   = useState(false);
   const [fetching, setFetching] = useState(isEdit);
   const [errors, setErrors]     = useState<Partial<Record<keyof FormData, string>>>({});
+
+  useEffect(() => {
+    if (!isEdit && currentFarmId) {
+      setForm((previous) => ({ ...previous, farm_id: currentFarmId }));
+    }
+  }, [currentFarmId, isEdit]);
 
   // Charger données existantes en mode édition
   useEffect(() => {
@@ -158,12 +166,12 @@ export default function AnimalFormScreen() {
           status:          data.status ?? 'active',
           assigned_device: data.assigned_device ?? '',
           species:         data.species ?? 'bovine',
-          farm_id:         data.farm_id ?? 1,
+          farm_id:         data.farm_id,
         });
       })
       .catch(() => Alert.alert('Erreur', 'Impossible de charger les données'))
       .finally(() => setFetching(false));
-  }, [animalId]);
+  }, [animalId, isEdit]);
 
   const set = (key: keyof FormData) => (value: string) =>
     setForm(prev => ({ ...prev, [key]: value }));
@@ -171,6 +179,7 @@ export default function AnimalFormScreen() {
   const validate = (): boolean => {
     const errs: Partial<Record<keyof FormData, string>> = {};
     if (!form.name.trim()) errs.name = 'The name is required';
+    if (!form.farm_id) errs.farm_id = 'No farm selected';
     if (form.weight && isNaN(parseFloat(form.weight)))
       errs.weight = 'Invalid weight';
     if (form.birth_date && !/^\d{4}-\d{2}-\d{2}$/.test(form.birth_date))

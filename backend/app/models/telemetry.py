@@ -1,31 +1,32 @@
 """
 Modèle Telemetry - Données capteurs (GPS, activité, température)
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, DECIMAL
+from sqlalchemy import Column, Integer, String, DateTime, DECIMAL, Float, Index, desc
 from geoalchemy2 import Geography
-from datetime import datetime
 from app.db.database import Base
 
 class Telemetry(Base):
     __tablename__ = "telemetry"
     
     # Clé primaire composite
-    time      = Column(DateTime, primary_key=True, nullable=False)
-    animal_id = Column(Integer, ForeignKey("animals.id"), primary_key=True, nullable=False)
-    device_id = Column(String, nullable=False, index=True)
+    animal_id = Column(Integer, primary_key=True, nullable=False)
+    time      = Column(DateTime(timezone=True), primary_key=True, nullable=False)
+    device_id = Column(String(50), nullable=False)
     
     # GPS
     location  = Column(Geography(geometry_type='POINT', srid=4326))
-    latitude  = Column(DECIMAL(10, 8))
-    longitude = Column(DECIMAL(11, 8))
+    latitude  = Column(Float)
+    longitude = Column(Float)
     altitude  = Column(DECIMAL(7, 2))
     speed     = Column(DECIMAL(5, 2))
     satellites = Column(Integer)
     
     # Activité (rétrocompat)
-    activity       = Column(DECIMAL(5, 3))
-    activity_std   = Column(DECIMAL(5, 3))   # NEW : écart-type magnitude
-    activity_state = Column(String(20))
+    activity            = Column(DECIMAL(5, 3))
+    activity_std        = Column(DECIMAL(5, 3))   # NEW : écart-type magnitude
+    activity_state      = Column(String(20))
+    predicted_behavior  = Column(String)
+    behavior_confidence = Column(Float)
 
     # ── Accéléromètre 3 axes (NEW) ──────────────────────────
     accel_x_mean = Column(DECIMAL(7, 4))
@@ -54,3 +55,8 @@ class Telemetry(Base):
     # Système
     battery_level   = Column(Integer)
     signal_strength = Column(Integer)
+
+    __table_args__ = (
+        Index("idx_telemetry_device", "device_id", desc("time")),
+        Index("telemetry_time_idx", desc("time")),
+    )

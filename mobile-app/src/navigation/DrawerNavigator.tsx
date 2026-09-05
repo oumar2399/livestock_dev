@@ -9,7 +9,7 @@
  * Le drawer reste accessible depuis tous les écrans via
  * DrawerActions.openDrawer() ou swipe depuis la gauche.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
@@ -20,9 +20,11 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { Colors, Spacing, Typography, Radius } from '../constants/config';
 import { useAuthStore } from '../store/authStore';
+import { useFarmStore } from '../store/farmStore';
 
 import MainNavigator    from './MainNavigator';
 import FarmScreen       from '../screens/drawer/FarmScreen';
@@ -32,7 +34,8 @@ import GeofenceScreen   from '../screens/drawer/GeofenceScreen';
 import ReportsScreen    from '../screens/drawer/ReportsScreen';
 import VetOptionsScreen from '../screens/drawer/VetOptionsScreen';
 import SettingsScreen   from '../screens/drawer/SettingsScreen';
-import ComingSoonScreen from '../screens/drawer/ComingSoonScreen';
+import AIAssistantScreen from '../screens/drawer/AIAssistantScreen';
+import MarketplaceScreen from '../screens/drawer/MarketplaceScreen';
 import HistoryScreen from '../screens/drawer/HistoryScreen';
 import VideoMonitoring from '../screens/drawer/VideoMonitoring';
 import AppServSettings from '../screens/drawer/AppServSettings';
@@ -54,8 +57,8 @@ function AppStackNavigator() {
       <AppStack.Screen name="Reports"     component={ReportsScreen} />
       <AppStack.Screen name="VetOptions"  component={VetOptionsScreen} />
       <AppStack.Screen name="Settings"    component={SettingsScreen} />
-      <AppStack.Screen name="Chatbot"     component={ComingSoonScreen} />
-      <AppStack.Screen name="Marketplace" component={ComingSoonScreen} />
+      <AppStack.Screen name="Chatbot"     component={AIAssistantScreen} />
+      <AppStack.Screen name="Marketplace" component={MarketplaceScreen} />
       <AppStack.Screen name="History"     component={HistoryScreen} />
       <AppStack.Screen name="VideoMonitoring" component={VideoMonitoring} />
       <AppStack.Screen name="AppServSettings" component={AppServSettings} />
@@ -71,7 +74,7 @@ const SECTIONS = [
       { label: 'Herd',         icon: 'paw-outline',           route: 'HomeTabs' },
       { label: 'Farm Management',    icon: 'home-outline',          route: 'Farm' },
       { label: 'Devices M5Stack',  icon: 'hardware-chip-outline', route: 'Devices' },
-      { label: 'Video Monitoring', icon: 'videocam-outline',       route: 'VideoMonitoring', comingSoon: true },
+      { label: 'Video Monitoring', icon: 'videocam-outline',       route: 'VideoMonitoring', preview: true },
     ],
   },
   {
@@ -84,21 +87,21 @@ const SECTIONS = [
   {
     title: 'Land',
     items: [
-      { label: 'Geofence', icon: 'map-outline', route: 'Geofence', comingSoon: true },
+      { label: 'Geofence', icon: 'map-outline', route: 'Geofence' },
     ],
   },
   {
     title: 'Data & Analytics',
     items: [
       { label: 'Reports / Exports', icon: 'bar-chart-outline', route: 'Reports' },
-      { label: 'History', icon: 'time-outline', route: 'History', comingSoon: true },
+      { label: 'History', icon: 'time-outline', route: 'History' },
     ],
   },
   {
     title: 'Services',
     items: [
-      { label: 'AI Assistant', icon: 'chatbubble-ellipses-outline', route: 'Chatbot',     comingSoon: true },
-      { label: 'Marketplace',  icon: 'storefront-outline',          route: 'Marketplace', comingSoon: true },
+      { label: 'AI Assistant', icon: 'chatbubble-ellipses-outline', route: 'Chatbot',     preview: true },
+      { label: 'Marketplace',  icon: 'storefront-outline',          route: 'Marketplace', preview: true },
       { label: 'App & Serveur', icon: 'server-outline',             route: 'AppServSettings' },
     ],
   },
@@ -116,15 +119,34 @@ const ROLE_COLORS: Record<string, string> = {
 function DrawerContent(props: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
   const { user, role, logout } = useAuthStore();
+  const queryClient = useQueryClient();
+  const { farms, currentFarmId, selectFarm, clear: clearFarms } = useFarmStore();
+  const currentFarm = farms.find((farm) => farm.id === currentFarmId) ?? null;
+  const currentRole = role === 'admin' ? 'admin' : currentFarm?.membership_role;
 
   const go = (route: string) => {
     props.navigation.closeDrawer();
     setTimeout(() => props.navigation.navigate('App', { screen: route } as any), 100);
   };
+  const handleFarmChange = async (farmId: number) => {
+    if (farmId === currentFarmId) return;
+    if (await selectFarm(farmId)) {
+      queryClient.clear();
+      go('HomeTabs');
+    }
+  };
   const handleLogout = () => {
     Alert.alert('Logout', 'Do you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          queryClient.clear();
+          await clearFarms();
+          await logout();
+        },
+      },
     ]);
   };
 
@@ -139,15 +161,15 @@ function DrawerContent(props: DrawerContentComponentProps) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.profileName} numberOfLines={1}>
-            {user?.name ?? 'Utilisateur'}
+            {user?.name ?? 'User'}
           </Text>
           <Text style={styles.profileEmail} numberOfLines={1}>
             {user?.email}
           </Text>
-          {role && (
-            <View style={[styles.roleBadge, { backgroundColor: (ROLE_COLORS[role] ?? Colors.primary) + '20' }]}>
-              <Text style={[styles.roleText, { color: ROLE_COLORS[role] ?? Colors.primary }]}>
-                {ROLE_LABELS[role] ?? role}
+          {currentRole && (
+            <View style={[styles.roleBadge, { backgroundColor: (ROLE_COLORS[currentRole] ?? Colors.primary) + '20' }]}>
+              <Text style={[styles.roleText, { color: ROLE_COLORS[currentRole] ?? Colors.primary }]}>
+                {ROLE_LABELS[currentRole] ?? currentRole}
               </Text>
             </View>
           )}
@@ -156,6 +178,32 @@ function DrawerContent(props: DrawerContentComponentProps) {
 
       {/* Menu */}
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+        {farms.length > 0 && (
+          <View style={styles.farmSection}>
+            <Text style={styles.sectionTitle}>Current Farm</Text>
+            {farms.map((farm) => {
+              const active = farm.id === currentFarmId;
+              return (
+                <TouchableOpacity
+                  key={farm.id}
+                  style={[styles.farmItem, active && styles.farmItemActive]}
+                  onPress={() => handleFarmChange(farm.id)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={active ? 'business' : 'business-outline'}
+                    size={19}
+                    color={active ? Colors.primary : Colors.text.secondary}
+                  />
+                  <Text style={[styles.farmName, active && styles.farmNameActive]} numberOfLines={1}>
+                    {farm.name}
+                  </Text>
+                  {active && <Ionicons name="checkmark" size={18} color={Colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
         {SECTIONS.map((section) => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -168,9 +216,9 @@ function DrawerContent(props: DrawerContentComponentProps) {
               >
                 <Ionicons name={item.icon as any} size={20} color={Colors.text.secondary} />
                 <Text style={styles.itemLabel}>{item.label}</Text>
-                {(item as any).comingSoon && (
+                {'preview' in item && item.preview && (
                   <View style={styles.soon}>
-                    <Text style={styles.soonText}>Soon</Text>
+                    <Text style={styles.soonText}>Preview</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -183,11 +231,11 @@ function DrawerContent(props: DrawerContentComponentProps) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.sm }]}>
         <TouchableOpacity style={styles.footerItem} onPress={() => go('Settings')}>
           <Ionicons name="settings-outline" size={20} color={Colors.text.secondary} />
-          <Text style={styles.footerText}>Paramètres</Text>
+          <Text style={styles.footerText}>Settings</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.footerItem} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={Colors.severity.critical} />
-          <Text style={[styles.footerText, { color: Colors.severity.critical }]}>Déconnexion</Text>
+          <Text style={[styles.footerText, { color: Colors.severity.critical }]}>Logout</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -199,6 +247,12 @@ function DrawerContent(props: DrawerContentComponentProps) {
 const Drawer = createDrawerNavigator();
 
 export default function DrawerNavigator() {
+  const loadFarms = useFarmStore((state) => state.loadFarms);
+
+  useEffect(() => {
+    loadFarms();
+  }, [loadFarms]);
+
   return (
     <Drawer.Navigator
       drawerContent={(props) => <DrawerContent {...props} />}
@@ -237,6 +291,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full,
   },
   roleText: { fontSize: Typography.xs, fontWeight: '700' },
+
+  farmSection: {
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.default,
+  },
+  farmItem: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+  },
+  farmItemActive: { backgroundColor: Colors.primary + '15' },
+  farmName: { flex: 1, fontSize: Typography.sm, color: Colors.text.secondary },
+  farmNameActive: { color: Colors.primary, fontWeight: '700' },
 
   section: { paddingTop: Spacing.md },
   sectionTitle: {

@@ -10,8 +10,6 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { DrawerActions } from '@react-navigation/native';
-import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import apiClient from '../api/client';
@@ -91,8 +89,7 @@ function EditableField({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const navigation = useNavigation<any>();
-  const { user, role, logout, token } = useAuthStore();
+  const { role, logout } = useAuthStore();
 
   const [editing, setEditing]   = useState(false);
   const [saving, setSaving]     = useState(false);
@@ -131,6 +128,10 @@ export default function ProfileScreen() {
   const handleSave = async () => {
     // Validate password change if requested
     if (form.newPassword) {
+      if (!form.currentPassword) {
+        Alert.alert('Error', 'Enter your current password.');
+        return;
+      }
       if (form.newPassword.length < 6) {
         Alert.alert('Error', 'New password must be at least 6 characters.');
         return;
@@ -149,6 +150,7 @@ export default function ProfileScreen() {
       };
       if (form.newPassword) {
         payload.password = form.newPassword;
+        payload.current_password = form.currentPassword;
       }
 
       const { data } = await apiClient.put('/auth/me', payload);
@@ -166,8 +168,8 @@ export default function ProfileScreen() {
 
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully.');
-    } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.detail ?? 'Failed to update profile.');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update profile.');
     } finally {
       setSaving(false);
     }

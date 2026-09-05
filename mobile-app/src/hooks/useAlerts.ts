@@ -20,6 +20,7 @@ import {
   AlertUpdate,
 } from '../types';
 import { Config } from '../constants/config';
+import { useFarmStore } from '../store/farmStore';
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
 
@@ -39,12 +40,15 @@ export function useAlerts(
   params?: AlertsQueryParams,
   options?: Omit<UseQueryOptions<AlertList>, 'queryKey' | 'queryFn'>,
 ) {
+  const currentFarmId = useFarmStore((state) => state.currentFarmId);
+  const scopedParams = currentFarmId ? { ...params, farm_id: currentFarmId } : params;
   return useQuery({
-    queryKey: alertKeys.list(params),
-    queryFn: () => alertsApi.list(params),
+    queryKey: alertKeys.list(scopedParams),
+    queryFn: () => alertsApi.list(scopedParams),
     staleTime: Config.STALE_TIME_SHORT,
     refetchInterval: Config.ALERTS_REFRESH_INTERVAL,
     ...options,
+    enabled: currentFarmId !== null && (options?.enabled ?? true),
   });
 }
 

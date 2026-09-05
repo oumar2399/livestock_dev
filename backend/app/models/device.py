@@ -2,7 +2,7 @@
 Device model - M5Stack sensors
 Maps to the 'devices' table defined in schema.sql
 """
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.database import Base
@@ -23,3 +23,8 @@ class Device(Base):
 
     # Relationship
     farm = relationship("Farm", backref="devices")
+
+    __table_args__ = (
+        Index("idx_devices_farm", "farm_id"),
+        Index("idx_devices_status", "status"),
+    )

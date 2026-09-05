@@ -5,15 +5,15 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-import os
+from app.core.config import settings
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
 # Clé secrète JWT - en production, mettre dans .env
-SECRET_KEY = os.getenv("SECRET_KEY", "livestock-secret-key-change-in-production-2024")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24       # 24 heures
-REFRESH_TOKEN_EXPIRE_DAYS = 30              # 30 jours
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
 
 # ─── Bcrypt ───────────────────────────────────────────────────────────────────
 

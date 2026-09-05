@@ -1,0 +1,135 @@
+﻿python : 11:43:45 [INFO] \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u
+2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255
+0\u2550\u2550\u2557
+At line:1 char:1
++ python -m train_v2 2>&1 | Out-File -Encoding utf8 train_log_v3_staged ...
++ ~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (11:43:45 [INFO]...550\u2550\u2557:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+11:43:45 [INFO] \u2551   Livestock Behavior Classifier ù Training Pipeline      \u2551
+11:43:45 [INFO] \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255
+0\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u
+2550\u255d
+
+11:43:45 [INFO] Loading cow1.csv à
+11:43:45 [INFO]   \u2192  311,876 rows
+11:43:45 [INFO] Loading cow2.csv à
+11:43:45 [INFO]   \u2192  269,772 rows
+11:43:45 [INFO] Loading cow3.csv à
+11:43:45 [INFO]   \u2192  269,903 rows
+11:43:45 [INFO] Loading cow4.csv à
+11:43:45 [INFO]   \u2192  224,912 rows
+11:43:45 [INFO] Loading cow5.csv à
+11:43:46 [INFO]   \u2192  134,904 rows
+11:43:46 [INFO] Loading cow6.csv à
+11:43:46 [INFO]   \u2192  179,857 rows
+11:43:46 [INFO] Total raw rows: 1,391,224
+
+11:43:46 [INFO] Data quality: 1,391,224 rows kept, 0 dropped (0.00% of raw data).
+11:43:47 [INFO] Label distribution [raw]:
+Label
+ETC    554855
+       540695
+RES    150130
+RUS     53229
+MOV     50199
+GRZ     17613
+SLT     10858
+FES      7934
+DRN      2476
+LCK      1302
+REL       764
+URI       621
+ATT       366
+ESC       128
+BMN        54
+
+11:43:47 [INFO] Downsampling 25 Hz \u2192 10 Hz à
+11:44:14 [WARNING]   cow1: 90553/215310 label bins are empty (42.1%) ù annotation coverage may be lower than expected.
+11:44:14 [INFO]   cow1: 124,757 samples @ 10 Hz ù 11 continuous segments detected (recording gap(s) found)
+11:44:37 [WARNING]   cow2: 90389/198354 label bins are empty (45.6%) ù annotation coverage may be lower than expected.
+11:44:37 [INFO]   cow2: 107,965 samples @ 10 Hz ù 12 continuous segments detected (recording gap(s) found)
+11:45:01 [WARNING]   cow3: 90486/198464 label bins are empty (45.6%) ù annotation coverage may be lower than expected.
+11:45:01 [INFO]   cow3: 107,978 samples @ 10 Hz ù 8 continuous segments detected (recording gap(s) found)
+11:45:22 [WARNING]   cow4: 90451/180413 label bins are empty (50.1%) ù annotation coverage may be lower than expected.
+11:45:22 [INFO]   cow4:  89,962 samples @ 10 Hz ù 8 continuous segments detected (recording gap(s) found)
+11:45:29 [INFO]   cow5:  53,984 samples @ 10 Hz ù 7 continuous segments detected (recording gap(s) found)
+11:45:49 [WARNING]   cow6: 108457/180416 label bins are empty (60.1%) ù annotation coverage may be lower than expected.
+11:45:49 [INFO]   cow6:  71,959 samples @ 10 Hz ù 10 continuous segments detected (recording gap(s) found)
+11:45:49 [INFO] Total samples @ 10 Hz: 556,605
+
+11:45:49 [INFO] Windowing: 150 samples = 15 s, purity threshold = 80% à
+11:45:50 [INFO] Windows extracted: 509
+11:45:50 [INFO] Simplified label distribution:
+label_simplified
+Resting    462
+Active      47
+
+11:45:50 [INFO] ============================================================
+11:45:50 [INFO] Leave-One-Animal-Out cross-validation
+11:45:50 [INFO] ============================================================
+11:45:50 [INFO] Window count per (animal Î class) ù pre-flight audit:
+11:45:50 [INFO] 
+label_simplified  Active  Resting
+animal_id                        
+cow1                   5       96
+cow2                   5      157
+cow3                   8       82
+cow4                  17       52
+cow5                   4       26
+cow6                   8       49
+
+11:45:50 [INFO]   Fold [cow1] ù balanced_acc: 0.995  (train=408  test=101  test_classes=['Active', 'Resting'])
+11:45:51 [INFO]   Fold [cow2] ù balanced_acc: 0.878  (train=347  test=162  test_classes=['Active', 'Resting'])
+11:45:51 [INFO]   Fold [cow3] ù balanced_acc: 0.938  (train=419  test=90  test_classes=['Active', 'Resting'])
+11:45:51 [INFO]   Fold [cow4] ù balanced_acc: 0.990  (train=440  test=69  test_classes=['Active', 'Resting'])
+11:45:51 [INFO]   Fold [cow5] ù balanced_acc: 0.904  (train=479  test=30  test_classes=['Active', 'Resting'])
+11:45:51 [INFO]   Fold [cow6] ù balanced_acc: 0.927  (train=452  test=57  test_classes=['Active', 'Resting'])
+11:45:51 [INFO] 
+============================================================
+11:45:51 [INFO] LOAO Overall Balanced Accuracy  : 0.952  (pooled)
+11:45:51 [INFO] LOAO Per-fold Balanced Accuracy : mean=0.939  std=0.047  (sample std, ddof=1)
+11:45:51 [INFO] 95% Confidence Interval (t-dist, df=5): [0.890, 0.988]  (margin ▒0.049)
+11:45:51 [INFO] 
+  \u2192 Thesis abstract value: 0.939 ▒ 0.049  (95% CI, LOAO, n=6 folds)
+11:45:51 [INFO] 
+  Wilcoxon signed-rank test vs chance (0.50): W=21.0, p=0.0156 (significant \u2713) (Note: with n=6, statistical power is extremely low; p < 0.05 is mathematically difficult to 
+achieve even for an excellent model)
+11:45:51 [INFO] 
+Classification Report:
+              precision    recall  f1-score   support
+
+      Active      0.746     0.936     0.830        47
+     Resting      0.993     0.968     0.980       462
+
+    accuracy                          0.965       509
+   macro avg      0.870     0.952     0.905       509
+weighted avg      0.970     0.965     0.966       509
+
+11:45:51 [INFO] Confusion Matrix:
+[[ 44   3]
+ [ 15 447]]
+11:45:51 [INFO] Class order: [np.str_('Active'), np.str_('Resting')]
+
+11:45:51 [INFO] ============================================================
+
+11:45:51 [INFO] Training final model on ALL 6 animals (200 trees) à
+11:45:51 [INFO]   NOTE: LOAO used 100 trees on 5 animals per fold. This model's true performance is expected to be at or above the LOAO estimates.
+11:45:52 [INFO] Feature importances (MDI, descending):
+accel_z_std     0.266810
+accel_y_std     0.246820
+accel_x_std     0.171991
+accel_x_min     0.117208
+accel_y_max     0.042226
+accel_y_min     0.036771
+accel_x_mean    0.035982
+accel_z_max     0.025722
+accel_x_max     0.018301
+accel_z_min     0.016720
+accel_y_mean    0.012206
+accel_z_mean    0.009242
+
+11:45:52 [INFO] Model artifact saved \u2192 C:\Users\oumba\Documents\livestock-monitoring\backend\ml\models\behavior_classifier_v3_staged.pkl
+11:45:52 [INFO] Metrics independently exported \u2192 C:\Users\oumba\Documents\livestock-monitoring\backend\ml\models\loao_metrics.json
+11:45:52 [INFO] \u2713 Training pipeline complete.

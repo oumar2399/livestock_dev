@@ -1,7 +1,7 @@
 """
 Schémas Pydantic pour Animal - Validation entrées/sorties API
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from datetime import date, datetime
 
@@ -27,7 +27,8 @@ class AnimalBase(BaseModel):
     weight: Optional[float] = Field(None, gt=0, le=9999.99, description="Poids en kg")
     assigned_device: Optional[str] = Field(None, max_length=50)
     
-    @validator('birth_date')
+    @field_validator('birth_date')
+    @classmethod
     def birth_date_not_future(cls, v):
         """Valide que date naissance pas dans le futur"""
         if v and v > date.today():
@@ -97,15 +98,7 @@ class AnimalResponse(AnimalBase):
     last_latitude: Optional[float] = None
     last_longitude: Optional[float] = None
     last_update: Optional[datetime] = None
-    
-    class Config:
-        """
-        Configuration Pydantic
-        """
-        model_config = {
-            "from_attributes": True
-        }  # Permet conversion depuis modèle SQLAlchemy
-        # Équivalent : AnimalResponse.from_orm(db_animal)
+    model_config = ConfigDict(from_attributes=True)
 
 # ============================================================
 # SCHÉMA LISTE (GET /animals avec plusieurs résultats)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Alert, ActivityIndicator, Modal, TextInput,
@@ -7,7 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import DrawerScreenBase from './DrawerScreenBase';
 import { Colors, Spacing, Typography, Radius } from '../../constants/config';
 import { useAuthStore } from '../../store/authStore';
+import { useFarmStore } from '../../store/farmStore';
 import apiClient from '../../api/client';
+import { FarmMembership, FarmMembershipList } from '../../types';
 
 const ROLE_LABELS: Record<string, string> = {
   farmer: 'Farmer', owner: 'Owner', vet: 'Veterinarian', admin: 'Admin',
@@ -17,42 +19,84 @@ const ROLE_COLORS: Record<string, string> = {
 };
 export default function UsersScreen() {
   const { isAdmin } = useAuthStore();
-  const [users, setUsers]     = useState<any[]>([]);
+  const { farms, currentFarmId } = useFarmStore();
+  const currentFarm = farms.find((farm) => farm.id === currentFarmId) ?? null;
+  const canManage = isAdmin() || (currentFarm?.permissions.includes('invite_members') ?? false);
+  const [users, setUsers]     = useState<FarmMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: '', name: '', role: 'vet', password: '' });
 
-  const load = () => {
-    apiClient.get('/auth/users')
-      .then(({ data }) => setUsers(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
+  const load = useCallback(async () => {
+    if (!currentFarmId) {
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data } = await apiClient.get<FarmMembershipList>(`/farms/${currentFarmId}/members`);
+      setUsers(data.members);
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Unable to load members');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentFarmId]);
 
-  useEffect(() => { load(); }, []);
-  const handleChangeRole = (userId: number, newRole: string) => {
+  useEffect(() => { load(); }, [load]);
+  const handleChangeRole = (membershipId: number, newRole: string) => {
+    if (!currentFarmId) return;
     Alert.alert('Change Role', `Assign role "${ROLE_LABELS[newRole]}" ?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Confirm', onPress: async () => {
           try {
-            await apiClient.put(`/auth/users/${userId}/role`, { role: newRole });
+            await apiClient.patch(`/farms/${currentFarmId}/members/${membershipId}`, { role: newRole });
             load();
-          } catch { Alert.alert('Error', 'Unable to change role'); }
+          } catch (error) {
+            Alert.alert('Error', error instanceof Error ? error.message : 'Unable to change role');
+          }
         },
       },
     ]);
   };
 
   const handleInvite = async () => {
+    if (!currentFarmId) return;
     try {
-      await apiClient.post('/auth/register', inviteForm);
+      await apiClient.post(`/farms/${currentFarmId}/members`, {
+        user_email: inviteForm.email.trim(),
+        name: inviteForm.name.trim() || null,
+        password: inviteForm.password || null,
+        role: inviteForm.role,
+      });
       setShowInvite(false);
+      setInviteForm({ email: '', name: '', role: 'vet', password: '' });
       load();
-      Alert.alert('Success', `Account created for ${inviteForm.email}`);
-    } catch (e: any) {
-      Alert.alert('Error', e.response?.data?.detail ?? 'Error creating account');
+      Alert.alert('Success', `${inviteForm.email} was added to ${currentFarm?.name ?? 'the farm'}`);
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Error inviting member');
     }
+  };
+
+  const handleRevoke = (membership: FarmMembership) => {
+    if (!currentFarmId) return;
+    Alert.alert('Revoke access', `Remove ${membership.user_name ?? membership.user_email} from this farm?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Revoke',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await apiClient.delete(`/farms/${currentFarmId}/members/${membership.id}`);
+            load();
+          } catch (error) {
+            Alert.alert('Error', error instanceof Error ? error.message : 'Unable to revoke access');
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -60,7 +104,7 @@ export default function UsersScreen() {
       title="Users"
       subtitle={`${users.length} member${users.length > 1 ? 's' : ''}`}
       rightAction={
-        isAdmin() ? (
+        canManage ? (
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowInvite(true)}>
             <Ionicons name="person-add-outline" size={20} color={Colors.primary} />
           </TouchableOpacity>
@@ -72,36 +116,37 @@ export default function UsersScreen() {
       ) : (
         <FlatList
           data={users}
-          keyExtractor={u => String(u.id)}
+          keyExtractor={membership => String(membership.id)}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <View style={[styles.avatar, { backgroundColor: (ROLE_COLORS[item.role] ?? Colors.primary) + '20' }]}>
                 <Text style={[styles.avatarText, { color: ROLE_COLORS[item.role] ?? Colors.primary }]}>
-                  {(item.name ?? item.email)[0].toUpperCase()}
+                  {(item.user_name ?? item.user_email ?? '?')[0].toUpperCase()}
                 </Text>
               </View>
               <View style={styles.info}>
-                <Text style={styles.name}>{item.name ?? item.email}</Text>
-                <Text style={styles.email}>{item.email}</Text>
+                <Text style={styles.name}>{item.user_name ?? item.user_email}</Text>
+                <Text style={styles.email}>{item.user_email}</Text>
                 <View style={[styles.roleBadge, { backgroundColor: (ROLE_COLORS[item.role] ?? Colors.primary) + '20' }]}>
                   <Text style={[styles.roleText, { color: ROLE_COLORS[item.role] ?? Colors.primary }]}>
                     {ROLE_LABELS[item.role] ?? item.role}
                   </Text>
                 </View>
               </View>
-              {isAdmin() && (
+              {canManage && item.status !== 'revoked' && (
                 <TouchableOpacity
                   onPress={() => {
-                    const roles = ['farmer', 'owner', 'vet', 'admin'];
+                    const roles = ['farmer', 'owner', 'vet'];
                     Alert.alert(
-                      'Change Role',
-                      `Choose the role for ${item.name ?? item.email} :`,
+                      'Manage Member',
+                      `Choose an action for ${item.user_name ?? item.user_email}:`,
                       [
                         ...roles.map(r => ({
                           text: ROLE_LABELS[r],
                           onPress: () => handleChangeRole(item.id, r),
                         })),
+                        { text: 'Revoke access', style: 'destructive' as const, onPress: () => handleRevoke(item) },
                         { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
                       ]
                     );
@@ -118,7 +163,7 @@ export default function UsersScreen() {
       <Modal visible={showInvite} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Invite User</Text>
+            <Text style={styles.modalTitle}>Invite Member</Text>
             {[
               { label: 'Email', key: 'email', placeholder: 'email@exemple.com' },
               { label: 'Name', key: 'name', placeholder: 'First Last' },
@@ -155,7 +200,7 @@ export default function UsersScreen() {
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmBtn} onPress={handleInvite}>
-                <Text style={styles.confirmText}>Create</Text>
+                <Text style={styles.confirmText}>Invite</Text>
               </TouchableOpacity>
             </View>
           </View>

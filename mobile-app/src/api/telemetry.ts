@@ -8,6 +8,8 @@ import {
   TelemetryLatest,
   TelemetryLatestParams,
   TelemetryRecord,
+  FeedbackCreate,
+  FeedbackResponse,
 } from '../types';
 
 const BASE = '/telemetry';
@@ -47,6 +49,15 @@ export const telemetryApi = {
       `${BASE}/history/${animalId}`,
       { params: { hours } },
     );
+    return data;
+  },
+
+  /**
+   * POST /api/v1/telemetry/feedback
+   * Envoyer feedback berger (verdict + correction)
+   */
+  submitFeedback: async (payload: FeedbackCreate): Promise<FeedbackResponse> => {
+    const { data } = await apiClient.post<FeedbackResponse>(`${BASE}/feedback`, payload);
     return data;
   },
 };

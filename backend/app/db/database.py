@@ -2,23 +2,18 @@
 Configuration base de données - Connexion PostgreSQL
 """
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import os
-from dotenv import load_dotenv
-
-# Charger variables environnement depuis .env
-load_dotenv()
+from sqlalchemy.orm import declarative_base, sessionmaker
+from app.core.config import settings
 
 # URL connexion PostgreSQL (depuis .env)
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = settings.DATABASE_URL
 
 # Créer engine SQLAlchemy
 # echo=True : affiche SQL généré (debug)
 # pool_pre_ping=True : vérifie connexion avant utilisation
 engine = create_engine(
     DATABASE_URL,
-    echo=True,  # Change à False en production
+    echo=settings.SQL_ECHO,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10

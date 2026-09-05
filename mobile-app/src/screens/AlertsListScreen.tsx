@@ -20,8 +20,9 @@ import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 import { useAlerts, useAcknowledgeAlert, useResolveAlert } from '../hooks/useAlerts';
+import { useSubmitAlertFeedback } from '../hooks/useFeedback';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
-import { Alert, AlertSeverity, AlertType } from '../types';
+import { Alert, AlertSeverity, AlertType, AlertFeedbackVerdict } from '../types';
 import {
   alertSeverityColor,
   alertSeverityLabel,
@@ -70,6 +71,8 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
   const isActive = isAlertActive(alert);
   const isAcked = isAlertAcknowledged(alert);
   const [expanded, setExpanded] = useState(false);
+  const [feedbackVerdict, setFeedbackVerdict] = useState<AlertFeedbackVerdict | null>(null);
+  const submitFeedbackMutation = useSubmitAlertFeedback();
 
   return (
     <View style={[styles.alertCard, { borderLeftColor: severityColor }, !isActive && styles.alertCardResolved]}>
@@ -134,11 +137,60 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
               <View style={styles.alertTimeRow}>
                 <Ionicons name="checkmark-circle-outline" size={13} color={Colors.status.healthy} />
                 <Text style={[styles.alertTimeText, { color: Colors.status.healthy }]}>
-                  RResolved : {formatDateTime(alert.resolved_at)}
+                  Resolved : {formatDateTime(alert.resolved_at)}
                 </Text>
               </View>
             )}
           </View>
+
+          {/* Section Feedback pour alertes de déviation ou santé */}
+          {(alert.type === 'activity_deviation_low' || alert.type === 'activity_deviation_high' || alert.type === 'health') && (
+            <View style={styles.feedbackSection}>
+              <Text style={styles.feedbackSectionTitle}>Field Feedback :</Text>
+              {feedbackVerdict ? (
+                <View style={styles.feedbackBadge}>
+                  <Ionicons
+                    name={feedbackVerdict === 'confirmed_issue' ? 'checkmark-circle' : 'close-circle'}
+                    size={16}
+                    color={feedbackVerdict === 'confirmed_issue' ? '#27AE60' : '#E67E22'}
+                  />
+                  <Text style={[styles.feedbackBadgeText, { color: feedbackVerdict === 'confirmed_issue' ? '#27AE60' : '#E67E22' }]}>
+                    {feedbackVerdict === 'confirmed_issue' ? 'Confirmed Issue 👍' : 'False Alarm 🟠'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.feedbackBtnRow}>
+                  <TouchableOpacity
+                    style={[styles.feedbackBtn, styles.feedbackBtnConfirm]}
+                    disabled={submitFeedbackMutation.isPending}
+                    onPress={() => {
+                      submitFeedbackMutation.mutate(
+                        { alertId: alert.id, payload: { verdict: 'confirmed_issue' } },
+                        { onSuccess: () => setFeedbackVerdict('confirmed_issue') }
+                      );
+                    }}
+                  >
+                    <Ionicons name="thumbs-up-outline" size={14} color="#27AE60" />
+                    <Text style={styles.feedbackBtnConfirmText}>Confirmed Issue 👍</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.feedbackBtn, styles.feedbackBtnFalse]}
+                    disabled={submitFeedbackMutation.isPending}
+                    onPress={() => {
+                      submitFeedbackMutation.mutate(
+                        { alertId: alert.id, payload: { verdict: 'false_alarm' } },
+                        { onSuccess: () => setFeedbackVerdict('false_alarm') }
+                      );
+                    }}
+                  >
+                    <Ionicons name="thumbs-down-outline" size={14} color="#E67E22" />
+                    <Text style={styles.feedbackBtnFalseText}>False Alarm 🟠</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Actions - seulement si alerte active */}
           {isActive && (
@@ -150,7 +202,7 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
                   disabled={isProcessing}
                 >
                   <Ionicons name="eye-outline" size={15} color={Colors.text.secondary} />
-                  <Text style={styles.actionBtnText}>J'ai vu</Text>
+                  <Text style={styles.actionBtnText}>Acknowledge</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -159,7 +211,7 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
                 disabled={isProcessing}
               >
                 <Ionicons name="checkmark-outline" size={15} color={Colors.primary} />
-                <Text style={[styles.actionBtnText, { color: Colors.primary }]}>Resolved</Text>
+                <Text style={[styles.actionBtnText, { color: Colors.primary }]}>Resolve</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -198,8 +250,8 @@ export default function AlertsListScreen() {
 
   const handleResolve = (id: number) => {
     RNAlert.alert(
-      'Résoudre l\'alerte',
-      'Confirmer que ce problème est résolu ?',
+      'Resolve Alert',
+      'Confirm that this issue is resolved?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -429,4 +481,59 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary + '40',
   },
   actionBtnText: { fontSize: Typography.sm, color: Colors.text.secondary, fontWeight: '600' },
+
+  // Feedback section for anomaly alerts
+  feedbackSection: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.default,
+  },
+  feedbackSectionTitle: {
+    fontSize: Typography.xs,
+    fontWeight: '600',
+    color: Colors.text.muted,
+    marginBottom: 6,
+  },
+  feedbackBtnRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  feedbackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  feedbackBtnConfirm: {
+    backgroundColor: '#27AE6015',
+    borderColor: '#27AE6050',
+  },
+  feedbackBtnConfirmText: {
+    fontSize: Typography.xs,
+    fontWeight: '600',
+    color: '#27AE60',
+  },
+  feedbackBtnFalse: {
+    backgroundColor: '#E67E2215',
+    borderColor: '#E67E2250',
+  },
+  feedbackBtnFalseText: {
+    fontSize: Typography.xs,
+    fontWeight: '600',
+    color: '#E67E22',
+  },
+  feedbackBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  feedbackBadgeText: {
+    fontSize: Typography.xs,
+    fontWeight: '700',
+  },
 });
