@@ -22,6 +22,7 @@ import {
   AnimalsQueryParams,
 } from '../types';
 import { Config } from '../constants/config';
+import { useFarmStore } from '../store/farmStore';
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
 // Centralisés ici pour invalidations cohérentes
@@ -44,12 +45,15 @@ export function useAnimals(
   params?: AnimalsQueryParams,
   options?: Omit<UseQueryOptions<AnimalList>, 'queryKey' | 'queryFn'>,
 ) {
+  const currentFarmId = useFarmStore((state) => state.currentFarmId);
+  const scopedParams = currentFarmId ? { ...params, farm_id: currentFarmId } : params;
   return useQuery({
-    queryKey: animalKeys.list(params),
-    queryFn: () => animalsApi.list(params),
+    queryKey: animalKeys.list(scopedParams),
+    queryFn: () => animalsApi.list(scopedParams),
     staleTime: Config.STALE_TIME_MEDIUM,
     refetchInterval: Config.DASHBOARD_REFRESH_INTERVAL,
     ...options,
+    enabled: currentFarmId !== null && (options?.enabled ?? true),
   });
 }
 

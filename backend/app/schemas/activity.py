@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import date
 
@@ -9,10 +9,8 @@ class ActivityBudgetItem(BaseModel):
 
 
 class ActivityBudget(BaseModel):
-    lying: ActivityBudgetItem
-    standing: ActivityBudgetItem
-    walking: ActivityBudgetItem
-    running: ActivityBudgetItem
+    Active: ActivityBudgetItem
+    Resting: ActivityBudgetItem
 
 
 class ActivityAverages(BaseModel):
@@ -29,6 +27,8 @@ class HourlyBreakdown(BaseModel):
 
 
 class ActivitySummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     animal_id: int
     animal_name: str
     date: date
@@ -37,6 +37,3 @@ class ActivitySummary(BaseModel):
     budget: ActivityBudget
     averages: ActivityAverages
     hourly_breakdown: list[HourlyBreakdown]
-
-    class Config:
-        orm_mode = True

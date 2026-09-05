@@ -17,6 +17,8 @@ class AlertType(str, Enum):
     BATTERY = "battery"
     OFFLINE = "offline"
     CUSTOM = "custom"
+    ACTIVITY_DEVIATION_LOW = "activity_deviation_low"
+    ACTIVITY_DEVIATION_HIGH = "activity_deviation_high"
 
 class AlertSeverity(str, Enum):
     """Niveaux de gravité"""

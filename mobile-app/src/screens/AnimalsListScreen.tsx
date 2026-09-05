@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAnimals } from '../hooks/useAnimals';
 import { useTelemetryLatest } from '../hooks/useTelemetry';
+import { useFarmStore } from '../store/farmStore';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import { Animal, AnimalStatus, TelemetryLatest } from '../types';
 import {
@@ -63,12 +64,10 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
   const statusColor = animalStatusColor(animal.status);
   const isOnline = !!telemetry;
 
+  // Use the ML-predicted state from the backend (or fallback to threshold)
   const activityState = telemetry
-    ? telemetry.activity < 0.15 ? 'lying'
-    : telemetry.activity < 0.5 ? 'standing'
-    : telemetry.activity < 1.0 ? 'walking' : 'running'
+    ? (telemetry.activity_state ?? (telemetry.activity < 0.5 ? 'Resting' : 'Active'))
     : null;
-
 
   const behaviorColor = activityStateColor(activityState as any);
 
@@ -143,6 +142,10 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
 export default function AnimalsListScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const currentFarm = useFarmStore((state) =>
+    state.farms.find((farm) => farm.id === state.currentFarmId),
+  );
+  const canEditAnimals = currentFarm?.permissions.includes('edit_animals') ?? false;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<AnimalStatus | 'all'>('all');
@@ -185,14 +188,14 @@ export default function AnimalsListScreen() {
         subtitle={`${data?.total ?? 0} animals`}
         onBack={() => navigation.dispatch(DrawerActions.openDrawer())}
         backIcon="menu-outline"
-        rightAction={
+        rightAction={canEditAnimals ? (
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate('AnimalForm')}
           >
             <Ionicons name="add" size={22} color={Colors.primary} />
           </TouchableOpacity>
-        }
+        ) : undefined}
       />
 
       {/* Recherche */}

@@ -3,7 +3,7 @@
  * Data comes from /devices table (auto-registered on first telemetry)
  * No more duplicate keys — device_id is primary key in devices table
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   ActivityIndicator, RefreshControl, TouchableOpacity, Alert,
@@ -13,6 +13,7 @@ import DrawerScreenBase from './DrawerScreenBase';
 import { Colors, Spacing, Typography, Radius } from '../../constants/config';
 import { timeAgo } from '../../utils/helpers';
 import apiClient from '../../api/client';
+import { useFarmStore } from '../../store/farmStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Device {
@@ -72,9 +73,11 @@ function batteryIcon(level: number | null): string {
 function DeviceCard({
   device,
   onChangeStatus,
+  canManage,
 }: {
   device: Device;
   onChangeStatus: (id: string, status: string) => void;
+  canManage: boolean;
 }) {
   const statusColor = STATUS_COLORS[device.status] ?? Colors.text.muted;
   const batColor    = batteryColor(device.battery_capacity);
@@ -97,7 +100,8 @@ function DeviceCard({
         {/* Status badge — tap to change */}
         <TouchableOpacity
           style={[styles.statusBadge, { backgroundColor: statusColor + '20', borderColor: statusColor + '50' }]}
-          onPress={() => onChangeStatus(device.id, device.status)}
+          onPress={() => canManage && onChangeStatus(device.id, device.status)}
+          disabled={!canManage}
         >
           <Text style={[styles.statusText, { color: statusColor }]}>
             {STATUS_LABELS[device.status]}
@@ -143,13 +147,22 @@ function DeviceCard({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DevicesScreen() {
+  const currentFarmId = useFarmStore((state) => state.currentFarmId);
+  const currentFarm = useFarmStore((state) =>
+    state.farms.find((farm) => farm.id === state.currentFarmId),
+  );
+  const canManageDevices = currentFarm?.permissions.includes('manage_devices') ?? false;
   const [devices,    setDevices]    = useState<Device[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
-      const { data } = await apiClient.get('/devices/');
+      if (!currentFarmId) {
+        setDevices([]);
+        return;
+      }
+      const { data } = await apiClient.get('/devices/', { params: { farm_id: currentFarmId } });
       setDevices(data);
     } catch {
       // Silently fail — devices table might be empty on first launch
@@ -157,9 +170,9 @@ export default function DevicesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [currentFarmId]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   // Change device status via PATCH /devices/{id}
   const handleChangeStatus = (deviceId: string, currentStatus: string) => {
@@ -213,6 +226,7 @@ export default function DevicesScreen() {
             <DeviceCard
               device={item}
               onChangeStatus={handleChangeStatus}
+              canManage={canManageDevices}
             />
           )}
           ListEmptyComponent={

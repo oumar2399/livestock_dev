@@ -82,7 +82,7 @@ export function ComingSoonPlaceholder({ feature }: { feature: string }) {
       </View>
       <Text style={styles.placeholderTitle}>{feature}</Text>
       <Text style={styles.placeholderText}>
-        This feature is coming soon! We're working hard to bring it to you in a future update. Stay tuned!
+        This feature is coming soon. We are working to bring it to you in a future update.
       </Text>
     </View>
   );

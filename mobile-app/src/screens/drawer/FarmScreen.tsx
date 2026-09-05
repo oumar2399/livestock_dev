@@ -7,15 +7,27 @@ import { Ionicons } from '@expo/vector-icons';
 import DrawerScreenBase from './DrawerScreenBase';
 import { Colors, Spacing, Typography, Radius } from '../../constants/config';
 import apiClient from '../../api/client';
+import { useFarmStore } from '../../store/farmStore';
 
 export default function FarmScreen() {
+  const { farms, currentFarmId, loadFarms } = useFarmStore();
+  const currentFarm = farms.find((item) => item.id === currentFarmId) ?? null;
+  const canManageFarm = currentFarm?.permissions.includes('manage_farm') ?? false;
   const [farm, setFarm]       = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm]       = useState({ name: '', address: '', size_hectares: '' });
+  const [saving, setSaving]   = useState(false);
 
   useEffect(() => {
-    apiClient.get('/farms/1')
+    if (!currentFarmId) {
+      setFarm(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setEditing(false);
+    apiClient.get(`/farms/${currentFarmId}`)
       .then(({ data }) => {
         setFarm(data);
         setForm({
@@ -26,35 +38,47 @@ export default function FarmScreen() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentFarmId]);
 
   const handleSave = async () => {
+    if (!currentFarmId) return;
+    setSaving(true);
     try {
-      await apiClient.put('/farms/1', {
+      await apiClient.put(`/farms/${currentFarmId}`, {
         name: form.name,
         address: form.address,
         size_hectares: form.size_hectares ? parseFloat(form.size_hectares) : null,
       });
       setEditing(false);
-      Alert.alert('Succès', 'Ferme mise à jour');
+      Alert.alert('Success', 'Farm updated successfully');
+      // Refresh farm data
+      const { data } = await apiClient.get(`/farms/${currentFarmId}`);
+      setFarm(data);
+      await loadFarms();
     } catch {
-      Alert.alert('Erreur', 'Impossible de mettre à jour la ferme');
+      Alert.alert('Error', 'Cannot update farm');
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
     <DrawerScreenBase
-      title="Gestion ferme"
+      title="Farm Management"
       rightAction={
-        !loading && (
-          <TouchableOpacity onPress={() => editing ? handleSave() : setEditing(true)} style={styles.editBtn}>
-            <Ionicons name={editing ? 'checkmark' : 'create-outline'} size={20} color={Colors.primary} />
+        !loading && !editing && canManageFarm && (
+          <TouchableOpacity onPress={() => setEditing(true)} style={styles.editBtn}>
+            <Ionicons name="create-outline" size={20} color={Colors.primary} />
           </TouchableOpacity>
         )
       }
     >
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={Colors.primary} /></View>
+      ) : !farm ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyText}>No farm assigned</Text>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.card}>
@@ -65,9 +89,9 @@ export default function FarmScreen() {
             {editing ? (
               <>
                 {[
-                  { label: 'Nom de la ferme', key: 'name' },
-                  { label: 'Adresse', key: 'address' },
-                  { label: 'Superficie (ha)', key: 'size_hectares', numeric: true },
+                  { label: 'Farm Name', key: 'name' },
+                  { label: 'Address', key: 'address' },
+                  { label: 'Size (ha)', key: 'size_hectares', numeric: true },
                 ].map(({ label, key, numeric }) => (
                   <View key={key} style={styles.field}>
                     <Text style={styles.fieldLabel}>{label}</Text>
@@ -80,18 +104,21 @@ export default function FarmScreen() {
                     />
                   </View>
                 ))}
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditing(false)}>
-                  <Text style={styles.cancelText}>Annuler</Text>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditing(false)} disabled={saving}>
+                  <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 {[
-                  { label: 'Nom', value: farm?.name, icon: 'home-outline' },
-                  { label: 'Adresse', value: farm?.address, icon: 'location-outline' },
-                  { label: 'Superficie', value: farm?.size_hectares ? `${farm.size_hectares} ha` : '-', icon: 'resize-outline' },
-                  { label: 'Propriétaire ID', value: farm?.owner_id ? `#${farm.owner_id}` : '-', icon: 'person-outline' },
-                  { label: 'Créée le', value: farm?.created_at ? new Date(farm.created_at).toLocaleDateString('fr-FR') : '-', icon: 'calendar-outline' },
+                  { label: 'Name', value: farm?.name, icon: 'home-outline' },
+                  { label: 'Address', value: farm?.address, icon: 'location-outline' },
+                  { label: 'Size', value: farm?.size_hectares ? `${farm.size_hectares} ha` : '-', icon: 'resize-outline' },
+                  { label: 'Owner ID', value: farm?.owner_id ? `#${farm.owner_id}` : '-', icon: 'person-outline' },
+                  { label: 'Created at', value: farm?.created_at ? new Date(farm.created_at).toLocaleDateString('en-US') : '-', icon: 'calendar-outline' },
                 ].map(({ label, value, icon }) => (
                   <View key={label} style={styles.infoRow}>
                     <Ionicons name={icon as any} size={16} color={Colors.text.muted} />
@@ -110,6 +137,7 @@ export default function FarmScreen() {
 
 const styles = StyleSheet.create({
   center:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { fontSize: Typography.sm, color: Colors.text.muted },
   content: { padding: Spacing.base },
   card: {
     backgroundColor: Colors.bg.card,
@@ -144,6 +172,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
     color: Colors.text.primary, fontSize: Typography.base,
   },
+  saveBtn: {
+    backgroundColor: Colors.primary, borderRadius: Radius.md,
+    padding: Spacing.md, alignItems: 'center', marginTop: Spacing.lg,
+  },
+  saveBtnText: { color: '#fff', fontSize: Typography.base, fontWeight: '600' },
   cancelBtn: { alignItems: 'center', marginTop: Spacing.sm, padding: Spacing.sm },
   cancelText: { color: Colors.text.muted, fontSize: Typography.sm },
 });

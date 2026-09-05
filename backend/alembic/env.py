@@ -12,7 +12,8 @@ load_dotenv()
 from app.db.database import Base
 from app.models import (          # importe chaque modèle
     user, farm, animal, device,
-    telemetry, alert, geofence
+    telemetry, alert, geofence,
+    feedback, daily_summary, membership, job_run,
 )
 
 # ── Config Alembic ───────────────────────────────────────────
@@ -25,6 +26,16 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+EXTENSION_MANAGED_TABLES = {"spatial_ref_sys"}
+
+
+def include_object(obj, name, type_, reflected, compare_to):
+    """Keep PostGIS-owned objects outside application migrations."""
+    if type_ == "table" and reflected and name in EXTENSION_MANAGED_TABLES:
+        return False
+    return True
+
+
 # ── Fonctions run (ne pas modifier) ─────────────────────────
 
 def run_migrations_offline():
@@ -34,6 +45,7 @@ def run_migrations_offline():
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -51,6 +63,7 @@ def run_migrations_online():
             target_metadata=target_metadata,
             # Important pour TimescaleDB — ignore les tables système
             include_schemas=False,
+            include_object=include_object,
         )
         with context.begin_transaction():
             context.run_migrations()

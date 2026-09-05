@@ -1,0 +1,87 @@
+{
+    "fold_results": [
+        {
+            "test_animal": "cow1",
+            "n_train": 408,
+            "n_test": 101,
+            "classes_in_test": [
+                "Active",
+                "Resting"
+            ],
+            "balanced_accuracy": 0.9948
+        },
+        {
+            "test_animal": "cow2",
+            "n_train": 347,
+            "n_test": 162,
+            "classes_in_test": [
+                "Active",
+                "Resting"
+            ],
+            "balanced_accuracy": 0.8777
+        },
+        {
+            "test_animal": "cow3",
+            "n_train": 419,
+            "n_test": 90,
+            "classes_in_test": [
+                "Active",
+                "Resting"
+            ],
+            "balanced_accuracy": 0.9375
+        },
+        {
+            "test_animal": "cow4",
+            "n_train": 440,
+            "n_test": 69,
+            "classes_in_test": [
+                "Active",
+                "Resting"
+            ],
+            "balanced_accuracy": 0.9904
+        },
+        {
+            "test_animal": "cow5",
+            "n_train": 479,
+            "n_test": 30,
+            "classes_in_test": [
+                "Active",
+                "Resting"
+            ],
+            "balanced_accuracy": 0.9038
+        },
+        {
+            "test_animal": "cow6",
+            "n_train": 452,
+            "n_test": 57,
+            "classes_in_test": [
+                "Active",
+                "Resting"
+            ],
+            "balanced_accuracy": 0.9273
+        }
+    ],
+    "overall_balanced_accuracy": 0.9519,
+    "mean_per_fold_accuracy": 0.9386,
+    "std_per_fold_accuracy": 0.0467,
+    "ci_95_low": 0.8896,
+    "ci_95_high": 0.9876,
+    "ci_95_margin": 0.049,
+    "wilcoxon_stat": 21.0,
+    "wilcoxon_p": 0.0156,
+    "classification_report": "              precision    recall  f1-score   support\n\n      Active      0.746     0.936     0.830        47\n     Resting      0.993     0.968     0.980       462\n\n    accuracy                          0.965       509\n   macro avg      0.870     0.952     0.905       509\nweighted avg      0.970     0.965     0.966       509\n",
+    "confusion_matrix": [
+        [
+            44,
+            3
+        ],
+        [
+            15,
+            447
+        ]
+    ],
+    "class_names": [
+        "Active",
+        "Resting"
+    ]
+}

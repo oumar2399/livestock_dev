@@ -3,6 +3,9 @@
 -- Version: 1.0
 -- ============================================================
 
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
 -- Table : Users (fermiers, propriétaires, vétérinaires)
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -35,7 +38,7 @@ CREATE INDEX idx_farms_location ON farms USING GIST(location);
 -- Table : Animals (animaux)
 CREATE TABLE IF NOT EXISTS animals (
     id SERIAL PRIMARY KEY,
-    farm_id INTEGER REFERENCES farms(id) ON DELETE CASCADE,
+    farm_id INTEGER NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     official_id VARCHAR(50) UNIQUE,  -- Numéro boucle oreille
     species VARCHAR(50) DEFAULT 'bovine',
@@ -51,7 +54,7 @@ CREATE TABLE IF NOT EXISTS animals (
 );
 
 CREATE INDEX idx_animals_farm ON animals(farm_id);
-CREATE INDEX idx_animals_device ON animals(assigned_device);
+CREATE UNIQUE INDEX uq_animals_assigned_device ON animals(assigned_device);
 CREATE INDEX idx_animals_status ON animals(status);
 
 -- Table : Telemetry (données capteurs - HYPERTABLE TimescaleDB)
@@ -70,7 +73,9 @@ CREATE TABLE IF NOT EXISTS telemetry (
     
     -- Activité
     activity DECIMAL(5, 3),
-    activity_state VARCHAR(20) CHECK (activity_state IN ('walking', 'standing', 'lying', 'running')),
+    activity_state VARCHAR(20) CHECK (
+        activity_state IN ('walking', 'standing', 'lying', 'running', 'Active', 'Resting')
+    ),
     
     -- Santé
     temperature DECIMAL(4, 2),
@@ -89,15 +94,15 @@ SELECT create_hypertable('telemetry', 'time', if_not_exists => TRUE);
 CREATE INDEX IF NOT EXISTS idx_telemetry_device ON telemetry(device_id, time DESC);
 CREATE INDEX IF NOT EXISTS idx_telemetry_location ON telemetry USING GIST(location);
 
--- Politique compression (données > 7 jours compressées)
-SELECT add_compression_policy('telemetry', INTERVAL '7 days', if_not_exists => TRUE);
+-- La compression/columnstore reste désactivée par défaut.
+-- Elle doit être activée séparément après validation de la politique de rétention.
 
 -- Table : Alerts (alertes)
 CREATE TABLE IF NOT EXISTS alerts (
     id SERIAL PRIMARY KEY,
-    animal_id INTEGER REFERENCES animals(id) ON DELETE CASCADE,
-    type VARCHAR(50) CHECK (type IN ('health', 'geofence', 'battery', 'offline', 'custom')),
-    severity VARCHAR(20) CHECK (severity IN ('info', 'warning', 'critical')),
+    animal_id INTEGER NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) NOT NULL CHECK (severity IN ('info', 'warning', 'critical')),
     title VARCHAR(255),
     message TEXT,
     triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -111,10 +116,25 @@ CREATE INDEX idx_alerts_animal ON alerts(animal_id, triggered_at DESC);
 CREATE INDEX idx_alerts_severity ON alerts(severity, triggered_at DESC);
 CREATE INDEX idx_alerts_unresolved ON alerts(resolved_at) WHERE resolved_at IS NULL;
 
+-- Table : Feedback sur prédictions (socle attendu par la migration 29135abe6072)
+CREATE TABLE IF NOT EXISTS prediction_feedbacks (
+    id SERIAL PRIMARY KEY,
+    animal_id INTEGER NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    telemetry_time TIMESTAMP,
+    predicted_behavior VARCHAR,
+    confidence DOUBLE PRECISION,
+    verdict VARCHAR(20) NOT NULL,
+    correction VARCHAR(50),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX ix_prediction_feedbacks_id ON prediction_feedbacks(id);
+
 -- Table : Geofences (zones géographiques)
 CREATE TABLE IF NOT EXISTS geofences (
     id SERIAL PRIMARY KEY,
-    farm_id INTEGER REFERENCES farms(id) ON DELETE CASCADE,
+    farm_id INTEGER NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     polygon GEOGRAPHY(POLYGON, 4326),
     type VARCHAR(50) CHECK (type IN ('pasture', 'danger', 'building', 'water')),

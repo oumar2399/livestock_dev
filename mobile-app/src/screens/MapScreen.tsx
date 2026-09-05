@@ -30,11 +30,19 @@ import { LoadingState, ErrorState } from '../components/ui';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getActivityState(activity: number): ActivityState {
-  if (activity < 0.15) return 'lying';
-  if (activity < 0.5)  return 'standing';
-  if (activity < 1.0)  return 'walking';
-  return 'running';
+/**
+ * Fallback: derive activity state from raw g value.
+ * Only used when the backend does not provide activity_state (legacy data).
+ * For new data the ML model prediction (Active/Resting) is used directly.
+ */
+function getActivityStateFallback(activity: number): ActivityState {
+  return activity < 0.5 ? 'Resting' : 'Active';
+}
+
+/** Resolve the activity state from a TelemetryLatest point.
+ *  Prefers the backend ML prediction; falls back to threshold if null. */
+function resolveActivityState(point: TelemetryLatest): ActivityState {
+  return (point.activity_state as ActivityState) ?? getActivityStateFallback(point.activity);
 }
 
 /** Distance en km entre deux points GPS (formule Haversine) */
@@ -133,14 +141,13 @@ function AnimalMarker({
   isIsolated: boolean;
   onPress: () => void;
 }) {
-  const state = getActivityState(point.activity);
+  const state = resolveActivityState(point);
   const color = isIsolated ? Colors.severity.critical : activityStateColor(state);
 
   return (
     <Marker
       coordinate={{ latitude: point.latitude, longitude: point.longitude }}
       onPress={onPress}
-      tracksViewChanges={false}
     >
       <View style={styles.markerContainer}>
         {/* Halo rouge si isolé */}
@@ -175,15 +182,13 @@ function ClusterMarker({
 }) {
   const count = cluster.points.length;
   // Couleur dominante du cluster (état le plus actif)
-  const maxActivity = Math.max(...cluster.points.map((p) => p.activity));
-  const state = getActivityState(maxActivity);
-  const color = activityStateColor(state);
+  const dominantState = cluster.points.some(p => resolveActivityState(p) === 'Active') ? 'Active' as ActivityState : 'Resting' as ActivityState;
+  const color = activityStateColor(dominantState);
 
   return (
     <Marker
       coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
       onPress={onPress}
-      tracksViewChanges={false}
     >
       <View style={styles.clusterContainer}>
         <View style={[styles.clusterOuter, { borderColor: color }]}>
@@ -211,7 +216,7 @@ function AnimalInfoSheet({
   onNavigate: (id: number) => void;
 }) {
   if (!point) return null;
-  const state      = getActivityState(point.activity);
+  const state      = resolveActivityState(point);
   const stateColor = activityStateColor(state);
   const batColor   = batteryColor(point.battery);
 
@@ -237,7 +242,7 @@ function AnimalInfoSheet({
         </View>
         <View style={styles.infoSheetTitle}>
           <Text style={styles.infoAnimalName}>{point.animal_name}</Text>
-          <Text style={styles.infoDeviceId}>Appareil : {point.device_id}</Text>
+          <Text style={styles.infoDeviceId}>Device: {point.device_id}</Text>
         </View>
         <TouchableOpacity onPress={onClose} hitSlop={12}>
           <Ionicons name="close" size={22} color={Colors.text.secondary} />
@@ -249,7 +254,7 @@ function AnimalInfoSheet({
           <View style={[styles.infoStatIcon, { backgroundColor: stateColor + '20' }]}>
             <Ionicons name="walk-outline" size={18} color={stateColor} />
           </View>
-          <Text style={styles.infoStatLabel}>Comportement</Text>
+          <Text style={styles.infoStatLabel}>Behavior</Text>
           <Text style={[styles.infoStatValue, { color: stateColor }]}>
             {activityStateLabel(state)}
           </Text>
@@ -258,22 +263,22 @@ function AnimalInfoSheet({
           <View style={[styles.infoStatIcon, { backgroundColor: Colors.primary + '20' }]}>
             <Ionicons name="pulse-outline" size={18} color={Colors.primary} />
           </View>
-          <Text style={styles.infoStatLabel}>Activité</Text>
+          <Text style={styles.infoStatLabel}>Activity</Text>
           <Text style={styles.infoStatValue}>{point.activity.toFixed(2)} g</Text>
         </View>
         <View style={styles.infoStat}>
           <View style={[styles.infoStatIcon, { backgroundColor: batColor + '20' }]}>
             <Ionicons name={batteryIcon(point.battery) as any} size={18} color={batColor} />
           </View>
-          <Text style={styles.infoStatLabel}>Batterie</Text>
+          <Text style={styles.infoStatLabel}>Battery</Text>
           <Text style={[styles.infoStatValue, { color: batColor }]}>{point.battery}%</Text>
         </View>
       </View>
 
       <View style={styles.infoFooter}>
-        <Text style={styles.infoUpdated}>Mis à jour {timeAgo(point.last_update)}</Text>
+        <Text style={styles.infoUpdated}>Updated {timeAgo(point.last_update)}</Text>
         <TouchableOpacity style={styles.infoDetailBtn} onPress={() => onNavigate(point.animal_id)}>
-          <Text style={styles.infoDetailBtnText}>Voir fiche complète</Text>
+          <Text style={styles.infoDetailBtnText}>View full profile</Text>
           <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
         </TouchableOpacity>
       </View>
@@ -301,7 +306,7 @@ function ClusterSheet({
       <View style={styles.infoSheetHandle} />
       <View style={styles.clusterSheetHeader}>
         <Text style={styles.clusterSheetTitle}>
-          {cluster.points.length} animaux au même endroit
+          {cluster.points.length} animals at same location
         </Text>
         <TouchableOpacity onPress={onClose} hitSlop={12}>
           <Ionicons name="close" size={22} color={Colors.text.secondary} />
@@ -309,7 +314,7 @@ function ClusterSheet({
       </View>
 
       {cluster.points.map((point) => {
-        const state = getActivityState(point.activity);
+        const state = resolveActivityState(point);
         const color = activityStateColor(state);
         const isIsolated = isolatedIds.has(point.animal_id);
         return (
@@ -367,8 +372,8 @@ export default function MapScreen() {
     })).filter(p => !isNaN(p.latitude) && !isNaN(p.longitude));
   }, [data]);
 
-  const { points, distantAnimals } = useMemo(() => {
-    if (allPoints.length === 0) return { points: [], distantAnimals: [] as any[] };
+  const { localPoints, distantAnimals } = useMemo(() => {
+    if (allPoints.length === 0) return { localPoints: [], distantAnimals: [] as any[] };
     const sortedLats = [...allPoints.map(p => p.latitude)].sort((a, b) => a - b);
     const sortedLons = [...allPoints.map(p => p.longitude)].sort((a, b) => a - b);
     const medLat = sortedLats[Math.floor(sortedLats.length / 2)];
@@ -380,8 +385,12 @@ export default function MapScreen() {
       if (dist < 100) local.push(p);
       else distant.push({ ...p, _distanceKm: Math.round(dist) });
     });
-    return { points: local, distantAnimals: distant };
+    return { localPoints: local, distantAnimals: distant };
   }, [allPoints]);
+
+  const points = useMemo(() => {
+    return viewMode === 'global' ? allPoints : localPoints;
+  }, [viewMode, allPoints, localPoints]);
 
   // Calculs dérivés
   const isolatedIds = useMemo(() => detectIsolatedAnimals(points), [points]);
@@ -471,8 +480,8 @@ export default function MapScreen() {
     ? { latitude: points[0].latitude, longitude: points[0].longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }
     : { latitude: 36.2048, longitude: 138.2529, latitudeDelta: 8, longitudeDelta: 8 };
 
-  if (isLoading && !data) return <LoadingState message="Chargement des positions…" />;
-  if (isError && !data)   return <ErrorState message="Impossible de charger les positions" onRetry={refetch} />;
+  if (isLoading && !data) return <LoadingState message="Loading positions..." />;
+  if (isError && !data)   return <ErrorState message="Failed to load positions" onRetry={refetch} />;
 
   const sheetOpen = !!selectedAnimal || !!selectedCluster || showDistantSheet;
 
@@ -518,6 +527,26 @@ export default function MapScreen() {
             />
           ),
         )}
+
+        {/* Marqueurs animaux distants (violet) */}
+        {distantAnimals.map((p: any) => (
+          <Marker
+            key={`distant-${p.animal_id}`}
+            coordinate={{ latitude: p.latitude, longitude: p.longitude }}
+            onPress={() => setSelectedAnimal(p)}
+          >
+            <View style={styles.markerContainer}>
+              <View style={[styles.markerOuter, { borderColor: '#9B59B6' }]}>
+                <View style={[styles.markerInner, { backgroundColor: '#9B59B6' }]}>
+                  <Text style={styles.markerInitial}>
+                    {p.animal_name[0].toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.markerTail, { backgroundColor: '#9B59B6' }]} />
+            </View>
+          </Marker>
+        ))}
       </MapView>
 
       {/* ── Header ───────────────────────────────────────────────────── */}
@@ -525,7 +554,7 @@ export default function MapScreen() {
         <View style={styles.headerCard}>
           <Ionicons name="map" size={16} color={Colors.primary} />
           <Text style={styles.headerText}>
-            {points.length} Animal{points.length > 1 ? 's' : ''}
+            {allPoints.length} Animal{allPoints.length > 1 ? 's' : ''}
           </Text>
           {isolatedIds.size > 0 && (
             <TouchableOpacity style={styles.isolatedBtn} onPress={zoomToIsolated}>
@@ -577,7 +606,7 @@ export default function MapScreen() {
 
       {/* ── FAB ──────────────────────────────────────────────────────── */}
       <View style={[styles.fabContainer, { bottom: insets.bottom + (sheetOpen ? 230 : 90) }]}>
-        <TouchableOpacity style={styles.fab} onPress={refetch}>
+        <TouchableOpacity style={styles.fab} onPress={() => refetch()}>
           <Ionicons name="refresh-outline" size={22} color={Colors.text.primary} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.fab} onPress={fitToHerd}>
@@ -588,7 +617,7 @@ export default function MapScreen() {
       {/* ── Légende ──────────────────────────────────────────────────── */}
       {!sheetOpen && (
         <View style={[styles.legend, { bottom: insets.bottom + 90 }]}>
-          {(['lying', 'standing', 'walking', 'running'] as ActivityState[]).map((s) => (
+          {(['Active', 'Resting'] as ActivityState[]).map((s) => (
             <View key={s} style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: activityStateColor(s) }]} />
               <Text style={styles.legendText}>{activityStateLabel(s)}</Text>
@@ -630,14 +659,27 @@ export default function MapScreen() {
           <View style={styles.infoSheetHandle} />
           <View style={styles.clusterSheetHeader}>
             <Text style={styles.clusterSheetTitle}>
-              Hors zone ({distantAnimals.length})
+              Out of zone ({distantAnimals.length})
             </Text>
             <TouchableOpacity onPress={() => setShowDistantSheet(false)} hitSlop={12}>
               <Ionicons name="close" size={22} color={Colors.text.secondary} />
             </TouchableOpacity>
           </View>
           {distantAnimals.map((p: any) => (
-            <View key={p.animal_id} style={styles.clusterItem}>
+            <TouchableOpacity
+              key={p.animal_id}
+              style={styles.clusterItem}
+              onPress={() => {
+                setShowDistantSheet(false);
+                setSelectedAnimal(p);
+                mapRef.current?.animateToRegion({
+                  latitude: p.latitude,
+                  longitude: p.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }, 600);
+              }}
+            >
               <View style={[styles.clusterItemAvatar, { backgroundColor: '#9B59B620' }]}>
                 <Text style={[styles.clusterItemInitial, { color: '#9B59B6' }]}>
                   {p.animal_name[0].toUpperCase()}
@@ -646,11 +688,12 @@ export default function MapScreen() {
               <View style={styles.clusterItemInfo}>
                 <Text style={styles.clusterItemName}>{p.animal_name}</Text>
                 <Text style={{ fontSize: Typography.xs, color: '#9B59B6' }}>
-                  À {p._distanceKm} km du troupeau
+                  {p._distanceKm} km from herd
                 </Text>
               </View>
               <Text style={styles.clusterItemBattery}>{p.battery}%</Text>
-            </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.text.muted} />
+            </TouchableOpacity>
           ))}
         </View>
       )}

@@ -1,11 +1,10 @@
 // ─── Configuration Application ───────────────────────────────────────────────
-// Modifier BASE_URL selon votre environnement de déploiement
+
+const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
 export const Config = {
   // URL backend FastAPI
-  // Développement local : adresse IP de votre machine sur le réseau WiFi
-  // Production : URL de votre serveur (ex: https://api.votre-domaine.com)
-  API_BASE_URL: 'https://theresa-unhidden-dispiritedly.ngrok-free.dev/api/v1',
+  API_BASE_URL: apiBaseUrl.replace(/\/$/, ''),
 
   // Timeouts (ms)
   REQUEST_TIMEOUT: 15_000,
@@ -29,6 +28,10 @@ export const Config = {
   // AsyncStorage keys
   STORAGE: {
     ACCESS_TOKEN: '@livestock/access_token',
+    REFRESH_TOKEN: '@livestock/refresh_token',
+    USER_ROLE: '@livestock/user_role',
+    USER_NAME: '@livestock/user_name',
+    USER_EMAIL: '@livestock/user_email',
     USER_PROFILE: '@livestock/user_profile',
     FARM_ID: '@livestock/farm_id',
   },
@@ -69,10 +72,14 @@ export const Colors = {
 
   // États comportementaux
   behavior: {
-    lying: '#8E44AD',      // violet - repos
-    standing: '#3498DB',   // bleu - debout
-    walking: '#27AE60',    // vert - marche
-    running: '#E67E22',    // orange - course
+    // Binary ML states (current)
+    Active: '#27AE60',     // vert - en mouvement (walking/running)
+    Resting: '#3498DB',    // bleu - au repos (standing/lying)
+    // Legacy 4-class states (backward compat — old DB records)
+    lying: '#3498DB',      // mapped to Resting color
+    standing: '#3498DB',   // mapped to Resting color
+    walking: '#27AE60',    // mapped to Active color
+    running: '#27AE60',    // mapped to Active color
   },
 
   // Statut animal

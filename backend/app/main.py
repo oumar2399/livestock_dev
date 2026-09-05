@@ -3,14 +3,23 @@ Point d'entrée principal - Application FastAPI
 Livestock Monitoring System
 VERSION 2.0 - Avec authentification JWT
 """
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Response, status
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
 from datetime import datetime
+from app.api.v1.predict import router as predict_router
+from app.db.database import get_db
+from app.schemas.health import LivenessResponse, ReadinessResponse
+from app.services.system_health import build_readiness
+from app.core.timezone import utc_now
+from sqlalchemy.orm import Session
 
 # Import routes
-from app.api.v1 import telemetry, animals, alerts, auth, devices, activity
+from app.api.v1 import telemetry, animals, alerts, auth, devices, activity, farms, admin, feedback, memberships, reports, history, geofences
+from app.core.scheduler import start_scheduler, stop_scheduler
+from app.core.config import settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,9 +41,9 @@ app = FastAPI(
     4. Entrer : `Bearer <votre_token>`
     
     ### Rôles :
-    - **farmer** : Accès complet à sa ferme
-    - **owner** : Lecture seule, métriques économiques
-    - **vet** : Données santé, résolution alertes santé
+    - **owner** : Gestion de la ferme, des animaux, membres et devices
+    - **farmer** : Consultation des animaux et feedback terrain
+    - **vet** : Consultation des animaux et feedback vétérinaire
     - **admin** : Accès total, gestion utilisateurs
     """,
     version="2.0.0",
@@ -51,14 +60,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:19006",
-        "http://127.0.0.1:3000",
-        "*",  # TODO: restreindre en production
-    ],
-    allow_credentials=True,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -93,6 +96,27 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
+
+@app.get("/health/live", response_model=LivenessResponse, tags=["root"])
+def liveness_check():
+    return {"status": "alive", "checked_at": utc_now()}
+
+
+@app.get(
+    "/health/ready",
+    response_model=ReadinessResponse,
+    tags=["root"],
+    responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ReadinessResponse}},
+)
+def readiness_check(
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    result = build_readiness(db)
+    if result["status"] != "ready":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return result
+
 # ─── Routers ──────────────────────────────────────────────────────────────────
 
 API_V1_PREFIX = "/api/v1"
@@ -106,6 +130,14 @@ app.include_router(animals.router,   prefix=API_V1_PREFIX, tags=["animals"])
 app.include_router(alerts.router,    prefix=API_V1_PREFIX, tags=["alerts"])
 app.include_router(devices.router,   prefix=API_V1_PREFIX, tags=["devices"])
 app.include_router(activity.router, prefix=API_V1_PREFIX, tags=["activity"])
+app.include_router(farms.router,    prefix=API_V1_PREFIX, tags=["farms"])
+app.include_router(admin.router,    prefix=API_V1_PREFIX, tags=["admin"])
+app.include_router(feedback.router, prefix=API_V1_PREFIX, tags=["feedback"])
+app.include_router(memberships.router, prefix=API_V1_PREFIX, tags=["memberships"])
+app.include_router(reports.router, prefix=API_V1_PREFIX, tags=["reports"])
+app.include_router(history.router, prefix=API_V1_PREFIX, tags=["history"])
+app.include_router(geofences.router, prefix=API_V1_PREFIX, tags=["geofences"])
+app.include_router(predict_router)
 
 # ─── Gestion erreurs globales ─────────────────────────────────────────────────
 
@@ -116,7 +148,7 @@ async def global_exception_handler(request, exc):
         status_code=500,
         content={
             "error": "Internal server error",
-            "message": str(exc),
+            "message": str(exc) if settings.EXPOSE_INTERNAL_ERRORS else "An unexpected error occurred",
             "path": request.url.path
         }
     )
@@ -129,6 +161,14 @@ async def startup_event():
     logger.info("🚀 Starting Livestock Monitoring API v2.0")
     logger.info("🔐 JWT Authentication: ENABLED")
     logger.info("=" * 60)
+
+    # Load the ML behavior classifier into memory (singleton)
+    from app.services import ml_inference
+    ml_inference.load_model()
+
+    # Start APScheduler background scheduler (if SCHEDULER_ENABLED=true)
+    start_scheduler()
+
     logger.info("📝 Documentation: http://localhost:8000/docs")
     logger.info("🏥 Health: http://localhost:8000/health")
     logger.info("=" * 60)
@@ -136,6 +176,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("🛑 Shutting down Livestock Monitoring API")
+    stop_scheduler()
 
 
 if __name__ == "__main__":

@@ -46,8 +46,15 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
+
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
+let refreshPromise: Promise<boolean> | null = null;
 
 // ─── Intercepteur REQUEST - injection token ───────────────────────────────────
 
@@ -91,11 +98,31 @@ apiClient.interceptors.response.use(
     const detail = (data as { detail?: string })?.detail;
     const message = detail ?? getDefaultMessage(status);
 
-    // 401 : token expiré ou invalide → déconnexion
-    // TODO: implémenter refresh token ici quand backend l'aura
-    if (status === 401) {
-      await AsyncStorage.removeItem(Config.STORAGE.ACCESS_TOKEN);
-      // L'AuthStore détectera l'absence de token au prochain check
+    const requestConfig = error.config as RetryableRequestConfig | undefined;
+    const isAuthenticationRequest = [
+      '/auth/login',
+      '/auth/login/form',
+      '/auth/refresh',
+    ].some((path) => requestConfig?.url?.includes(path));
+
+    if (status === 401 && requestConfig && !requestConfig._retry && !isAuthenticationRequest) {
+      requestConfig._retry = true;
+
+      if (!refreshPromise) {
+        refreshPromise = import('../store/authStore')
+          .then(({ useAuthStore }) => useAuthStore.getState().refreshToken())
+          .finally(() => {
+            refreshPromise = null;
+          });
+      }
+
+      if (await refreshPromise) {
+        const token = await AsyncStorage.getItem(Config.STORAGE.ACCESS_TOKEN);
+        if (token) {
+          requestConfig.headers.Authorization = `Bearer ${token}`;
+          return apiClient(requestConfig);
+        }
+      }
     }
 
     return Promise.reject(new ApiError(status, message, data));

@@ -17,6 +17,8 @@ from typing import List
 
 from app.db.database import get_db
 from app.models.user import User
+from app.models.farm import Farm
+from app.models.membership import FarmMembership
 from app.core.security import (
     hash_password,
     verify_password,
@@ -256,6 +258,14 @@ async def update_me(
     if data.phone is not None:
         current_user.phone = data.phone
     if data.password is not None:
+        if not data.current_password or not verify_password(
+            data.current_password,
+            current_user.password_hash,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le mot de passe actuel est incorrect",
+            )
         current_user.password_hash = hash_password(data.password)
 
     db.commit()
@@ -322,6 +332,45 @@ async def delete_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+    owned_farm = db.query(Farm.id).filter(Farm.owner_id == user_id).first()
+    if owned_farm:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cet utilisateur possède encore la ferme {owned_farm[0]}. "
+                "Transférez sa propriété avant de supprimer le compte."
+            ),
+        )
+
+    owner_memberships = (
+        db.query(FarmMembership)
+        .filter(
+            FarmMembership.user_id == user_id,
+            FarmMembership.role == "owner",
+            FarmMembership.status == "active",
+        )
+        .all()
+    )
+    for membership in owner_memberships:
+        other_owner_count = (
+            db.query(FarmMembership)
+            .filter(
+                FarmMembership.farm_id == membership.farm_id,
+                FarmMembership.user_id != user_id,
+                FarmMembership.role == "owner",
+                FarmMembership.status == "active",
+            )
+            .count()
+        )
+        if other_owner_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Cet utilisateur est le dernier owner actif de la ferme "
+                    f"{membership.farm_id}. Ajoutez un autre owner avant de supprimer le compte."
+                ),
+            )
 
     db.delete(user)
     db.commit()

@@ -12,11 +12,11 @@ import { LoginCredentials } from '../types';
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
 
 const STORAGE_KEYS = {
-  ACCESS_TOKEN:  '@livestock/access_token',
-  REFRESH_TOKEN: '@livestock/refresh_token',
-  USER_ROLE:     '@livestock/user_role',
-  USER_NAME:     '@livestock/user_name',
-  USER_EMAIL:    '@livestock/user_email',
+  ACCESS_TOKEN:  Config.STORAGE.ACCESS_TOKEN,
+  REFRESH_TOKEN: Config.STORAGE.REFRESH_TOKEN,
+  USER_ROLE:     Config.STORAGE.USER_ROLE,
+  USER_NAME:     Config.STORAGE.USER_NAME,
+  USER_EMAIL:    Config.STORAGE.USER_EMAIL,
 } as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -87,29 +87,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ]);
 
       const savedToken = results[0][1];
-      const savedRole  = results[2][1] as UserRole | null;
-      const savedName  = results[3][1];
-      const savedEmail = results[4][1];
+      const savedRefreshToken = results[1][1];
 
-      if (savedToken && savedRole && savedEmail) {
+      if (savedToken && savedRefreshToken) {
+        const { data: profile } = await apiClient.get<UserProfile>('/auth/me');
+        const activeToken = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+        await AsyncStorage.multiSet([
+          [STORAGE_KEYS.USER_ROLE, profile.role],
+          [STORAGE_KEYS.USER_NAME, profile.name ?? ''],
+          [STORAGE_KEYS.USER_EMAIL, profile.email],
+        ]);
         set({
           isAuthenticated: true,
-          token: savedToken,
-          role: savedRole,
-          user: {
-            id: 0,  // sera rafraîchi via GET /auth/me si nécessaire
-            email: savedEmail,
-            name: savedName ?? null,
-            role: savedRole,
-            phone: null,
-          },
+          token: activeToken,
+          role: profile.role,
+          user: profile,
           isLoading: false,
         });
       } else {
-        set({ isAuthenticated: false, isLoading: false });
+        await get().logout();
       }
     } catch {
-      set({ isAuthenticated: false, isLoading: false });
+      await get().logout();
     }
   },
 
@@ -154,7 +153,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshToken: async (): Promise<boolean> => {
     try {
       const savedRefreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-      if (!savedRefreshToken) return false;
+      if (!savedRefreshToken) {
+        await get().logout();
+        return false;
+      }
 
       const { data } = await apiClient.post<TokenResponse>('/auth/refresh', {
         refresh_token: savedRefreshToken,
@@ -194,6 +196,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       role: null,
       user: null,
       error: null,
+      isLoading: false,
     });
   },
 

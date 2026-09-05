@@ -3,7 +3,7 @@
  * Basées sur les valeurs réelles du backend (enums, seuils)
  */
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import {
   ActivityState,
   Alert,
@@ -35,7 +35,7 @@ export function animalStatusColor(status: AnimalStatus): string {
 /** Sexe lisible */
 export function animalSexLabel(sex: 'M' | 'F' | null): string {
   if (!sex) return '–';
-  return sex === 'M' ? 'Mâle' : 'Femelle';
+  return sex === 'M' ? 'Male' : 'Female';
 }
 
 /** Âge en années depuis birth_date (format "YYYY-MM-DD") */
@@ -47,11 +47,11 @@ export function animalAge(birthDate: string | null): string {
   const months = now.getMonth() - birth.getMonth();
   const totalMonths = years * 12 + months;
 
-  if (totalMonths < 1) return '< 1 mois';
-  if (totalMonths < 12) return `${totalMonths} mois`;
+  if (totalMonths < 1) return '< 1 month';
+  if (totalMonths < 12) return `${totalMonths} months`;
   const y = Math.floor(totalMonths / 12);
   const m = totalMonths % 12;
-  return m > 0 ? `${y} ans ${m} mois` : `${y} an${y > 1 ? 's' : ''}`;
+  return m > 0 ? `${y} yrs ${m} mo` : `${y} yr${y > 1 ? 's' : ''}`;
 }
 
 /** Indicateur de fraîcheur de la donnée GPS */
@@ -67,12 +67,16 @@ export function isRecentUpdate(lastUpdate: string | null, maxMinutes = 30): bool
 export function activityStateLabel(state: ActivityState | null | undefined): string {
   if (!state) return '–';
   const labels: Record<ActivityState, string> = {
-    lying: 'Lying',
-    standing: 'Standing',
-    walking: 'Walking',
-    running: 'Running',
+    // Binary ML states (primary)
+    Active: 'Active',
+    Resting: 'Resting',
+    // Legacy 4-class states (backward compat)
+    lying: 'Resting',
+    standing: 'Resting',
+    walking: 'Active',
+    running: 'Active',
   };
-  return labels[state];
+  return labels[state] ?? state;
 }
 
 /** Couleur de l'état d'activité */
@@ -84,10 +88,12 @@ export function activityStateColor(state: ActivityState | null | undefined): str
 /** Icône Ionicons pour état d'activité */
 export function activityStateIcon(state: ActivityState | null | undefined): string {
   const icons: Record<ActivityState, string> = {
+    Active: 'walk-outline',
+    Resting: 'bed-outline',
     lying: 'bed-outline',
-    standing: 'body-outline',
+    standing: 'bed-outline',
     walking: 'walk-outline',
-    running: 'fitness-outline',
+    running: 'walk-outline',
   };
   return state ? (icons[state] ?? 'help-circle-outline') : 'help-circle-outline';
 }
@@ -121,6 +127,8 @@ export function alertTypeLabel(type: AlertType): string {
     geofence: 'Geofencing',
     battery: 'Battery',
     offline: 'Offline',
+    activity_deviation_low: 'Low Activity',
+    activity_deviation_high: 'High Activity',
     custom: 'Custom',
   };
   return labels[type] ?? type;
@@ -133,6 +141,8 @@ export function alertTypeIcon(type: AlertType): string {
     geofence: 'location-outline',
     battery: 'battery-dead-outline',
     offline: 'wifi-outline',
+    activity_deviation_low: 'trending-down-outline',
+    activity_deviation_high: 'trending-up-outline',
     custom: 'alert-circle-outline',
   };
   return icons[type] ?? 'alert-circle-outline';
@@ -170,7 +180,7 @@ export function isAlertAcknowledged(alert: Alert): boolean {
 export function timeAgo(isoDate: string | null): string {
   if (!isoDate) return '–';
   try {
-    return formatDistanceToNow(parseISO(isoDate), { addSuffix: true, locale: fr });
+    return formatDistanceToNow(parseISO(isoDate), { addSuffix: true, locale: enUS });
   } catch {
     return '–';
   }
@@ -180,7 +190,7 @@ export function timeAgo(isoDate: string | null): string {
 export function formatDateTime(isoDate: string | null): string {
   if (!isoDate) return '–';
   try {
-    return format(parseISO(isoDate), "d MMM yyyy, HH:mm", { locale: fr });
+    return format(parseISO(isoDate), "MMM d, yyyy, HH:mm", { locale: enUS });
   } catch {
     return '–';
   }
@@ -190,7 +200,7 @@ export function formatDateTime(isoDate: string | null): string {
 export function formatDate(isoDate: string | null): string {
   if (!isoDate) return '–';
   try {
-    return format(parseISO(isoDate), 'dd/MM/yyyy');
+    return format(parseISO(isoDate), 'MM/dd/yyyy');
   } catch {
     return '–';
   }
@@ -217,6 +227,19 @@ export function formatActivity(g: number): string {
 
 /** Formate coordonnées GPS */
 export function formatCoords(lat: number | null, lon: number | null): string {
-  if (lat === null || lon === null) return 'Position inconnue';
+  if (lat === null || lon === null) return 'Unknown position';
   return `${lat.toFixed(5)}° N, ${lon.toFixed(5)}° E`;
+}
+
+// ─── Machine Learning ─────────────────────────────────────────────────────────
+
+/**
+ * Returns a color based on ML confidence score (0.0 to 1.0).
+ * >80% = Green (High), >50% = Orange (Medium), else Red (Low)
+ */
+export function confidenceColor(confidence: number | null | undefined): string {
+  if (confidence == null) return Colors.text.muted;
+  if (confidence >= 0.8) return '#27AE60'; // Green
+  if (confidence >= 0.5) return '#F39C12'; // Orange
+  return '#E74C3C'; // Red
 }

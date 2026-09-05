@@ -1,7 +1,7 @@
 """
 Modèle Geofence - Zones géographiques (pâturages, zones interdites)
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geography
 from datetime import datetime
@@ -13,7 +13,7 @@ class Geofence(Base):
     """
     __tablename__ = "geofences"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     farm_id = Column(Integer, ForeignKey("farms.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     polygon = Column(Geography(geometry_type='POLYGON', srid=4326))  # PostGIS
@@ -23,3 +23,8 @@ class Geofence(Base):
     
     # Relations
     farm = relationship("Farm", back_populates="geofences")
+
+    __table_args__ = (
+        Index("idx_geofences_farm", "farm_id"),
+        Index("idx_geofences_polygon", "polygon", postgresql_using="gist"),
+    )

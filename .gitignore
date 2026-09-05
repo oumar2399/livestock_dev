@@ -1,10 +1,69 @@
-# Fichier d'environnement
-backend/.env
-backend/venv/
-backend/ml/data/*.csv
-__pycache__/
-.vscode/
-*.pyc
-.DS_Store
-.expo/
+# Environnements et secrets locaux
+.env
+.env.*
+!.env.example
+!**/.env.example
+m5stack/tests/device_config.py
+
+# Certificats et clés privées
+*.pem
+*.key
+*.p8
+*.p12
+*.jks
+*.mobileprovision
+
+# Dépendances et environnements virtuels
 node_modules/
+venv/
+.venv/
+
+# Python : bytecode, caches et résultats de tests
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+
+# Expo, Metro et sorties de compilation
+.expo/
+.metro-health-check*
+dist/
+build/
+web-build/
+*.tsbuildinfo
+
+# Dossiers natifs Expo générés
+mobile-app/android/
+mobile-app/ios/
+mobile-app/.kotlin/
+
+# Données ML locales : conserver uniquement la documentation éventuelle
+backend/ml/data/*
+!backend/ml/data/.gitkeep
+!backend/ml/data/README.md
+
+# Bases et fichiers générés localement
+*.db
+*.sqlite
+*.sqlite3
+/output*.png
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+/not-important.md
+
+# IDE et système d'exploitation
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+.ipynb_checkpoints/

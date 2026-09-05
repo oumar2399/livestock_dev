@@ -10,17 +10,12 @@ import ujson
 import time
 import random
 import math
-from machine import I2C
+from machine import I2C, UART
+from device_config import WIFI_SSID, WIFI_PASSWORD, API_BASE_URL, DEVICE_ID, ANIMAL_ID
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
-
-WIFI_SSID     = "S23"
-WIFI_PASSWORD = "azertyuio"
-API_BASE_URL  = "http://10.177.53.247:8000"
-DEVICE_ID     = "M5-001"
-ANIMAL_ID     = 1
 
 SAMPLE_RATE   = 10    # Hz — fréquence d'échantillonnage
 WINDOW_SIZE   = 50    # samples = 5 secondes à 10 Hz
@@ -32,13 +27,84 @@ BASE_LAT = 34.6901
 BASE_LON = 135.1955
 
 # ============================================================
-# SCREEN + WIFI + IMU  (identique à v1.3 — pas de changement)
+# SCREEN + WIFI + IMU + GPS UART
 # ============================================================
 
 lcd.clear()
 lcd.setTextColor(0x00FFFF)
 lcd.setCursor(10, 10)
 lcd.print("LIVESTOCK MONITOR v2.0")
+
+# ── GPS UART (TX=17, RX=16) ──────────────────────────────────
+uart = None
+try:
+    uart = UART(1, tx=17, rx=16)
+    uart.init(115200, bits=8, parity=None, stop=1)
+    print("GPS UART initialized on TX:17 RX:16")
+except Exception as e:
+    print("GPS UART init error:", e)
+
+gps_buffer = ""
+last_known_gps = (BASE_LAT, BASE_LON, 8)
+
+def nmea_to_decimal(coord, direction):
+    try:
+        degres_len = 2 if direction in ('N', 'S') else 3
+        degres = int(coord[0:degres_len])
+        minutes = float(coord[degres_len:])
+        decimal = degres + minutes / 60
+        if direction in ('S', 'W'):
+            decimal = -decimal
+        return decimal
+    except:
+        return None
+
+def read_real_gps():
+    global gps_buffer
+    if uart is None or not uart.any():
+        return None
+
+    try:
+        data = uart.read()
+        if data:
+            gps_buffer += data.decode('utf-8', 'ignore')
+
+        if '\n' in gps_buffer:
+            lines = gps_buffer.split('\n')
+            gps_buffer = lines[-1]
+            gga_lines = [l for l in lines if 'GGA' in l]
+
+            if gga_lines:
+                trame = gga_lines[-1].strip()
+                champs = trame.split(',')
+                if len(champs) >= 10:
+                    lat_brute = champs[2]
+                    lat_dir   = champs[3]
+                    lon_brute = champs[4]
+                    lon_dir   = champs[5]
+                    qualite   = champs[6]
+                    nb_sat    = champs[7]
+
+                    if lat_brute and lon_brute and qualite != '0':
+                        lat = nmea_to_decimal(lat_brute, lat_dir)
+                        lon = nmea_to_decimal(lon_brute, lon_dir)
+                        sats = int(nb_sat) if nb_sat.isdigit() else 8
+                        if lat is not None and lon is not None:
+                            return round(lat, 6), round(lon, 6), sats
+    except Exception as e:
+        print("GPS NMEA parse error:", e)
+
+    return None
+
+def get_gps_data():
+    global last_known_gps
+    real = read_real_gps()
+    if real is not None:
+        last_known_gps = real
+        return real
+
+    # Si le GPS physique n'a pas encore de Fix satellite, on garde la dernière position
+    return last_known_gps
 
 def connect_wifi():
     import wifiCfg
@@ -249,8 +315,12 @@ def send_data(lat, lon, sats, features, battery):
             "window_samples": features["window_samples"],
         }
 
-        url     = API_BASE_URL + "/api/v1/telemetry"
-        headers = {"Content-Type": "application/json"}
+        url     = API_BASE_URL + "/api/v1/telemetry/"
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "M5Stack",
+            "ngrok-skip-browser-warning": "true"
+        }
         body    = ujson.dumps(payload)
 
         print("POST", url)
@@ -259,11 +329,12 @@ def send_data(lat, lon, sats, features, battery):
         response.close()
 
         print("Response:", status_code)
-        return (status_code in (200, 201)), status_code
+        return (status_code in (200, 201)), str(status_code)
 
     except Exception as e:
-        print("Send error:", e)
-        return False, 0
+        err_str = str(e)
+        print("Send error:", err_str)
+        return False, err_str[:12]
 
 # ============================================================
 # AFFICHAGE
@@ -336,7 +407,7 @@ last_send = 0
 while True:
     try:
         counter += 1
-        lat, lon, sats = get_simulated_gps()
+        lat, lon, sats = get_gps_data()
         battery        = get_battery()
         ensure_wifi()
 
@@ -347,8 +418,8 @@ while True:
             xs, ys, zs = collect_window()
             features   = extract_window_features(xs, ys, zs)
 
-            success, status_code = send_data(lat, lon, sats, features, battery)
-            status_msg = "OK" if success else "ERR_{}".format(status_code)
+            success, status_info = send_data(lat, lon, sats, features, battery)
+            status_msg = "OK" if success else "ERR: {}".format(status_info)
             last_send  = time.time()
 
             print("[{}] Act:{:.3f}g State:{} X:{:.3f} Y:{:.3f} Z:{:.3f}".format(

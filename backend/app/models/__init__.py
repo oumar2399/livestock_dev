@@ -10,18 +10,22 @@ from app.models.telemetry import Telemetry
 from app.models.alert import Alert
 from app.models.farm import Farm
 from app.models.geofence import Geofence
-
-# À ajouter plus tard :
-# from app.models.farm import Farm
-# from app.models.geofence import Geofence
-# from app.models.device import Device
+from app.models.feedback import PredictionFeedback, AlertFeedback
+from app.models.daily_summary import DailyBehaviorSummary
+from app.models.membership import FarmMembership
+from app.models.job_run import DailyJobRun
 
 __all__ = [
     "Base",
     "User",
     "Farm",
-    "Animal", 
+    "FarmMembership",
+    "Animal",
     "Telemetry",
     "Alert",
     "Geofence",
+    "PredictionFeedback",
+    "AlertFeedback",
+    "DailyBehaviorSummary",
+    "DailyJobRun",
 ]

@@ -1,20 +1,33 @@
 """
 Routes API Animals - CRUD animaux
+Farm-scoped: all operations require active membership on the animal's farm.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 
 from app.db.database import get_db
 from app.models.animal import Animal
 from app.models.telemetry import Telemetry
+from app.models.user import User
 from app.schemas.animal import (
     AnimalCreate,
     AnimalUpdate,
     AnimalResponse,
     AnimalList
 )
-from app.core.dependencies import require_authenticated, require_farmer
+from app.core.dependencies import (
+    get_current_user,
+    require_admin,
+)
+from app.core.access import (
+    get_accessible_farm_ids,
+    require_farm,
+    require_animal_access,
+    resolve_farm_scope,
+)
+from app.services.device_assignment import validate_device_assignment
 
 router = APIRouter(
     prefix="/animals",
@@ -22,47 +35,44 @@ router = APIRouter(
 )
 
 # ============================================================
-# GET /api/v1/animals - Liste animaux
+# GET /api/v1/animals - Liste animaux (farm-scoped)
 # ============================================================
 
 @router.get("/", response_model=AnimalList)
 async def list_animals(
-    farm_id: Optional[int] = Query(None, description="Filtrer par ferme"),
-    status: Optional[str] = Query(None, description="Filtrer par statut"),
-    page: int = Query(1, ge=1, description="Numéro page"),
-    page_size: int = Query(50, ge=1, le=100, description="Taille page"),
+    farm_id: Optional[int] = Query(None, description="Filter by farm"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=100, description="Page size"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_authenticated),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Liste tous les animaux avec pagination
+    List animals — only those in farms the user has access to.
     """
-    
-    # Base query
-    query = db.query(Animal)
-    
-    # Filtres optionnels
-    if farm_id:
-        query = query.filter(Animal.farm_id == farm_id)
+    allowed_farm_ids = resolve_farm_scope(current_user, db, farm_id)
+
+    # Base query — scoped to accessible farms
+    query = db.query(Animal).filter(Animal.farm_id.in_(allowed_farm_ids))
+
+    # Optional status filter
     if status:
         query = query.filter(Animal.status == status)
-    
-    # Total avant pagination
+
+    # Total before pagination
     total = query.count()
-    
+
     # Pagination
     offset = (page - 1) * page_size
     animals = query.offset(offset).limit(page_size).all()
-    
-    # Convertir en AnimalResponse (avec from_orm)
+
+    # Build response with last telemetry
     animal_responses = []
     for animal in animals:
-        # Dernière position (optionnel)
         last_telemetry = db.query(Telemetry).filter(
             Telemetry.animal_id == animal.id
         ).order_by(Telemetry.time.desc()).first()
-        
-        # Créer dict avec toutes les infos
+
         animal_dict = {
             "id": animal.id,
             "farm_id": animal.farm_id,
@@ -82,9 +92,9 @@ async def list_animals(
             "last_longitude": last_telemetry.longitude if last_telemetry else None,
             "last_update": last_telemetry.time if last_telemetry else None
         }
-        
+
         animal_responses.append(AnimalResponse(**animal_dict))
-    
+
     return AnimalList(
         total=total,
         animals=animal_responses,
@@ -100,22 +110,18 @@ async def list_animals(
 async def get_animal(
     animal_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_authenticated),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Obtenir détails d'un animal spécifique
+    Get animal details — requires membership on the animal's farm.
     """
-    animal = db.query(Animal).filter(Animal.id == animal_id).first()
-    
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
-    
-    # Dernière position
+    animal = require_animal_access(current_user, animal_id, "view_animals", db)
+
+    # Last position
     last_telemetry = db.query(Telemetry).filter(
         Telemetry.animal_id == animal_id
     ).order_by(Telemetry.time.desc()).first()
-    
-    # Créer dict complet
+
     animal_dict = {
         "id": animal.id,
         "farm_id": animal.farm_id,
@@ -135,7 +141,7 @@ async def get_animal(
         "last_longitude": last_telemetry.longitude if last_telemetry else None,
         "last_update": last_telemetry.time if last_telemetry else None
     }
-    
+
     return AnimalResponse(**animal_dict)
 
 # ============================================================
@@ -146,32 +152,15 @@ async def get_animal(
 async def create_animal(
     animal_data: AnimalCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_farmer),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Créer un nouvel animal
-    
-    **Utilisé lors ajout animal au système**
-    
-    Body JSON:
-```json
-    {
-      "name": "Marguerite",
-      "farm_id": 1,
-      "official_id": "FR001",
-      "species": "bovine",
-      "breed": "Holstein",
-      "sex": "F",
-      "birth_date": "2021-03-15",
-      "assigned_device": "M5-001"
-    }
-```
-    
-    Returns:
-        Animal créé avec ID
+    Create animal — requires edit_animals permission on the target farm.
     """
-    
-    # Vérifier official_id unique (si fourni)
+    # Verify farm access with edit permission
+    require_farm(current_user, animal_data.farm_id, "edit_animals", db)
+
+    # Check official_id uniqueness
     if animal_data.official_id:
         existing = db.query(Animal).filter(
             Animal.official_id == animal_data.official_id
@@ -181,13 +170,27 @@ async def create_animal(
                 status_code=400,
                 detail=f"Animal with official_id {animal_data.official_id} already exists"
             )
-    
-    # Créer animal
-    animal = Animal(**animal_data.dict())
+
+    create_data = animal_data.dict()
+    create_data["assigned_device"] = validate_device_assignment(
+        db,
+        current_user,
+        animal_data.farm_id,
+        animal_data.assigned_device,
+    )
+
+    animal = Animal(**create_data)
     db.add(animal)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Official ID or assigned device is already in use",
+        ) from exc
     db.refresh(animal)
-    
+
     return animal
 
 # ============================================================
@@ -199,44 +202,36 @@ async def update_animal(
     animal_id: int,
     animal_data: AnimalUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(require_farmer),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Modifier un animal existant
-    
-    **Utilisé pour mettre à jour infos (poids, device assigné, statut, etc.)**
-    
-    Path params:
-    - animal_id: ID de l'animal à modifier
-    
-    Body JSON (tous champs optionnels):
-```json
-    {
-      "name": "Nouveau nom",
-      "weight": 450.5,
-      "assigned_device": "M5-002",
-      "status": "sick"
-    }
-```
-    
-    Returns:
-        Animal modifié
+    Update animal — requires edit_animals permission on the animal's farm.
     """
-    
-    animal = db.query(Animal).filter(Animal.id == animal_id).first()
-    
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
-    
-    # Mettre à jour seulement champs fournis (exclude_unset=True)
+    animal = require_animal_access(current_user, animal_id, "edit_animals", db)
+
     update_data = animal_data.dict(exclude_unset=True)
-    
+    if "assigned_device" in update_data:
+        update_data["assigned_device"] = validate_device_assignment(
+            db,
+            current_user,
+            animal.farm_id,
+            update_data["assigned_device"],
+            current_animal_id=animal.id,
+        )
+
     for field, value in update_data.items():
         setattr(animal, field, value)
-    
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Official ID or assigned device is already in use",
+        ) from exc
     db.refresh(animal)
-    
+
     return animal
 
 # ============================================================
@@ -247,26 +242,15 @@ async def update_animal(
 async def delete_animal(
     animal_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(require_farmer),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Supprimer un animal
-    
-    **ATTENTION : Supprime aussi télémétrie et alertes associées (CASCADE)**
-    
-    Path params:
-    - animal_id: ID de l'animal à supprimer
-    
-    Returns:
-        204 No Content (succès sans body)
+    Delete animal — requires edit_animals permission on the animal's farm.
+    CASCADE deletes telemetry and alerts.
     """
-    
-    animal = db.query(Animal).filter(Animal.id == animal_id).first()
-    
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
-    
+    animal = require_animal_access(current_user, animal_id, "edit_animals", db)
+
     db.delete(animal)
     db.commit()
-    
+
     return None  # 204 No Content

@@ -51,7 +51,7 @@ function AlertCard({ alert }: { alert: Alert }) {
       <View style={styles.alertContent}>
         <Text style={styles.alertTitle} numberOfLines={1}>{alert.title}</Text>
         <Text style={styles.alertMeta}>
-          {alert.animal_name ?? 'Inconnu'} · {timeAgo(alert.triggered_at)}
+          {alert.animal_name ?? 'Unknown'} · {timeAgo(alert.triggered_at)}
         </Text>
       </View>
       <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
@@ -64,11 +64,12 @@ function AlertCard({ alert }: { alert: Alert }) {
 function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: TelemetryLatest }) {
   const navigation = useNavigation<any>();
   const statusColor = animalStatusColor(animal.status);
-  const behaviorColor = activityStateColor(telemetry?.activity !== undefined
-    ? telemetry.activity < 0.15 ? 'lying'
-    : telemetry.activity < 0.5 ? 'standing'
-    : telemetry.activity < 1.0 ? 'walking' : 'running'
-    : null);
+
+  // Use the ML-predicted state from the backend (or fallback to threshold)
+  const activityState = telemetry
+    ? (telemetry.activity_state ?? (telemetry.activity < 0.5 ? 'Resting' : 'Active'))
+    : null;
+  const behaviorColor = activityStateColor(activityState as any);
 
   return (
     <TouchableOpacity
@@ -94,14 +95,10 @@ function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: Telemetr
       </View>
 
       <View style={styles.animalRight}>
-        {telemetry ? (
+        {telemetry && activityState ? (
           <View style={[styles.behaviorTag, { backgroundColor: behaviorColor + '20' }]}>
             <Text style={[styles.behaviorText, { color: behaviorColor }]}>
-              {activityStateLabel(
-                telemetry.activity < 0.15 ? 'lying'
-                : telemetry.activity < 0.5 ? 'standing'
-                : telemetry.activity < 1.0 ? 'walking' : 'running'
-              )}
+              {activityStateLabel(activityState as any)}
             </Text>
           </View>
         ) : (
@@ -151,11 +148,11 @@ export default function DashboardScreen() {
   const unresolvedCount = alertsQuery.data?.unresolved_count ?? 0;
 
   if (animalsQuery.isLoading && !animalsQuery.data) {
-    return <LoadingState message="Chargement du troupeau…" />;
+    return <LoadingState message="Loading herd..." />;
   }
 
   if (animalsQuery.isError) {
-    return <ErrorState message="Impossible de charger les données" onRetry={onRefresh} />;
+    return <ErrorState message="Failed to load data" onRetry={onRefresh} />;
   }
 
   return (

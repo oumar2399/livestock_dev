@@ -1,7 +1,7 @@
 """
 Schémas Pydantic pour Telemetry - Données capteurs
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import datetime
 
@@ -15,9 +15,11 @@ class TelemetryBase(BaseModel):
     satellites : Optional[int]   = Field(None, ge=0, le=50)
 
     # Activité (rétrocompat — toujours présent)
-    activity       : float          = Field(..., ge=0, le=20)
-    activity_std   : Optional[float] = Field(None, ge=0)
-    activity_state : Optional[str]   = Field(None, max_length=20)
+    activity            : float           = Field(..., ge=0, le=20)
+    activity_std        : Optional[float] = Field(None, ge=0)
+    activity_state      : Optional[str]   = Field(None, max_length=20)
+    predicted_behavior  : Optional[str]   = None
+    behavior_confidence : Optional[float] = None
 
     # ── Accéléromètre 3 axes (NEW — tous optionnels) ────────
     accel_x_mean : Optional[float] = None
@@ -81,15 +83,15 @@ class TelemetryCreate(TelemetryBase):
 
 
 class TelemetryResponse(TelemetryBase):
-    time      : datetime
-    animal_id : Optional[int] = None
-    battery   : int = Field(..., alias="battery_level",
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    time                : datetime
+    animal_id           : Optional[int] = None
+    battery             : int = Field(..., alias="battery_level",
                             serialization_alias="battery")
-
-    class Config:
-        orm_mode         = True
-        populate_by_name = True
-
+    has_feedback        : Optional[bool] = False
+    feedback_verdict    : Optional[str] = None
+    feedback_correction : Optional[str] = None
 
 class TelemetryLatest(BaseModel):
     """Dernière position d'un animal (vue optimisée)"""
@@ -99,5 +101,6 @@ class TelemetryLatest(BaseModel):
     latitude    : float
     longitude   : float
     activity    : float
+    activity_state : Optional[str] = None
     battery     : int
     last_update : datetime

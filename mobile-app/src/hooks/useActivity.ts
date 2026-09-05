@@ -13,10 +13,8 @@ export interface ActivitySummary {
   total_records: number;
   duration_hours: number;
   budget: {
-    lying: ActivityBudgetItem;
-    standing: ActivityBudgetItem;
-    walking: ActivityBudgetItem;
-    running: ActivityBudgetItem;
+    Active: ActivityBudgetItem;
+    Resting: ActivityBudgetItem;
   };
   averages: {
     activity: number;
