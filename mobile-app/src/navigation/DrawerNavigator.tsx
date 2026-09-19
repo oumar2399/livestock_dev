@@ -120,7 +120,7 @@ function DrawerContent(props: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
   const { user, role, logout } = useAuthStore();
   const queryClient = useQueryClient();
-  const { farms, currentFarmId, selectFarm, clear: clearFarms } = useFarmStore();
+  const { farms, currentFarmId, selectFarm } = useFarmStore();
   const currentFarm = farms.find((farm) => farm.id === currentFarmId) ?? null;
   const currentRole = role === 'admin' ? 'admin' : currentFarm?.membership_role;
 
@@ -141,11 +141,7 @@ function DrawerContent(props: DrawerContentComponentProps) {
       {
         text: 'Logout',
         style: 'destructive',
-        onPress: async () => {
-          queryClient.clear();
-          await clearFarms();
-          await logout();
-        },
+        onPress: logout,
       },
     ]);
   };

@@ -16,6 +16,7 @@ import { ReportDataset } from '../../types';
 
 const DATASETS: { value: ReportDataset; label: string; icon: string }[] = [
   { value: 'telemetry', label: 'Telemetry', icon: 'pulse-outline' },
+  { value: 'untimed_telemetry', label: 'Untimed windows', icon: 'time-outline' },
   { value: 'daily_summaries', label: 'Daily summaries', icon: 'calendar-outline' },
   { value: 'alerts', label: 'Alerts', icon: 'warning-outline' },
   { value: 'prediction_feedbacks', label: 'Prediction feedback', icon: 'analytics-outline' },
@@ -56,17 +57,20 @@ export default function ReportsScreen() {
 
 function ReportsWorkspace({ farmId, farmName }: { farmId?: number; farmName: string }) {
   const [dataset, setDataset] = useState<ReportDataset>('telemetry');
+  const [deviceId, setDeviceId] = useState('');
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const exportReport = useReportExport();
-  const datesRequired = dataset === 'telemetry';
+  const untimed = dataset === 'untimed_telemetry';
+  const datesRequired = dataset === 'telemetry' || untimed;
   const datesValid = useMemo(
     () => (!dateFrom || (ISO_DATE.test(dateFrom) && isMatch(dateFrom, 'yyyy-MM-dd'))) &&
       (!dateTo || (ISO_DATE.test(dateTo) && isMatch(dateTo, 'yyyy-MM-dd'))),
     [dateFrom, dateTo],
   );
-  const params = useMemo(() => ({ dataset, farmId, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
-    [dataset, farmId, dateFrom, dateTo]);
+  const params = useMemo(() => ({ dataset, farmId, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
+    ...(untimed && deviceId.trim() ? { deviceId: deviceId.trim() } : {}) }),
+    [dataset, farmId, dateFrom, dateTo, untimed, deviceId]);
   const filterKey = JSON.stringify(params);
   const debouncedParams = useDebouncedValue(params, PREVIEW_DELAY_MS);
   const debouncedKey = JSON.stringify(debouncedParams);
@@ -81,7 +85,7 @@ function ReportsWorkspace({ farmId, farmName }: { farmId?: number; farmName: str
 
   const validatePeriod = () => {
     if (datesRequired && (!dateFrom || !dateTo)) {
-      Alert.alert('Dates required', 'Telemetry exports require a start and end date.');
+      Alert.alert('Dates required', untimed ? 'Both reception dates are required.' : 'Telemetry exports require a start and end date.');
       return false;
     }
     if (!datesValid || (dateFrom && dateTo && dateTo < dateFrom)) {
@@ -101,7 +105,7 @@ function ReportsWorkspace({ farmId, farmName }: { farmId?: number; farmName: str
   };
 
   return (
-    <DrawerScreenBase title="Reports & Exports" subtitle={farmName}>
+    <DrawerScreenBase title="Reports & Exports" subtitle={untimed ? `Reception context: ${farmName}` : farmName}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.sectionLabel}>DATASET</Text>
         <View style={styles.datasetGrid}>
@@ -124,17 +128,23 @@ function ReportsWorkspace({ farmId, farmName }: { farmId?: number; farmName: str
           })}
         </View>
 
-        <Text style={styles.sectionLabel}>PERIOD</Text>
+        {untimed && <View>
+          <Text style={styles.sectionLabel}>DEVICE</Text>
+          <TextInput accessibilityLabel="Device ID" maxLength={50} autoCapitalize="none"
+            value={deviceId} onChangeText={setDeviceId} editable={!busy} placeholder="All devices"
+            placeholderTextColor={Colors.text.disabled} style={styles.input} />
+        </View>}
+        <Text style={styles.sectionLabel}>{untimed ? 'RECEPTION PERIOD' : 'PERIOD'}</Text>
         <View style={styles.dateRow}>
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>From</Text>
-            <TextInput accessibilityLabel="From date" editable={!exportReport.isPending}
+            <Text style={styles.fieldLabel}>{untimed ? 'Received from' : 'From'}</Text>
+            <TextInput accessibilityLabel={untimed ? 'Received from date' : 'From date'} editable={!exportReport.isPending}
               value={dateFrom} onChangeText={setDateFrom} placeholder="YYYY-MM-DD"
               placeholderTextColor={Colors.text.disabled} style={styles.input} autoCapitalize="none" />
           </View>
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>To</Text>
-            <TextInput accessibilityLabel="To date" editable={!exportReport.isPending}
+            <Text style={styles.fieldLabel}>{untimed ? 'Received to' : 'To'}</Text>
+            <TextInput accessibilityLabel={untimed ? 'Received to date' : 'To date'} editable={!exportReport.isPending}
               value={dateTo} onChangeText={setDateTo} placeholder="YYYY-MM-DD"
               placeholderTextColor={Colors.text.disabled} style={styles.input} autoCapitalize="none" />
           </View>
@@ -155,7 +165,7 @@ function ReportsWorkspace({ farmId, farmName }: { farmId?: number; farmName: str
             <View style={styles.previewState} accessibilityLiveRegion="polite">
               <Ionicons name="calendar-outline" size={28} color={Colors.text.muted} />
               <Text style={styles.stateTitle}>Select a valid period</Text>
-              {datesRequired && <Text style={styles.hint}>Telemetry requires both dates.</Text>}
+              {datesRequired && <Text style={styles.hint}>{untimed ? 'Both reception dates are required.' : 'Telemetry requires both dates.'}</Text>}
             </View>
           ) : previewPending ? (
             <View style={styles.previewState} accessibilityLiveRegion="polite">
@@ -211,7 +221,7 @@ const styles = StyleSheet.create({
   datasetGrid: { gap: Spacing.sm },
   datasetButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border.default, backgroundColor: Colors.bg.card },
   datasetButtonActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
-  datasetText: { color: Colors.text.secondary, fontSize: Typography.sm, fontWeight: '600' },
+  datasetText: { color: Colors.text.secondary, fontSize: Typography.sm, fontWeight: '600', flexShrink: 1 },
   datasetTextActive: { color: Colors.text.primary },
   dateRow: { flexDirection: 'row', gap: Spacing.sm },
   field: { flex: 1 },

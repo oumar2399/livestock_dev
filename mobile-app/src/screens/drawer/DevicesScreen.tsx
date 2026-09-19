@@ -13,6 +13,7 @@ import DrawerScreenBase from './DrawerScreenBase';
 import { Colors, Spacing, Typography, Radius } from '../../constants/config';
 import { timeAgo } from '../../utils/helpers';
 import apiClient from '../../api/client';
+import { queryClient } from '../../api/queryClient';
 import { useFarmStore } from '../../store/farmStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,6 +27,7 @@ interface Device {
   status:           'active' | 'maintenance' | 'lost' | 'retired';
   notes:            string | null;
   created_at:       string;
+  ingestion_revoked_at?: string | null;
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -137,6 +139,7 @@ function DeviceCard({
       </View>
 
       {/* Notes if any */}
+      {device.ingestion_revoked_at && <Text style={styles.notes}>Reception revoked</Text>}
       {device.notes && (
         <Text style={styles.notes}>{device.notes}</Text>
       )}
@@ -175,6 +178,12 @@ export default function DevicesScreen() {
   useEffect(() => { load(); }, [load]);
 
   // Change device status via PATCH /devices/{id}
+  const refreshDeviceData = () => {
+    for (const key of ['telemetry', 'activity', 'animals', 'alerts']) {
+      void queryClient.invalidateQueries({ queryKey: [key] });
+    }
+    void load();
+  };
   const handleChangeStatus = (deviceId: string, currentStatus: string) => {
     const statuses = ['active', 'maintenance', 'lost', 'retired'];
     Alert.alert(
@@ -186,9 +195,21 @@ export default function DevicesScreen() {
           .map(s => ({
             text: STATUS_LABELS[s],
             onPress: async () => {
+              if (currentStatus === 'lost' && s === 'active') {
+                Alert.alert('Collar recovered', 'Is this collar secured on the correct animal again?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Confirm remounted', onPress: async () => {
+                    try {
+                      await apiClient.patch(`/devices/${deviceId}`, { status: s, confirm_remounted: true });
+                      refreshDeviceData();
+                    } catch { Alert.alert('Error', 'Unable to confirm collar recovery.'); }
+                  } },
+                ]);
+                return;
+              }
               try {
                 await apiClient.patch(`/devices/${deviceId}`, { status: s });
-                load();
+                refreshDeviceData();
               } catch {
                 Alert.alert('Error', 'Failed to update device status.');
               }

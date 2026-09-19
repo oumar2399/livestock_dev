@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import TARGET_TIMEZONE, settings
 from app.core.timezone import utc_now
-from app.services.ml_inference import get_model_info
+from app.services.ml_inference import get_model_info, get_profile_status
 
 
 def _database_health(db: Session) -> dict[str, Any]:
@@ -40,8 +40,8 @@ def _schema_health(db: Session, database_is_up: bool) -> dict[str, Any]:
 def _model_health() -> dict[str, Any]:
     info = get_model_info()
     if info is None:
-        return {"status": "unavailable", "classes": []}
-    return {"status": "loaded", "classes": info.get("classes", [])}
+        return {"status": "unavailable", "classes": [], "profiles": get_profile_status()}
+    return {"status": "loaded", "classes": info.get("classes", []), "profiles": get_profile_status()}
 
 
 def _scheduler_health() -> dict[str, Any]:

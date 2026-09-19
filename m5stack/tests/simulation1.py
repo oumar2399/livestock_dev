@@ -3,6 +3,16 @@ Livestock Monitoring System - v2.0
 Windowed accelerometry : 3 axes X/Y/Z à 10 Hz sur fenêtres de 5s
 Features statistiques envoyées au backend (mean, std, min, max)
 """
+import device_config as config
+
+telemetry_mode = getattr(config, "TELEMETRY_MODE", "json")
+if telemetry_mode not in ("json", "binary_v2"):
+    raise ValueError("Unknown TELEMETRY_MODE")
+if telemetry_mode == "binary_v2":
+    from b4_runtime import run
+    run(config)
+    raise SystemExit
+
 from m5stack import *
 from m5ui import *
 import urequests

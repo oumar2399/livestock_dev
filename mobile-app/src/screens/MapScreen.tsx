@@ -18,7 +18,8 @@ import { useNavigation } from '@react-navigation/native';
 
 import { useTelemetryLatest } from '../hooks/useTelemetry';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
-import { TelemetryLatest, ActivityState } from '../types';
+import { PositionedTelemetry as TelemetryLatest, ActivityState } from '../types';
+import { mapAnimals, positionRecency } from '../utils/geofenceMap';
 import {
   activityStateColor,
   activityStateLabel,
@@ -41,7 +42,8 @@ function getActivityStateFallback(activity: number): ActivityState {
 
 /** Resolve the activity state from a TelemetryLatest point.
  *  Prefers the backend ML prediction; falls back to threshold if null. */
-function resolveActivityState(point: TelemetryLatest): ActivityState {
+function resolveActivityState(point: TelemetryLatest): ActivityState | null {
+  if (point.behavior_eligible === false) return null;
   return (point.activity_state as ActivityState) ?? getActivityStateFallback(point.activity);
 }
 
@@ -73,6 +75,7 @@ function centroid(points: TelemetryLatest[]) {
 const ISOLATION_THRESHOLD_KM = 0.8; // 2km
 
 function detectIsolatedAnimals(points: TelemetryLatest[]): Set<number> {
+  points = points.filter((point) => positionRecency(point.last_update, Date.now()) === 'recent');
   if (points.length <= 2) return new Set();
   const sortedLats = [...points.map(p => p.latitude)].sort((a, b) => a - b);
   const sortedLons = [...points.map(p => p.longitude)].sort((a, b) => a - b);
@@ -182,7 +185,8 @@ function ClusterMarker({
 }) {
   const count = cluster.points.length;
   // Couleur dominante du cluster (état le plus actif)
-  const dominantState = cluster.points.some(p => resolveActivityState(p) === 'Active') ? 'Active' as ActivityState : 'Resting' as ActivityState;
+  const states = cluster.points.map(resolveActivityState).filter(Boolean);
+  const dominantState = states.length ? (states.includes('Active') ? 'Active' : 'Resting') : null;
   const color = activityStateColor(dominantState);
 
   return (
@@ -264,7 +268,7 @@ function AnimalInfoSheet({
             <Ionicons name="pulse-outline" size={18} color={Colors.primary} />
           </View>
           <Text style={styles.infoStatLabel}>Activity</Text>
-          <Text style={styles.infoStatValue}>{point.activity.toFixed(2)} g</Text>
+          <Text style={styles.infoStatValue}>{point.behavior_eligible === false ? 'Unavailable' : point.activity.toFixed(2) + ' g'}</Text>
         </View>
         <View style={styles.infoStat}>
           <View style={[styles.infoStatIcon, { backgroundColor: batColor + '20' }]}>
@@ -363,7 +367,7 @@ export default function MapScreen() {
   const [showDistantSheet, setShowDistantSheet] = useState(false);
 
   const allPoints = useMemo(() => {
-  return (data ?? []).map(p => ({
+  return mapAnimals(data ?? []).filter(p => p.position_is_animal !== false).map(p => ({
     ...p,
     latitude:  parseFloat(String(p.latitude)),
     longitude: parseFloat(String(p.longitude)),
@@ -371,6 +375,16 @@ export default function MapScreen() {
     battery:   parseInt(String(p.battery), 10),
     })).filter(p => !isNaN(p.latitude) && !isNaN(p.longitude));
   }, [data]);
+
+  useEffect(() => {
+    setSelectedAnimal((current) => current ? allPoints.find((point) => point.animal_id === current.animal_id) ?? null : null);
+    setSelectedCluster((current) => {
+      if (!current) return null;
+      const ids = new Set(current.points.map((point) => point.animal_id));
+      const members = allPoints.filter((point) => ids.has(point.animal_id));
+      return members.length ? { ...current, points: members, ...centroid(members) } : null;
+    });
+  }, [allPoints]);
 
   const { localPoints, distantAnimals } = useMemo(() => {
     if (allPoints.length === 0) return { localPoints: [], distantAnimals: [] as any[] };

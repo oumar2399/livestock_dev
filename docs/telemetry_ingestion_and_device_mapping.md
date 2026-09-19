@@ -1,15 +1,18 @@
 # Ingestion de la télémétrie et correspondance device-animal
 
-> État du code observé le 5 septembre 2026. Ce document décrit d'abord le
-> fonctionnement actuellement implémenté. La dernière partie décrit une
-> proposition pour un futur endpoint binaire ; cette proposition n'est pas
-> encore implémentée.
+> Mise à jour du 7 septembre 2026 : les entrées JSON et binaire sont implémentées
+> et partagent le même service d'ingestion. Le firmware reste en JSON.
+> La section 11 décrit le binaire livré ; le plan détaillé et le bilan de tests
+> sont dans `plan_implementation_telemetrie_binaire.md` et `validation_telemetrie_binaire.md`.
 
 ## 1. Fichiers de référence
 
 | Rôle | Fichier actuel |
 |---|---|
-| Endpoint de réception JSON | `backend/app/api/v1/telemetry.py` |
+| Endpoints de réception JSON et binaire | `backend/app/api/v1/telemetry.py` |
+| Service commun d'ingestion | `backend/app/services/telemetry_ingestion.py` |
+| Contrat binaire v1 | `backend/app/core/binary_protocol.py` |
+| Décodeur indépendant | `backend/app/services/binary_telemetry.py` |
 | Schémas Pydantic de télémétrie | `backend/app/schemas/telemetry.py` |
 | Modèle SQLAlchemy `Telemetry` | `backend/app/models/telemetry.py` |
 | Modèle SQLAlchemy `Device` | `backend/app/models/device.py` |
@@ -81,15 +84,20 @@ Déclaration FastAPI actuelle :
 
 ```python
 @router.post("/", response_model=TelemetryResponse, status_code=201)
-async def receive_telemetry(
+def receive_telemetry(
     data: TelemetryCreate,
     db: Session = Depends(get_db),
+    device_secret: Optional[str] = Header(None, alias=DEVICE_SECRET_HEADER),
 ):
+    _authenticated_device(db, device_secret, device_id=data.device_id)
+    return ingest_telemetry(data, db).telemetry
 ```
 
-Cette route d'ingestion matérielle ne demande actuellement ni JWT, ni clé API,
-ni signature propre au device. Connaître un `device_id` valide suffit donc pour
-tenter une injection de télémétrie.
+Cette route ne demande pas de JWT utilisateur. Elle exige `X-Device-Secret`
+si le device est provisionné ; sinon elle conserve le mode historique ouvert.
+L'authentification précède tout effet métier. La route `def` et le service
+synchrone s'exécutent dans le threadpool FastAPI. La logique décrite dans les
+sous-sections suivantes réside désormais dans `services/telemetry_ingestion.py`.
 
 ### 3.2 Validation avant l'exécution de l'endpoint
 
@@ -237,7 +245,7 @@ actuel limite en plus les valeurs à :
 walking, standing, lying, running, Active, Resting
 ```
 
-Un futur décodeur binaire doit donc produire une de ces valeurs ou `NULL`.
+Le décodeur binaire v1 laisse cet état absent : le service le calcule depuis `activity`.
 
 ### 3.8 GPS et géographie PostGIS
 
@@ -284,8 +292,9 @@ db.refresh(telemetry)
 Sur succès, la réponse est `201 Created` et suit `TelemetryResponse`.
 
 La clé primaire de la télémétrie est `(animal_id, time)`. Deux mesures du même
-animal avec exactement le même timestamp entreraient donc en conflit. Ce cas
-n'est pas transformé actuellement en erreur métier explicite.
+animal avec exactement le même timestamp entreraient donc en conflit. Sur le
+JSON historique, ce cas n'est pas transformé en erreur métier explicite.
+Le binaire traite séparément les renvois avec `200` ou `409` (section 11).
 
 ## 4. Contrat Pydantic de télémétrie
 
@@ -431,6 +440,8 @@ Table PostgreSQL : `devices`.
 | Colonne SQL | Type | Nullable | Défaut / valeurs actuelles | Rôle |
 |---|---|:---:|---|---|
 | `id` | `VARCHAR(50)` | non | aucune | clé primaire, par ex. `M5-001` |
+| `transport_id` | `INTEGER` | oui | unique, 1..65535 | identifiant binaire compact, 0 réservé |
+| `device_secret` | `VARCHAR(64)` | oui | empreinte SHA-256 hexadécimale | secret brut jamais stocké ni retourné |
 | `farm_id` | `INTEGER` | oui | `NULL` pour un orphelin | clé étrangère vers `farms.id` |
 | `model` | `VARCHAR(100)` | oui | auto-inscription : `M5Stack M5GO` | modèle matériel |
 | `firmware_version` | `VARCHAR(50)` | oui | auto-inscription : `NULL` | version firmware |
@@ -446,6 +457,9 @@ Indexes :
 PRIMARY KEY (id)
 idx_devices_farm (farm_id)
 idx_devices_status (status)
+uq_devices_transport_id UNIQUE (transport_id)
+ck_devices_transport_id_range CHECK (transport_id IS NULL OR transport_id BETWEEN 1 AND 65535)
+ck_devices_binary_credentials_pair CHECK (deux NULL ou deux valeurs présentes)
 ```
 
 ### 6.1 Schémas Pydantic des devices
@@ -454,6 +468,7 @@ idx_devices_status (status)
 
 ```text
 id: str
+transport_id: int | None
 farm_id: int | None
 model: str | None
 firmware_version: str | None
@@ -470,7 +485,15 @@ created_at: datetime
 status: str | None
 notes: str | None
 farm_id: int | None
+transport_id: int | None          entier strict, 1..65535
+device_secret: SecretStr | None   écriture seule, 64 caractères hexadécimaux minuscules
 ```
+
+Première activation : fournir `transport_id` et `device_secret` ensemble.
+Rotation : nouveau secret seul accepté, omission des champs sans effet ;
+effacement explicite refusé après provisioning. Permission `manage_devices`
+requise même si le PATCH reprend le `farm_id` actuel. Secret absent des réponses
+et entrées brutes des erreurs Pydantic. La base reçoit uniquement son empreinte.
 
 Il n'existe pas encore de schéma `DeviceCreate`. Les devices apparaissent au
 premier contact télémétrique, puis un administrateur peut réclamer un orphelin
@@ -670,204 +693,154 @@ Points importants :
 | Code | Signification actuelle |
 |---:|---|
 | `201` | télémétrie validée et enregistrée |
+| `401` | device JSON provisionné mais secret absent ou incorrect |
 | `404` | aucun animal actif affecté, cas normal d'un nouveau device orphelin |
 | `409` | divergence de ferme ; peut aussi apparaître pour un device déjà rattaché mais sans animal actif |
 | `422` | JSON, type ou contrainte Pydantic invalide |
 | `500` | erreur non transformée, par exemple certaines contraintes SQL ou un problème de commit |
 
-## 11. Proposition compatible pour un endpoint binaire
+## 11. Endpoint binaire v1 implémenté
 
-Cette section décrit une cible possible. Aucun élément de cette section n'est
-encore présent dans le code de production.
+### 11.1 Identité et provisioning
 
-### 11.1 Ne pas remplacer directement `devices.id`
+`devices.id`, `animals.assigned_device` et `telemetry.device_id` restent
+textuels. Le nouveau `devices.transport_id` identifie un device déjà présent,
+sans déduire son nom à partir du nombre. La migration `3d9f1b2c4a6e` ajoute
+les deux colonnes et les trois contraintes listées en section 6.
 
-Transformer la clé primaire textuelle `devices.id` en entier toucherait :
+`PATCH /api/v1/devices/{device_id}` permet l'activation atomique puis la rotation.
+Le secret brut est généré localement avec `generate_device_secret()` :
+32 octets aléatoires, représentés par 64 caractères hexadécimaux minuscules.
+`hash_device_secret()` stocke le SHA-256 de cette chaîne ASCII.
+Le secret est à conserver côté émetteur dans une configuration non versionnée.
 
-- la table `devices` ;
-- `animals.assigned_device` ;
-- toutes les lignes `telemetry.device_id` ;
-- les schémas Pydantic ;
-- les routes `/devices/{device_id}` ;
-- l'application mobile ;
-- les données historiques et les scripts M5Stack actuels.
-
-Pour éviter cette rupture, il est préférable de conserver l'identité textuelle
-et d'ajouter un identifiant numérique de transport :
-
-```text
-devices.id           = "M5-001"   identité métier existante
-devices.transport_id = 1          identifiant compact du protocole binaire
-```
-
-Nom recommandé : `transport_id`. Autres noms possibles, à éviter si plusieurs
-transports sont prévus : `lora_id` ou `binary_id`.
-
-Une première migration prudente pourrait ajouter :
-
-```text
-transport_id INTEGER NULL UNIQUE
-```
-
-Le champ resterait nullable pendant la transition. Une étape de provisioning
-attribuerait ensuite un code positif et unique aux devices utilisant le nouveau
-protocole. Si la plage est garantie inférieure ou égale à 32 767, un `SMALLINT`
-positif peut suffire ; sinon `INTEGER` est plus prudent.
-
-Le code numérique ne doit pas être déduit implicitement de `M5-001`, car ce
-format textuel n'est pas garanti pour tous les futurs devices et peut créer des
-collisions entre fabricants ou familles de matériel.
-
-### 11.2 Route binaire à ajouter à côté
-
-Route proposée :
+### 11.2 Route et format
 
 ```http
 POST /api/v1/telemetry/binary
 Content-Type: application/octet-stream
+X-Device-Secret: <secret local du device>
 ```
 
-Elle peut être ajoutée sur le même routeur sans modifier :
+Taille exacte : **45 octets**, little-endian, `<BHIiiBB12h2H`.
 
-```http
-POST /api/v1/telemetry/
-Content-Type: application/json
-```
+| Offset | Octets | Champ | Conversion |
+|---:|---:|---|---|
+| 0 | 1 | version | uint8, valeur 1 |
+| 1 | 2 | transport_id | uint16, 1..65535 |
+| 3 | 4 | timestamp | uint32 Unix UTC, fin de fenêtre |
+| 7 | 4 | latitude | int32 / 1 000 000 |
+| 11 | 4 | longitude | int32 / 1 000 000 |
+| 15 | 1 | satellites | uint8, 1..50 |
+| 16 | 1 | battery | uint8, 0..100 |
+| 17 | 24 | les 12 accel_* | int16 / 1 000, ordre ci-dessous |
+| 41 | 2 | activity | uint16 / 1 000, valeur décodée 0..20 |
+| 43 | 2 | activity_std | uint16 / 1 000 |
 
-### 11.3 Flux recommandé
+Ordre des features : `accel_x_mean`, `accel_x_std`, `accel_x_min`,
+`accel_x_max`, puis les quatre équivalents Y, puis Z. Limites physiques :
+[-6g, 6g], écart-type non négatif et `min <= mean <= max` sur chaque axe.
+Arrondi encodeur prévu : au plus proche, demi-unité éloignée de zéro,
+sans saturation silencieuse. Le backend divise les entiers reçus.
 
-```text
-Payload binaire
-  -> lecture et validation de l'en-tête
-  -> lecture de transport_id
-  -> recherche Device.transport_id == transport_id
-  -> récupération du Device.id textuel
-  -> décodage des mesures
-  -> dictionnaire avec les noms actuels
-  -> TelemetryCreate.model_validate(decoded_values)
-  -> fonction d'ingestion commune
-  -> TelemetryResponse / code HTTP
-```
+`activity` et `activity_std` sont transportés, car les 12 features ne
+permettent pas de reconstruire exactement ces statistiques de magnitude.
 
-Après décodage, le dictionnaire doit reprendre exactement les noms existants :
+### 11.3 Chaîne de traitement
 
-```text
-device_id
-latitude
-longitude
-altitude
-speed
-satellites
-activity
-activity_std
-activity_state
-accel_x_mean
-accel_x_std
-accel_x_min
-accel_x_max
-accel_y_mean
-accel_y_std
-accel_y_min
-accel_y_max
-accel_z_mean
-accel_z_std
-accel_z_min
-accel_z_max
-sample_rate
-window_samples
-temperature
-battery
-signal_strength
-timestamp
-```
+1. Dépendance `async read_binary_body` : type de contenu et limite effective
+   de 45 octets sur le flux, même sans `Content-Length`.
+2. Route `def receive_binary_telemetry` : lecture minimale version/transport_id.
+3. Résolution de `Device.transport_id`, verrou de ligne et authentification.
+   Device inconnu, non provisionné ou secret incorrect : même `401`, sans
+   décoder les mesures ni enregistrer de device.
+4. `decode_binary_payload(raw)` : dictionnaire aux noms `TelemetryCreate`,
+   sauf `device_id` que la route complète depuis le device authentifié.
+5. Validation des mesures et du timestamp : depuis le 1er janvier 2020 UTC,
+   au plus 300 secondes après l'heure de réception capturée avant lecture du corps.
+6. Validation du profil : `sample_rate=10`, `window_samples=50`, 5 secondes,
+   `ddof=0`. Modèle chargé incompatible : `409`. Modèle absent : fallback
+   habituel sans prédiction.
+7. `ingest_telemetry(data, db, idempotent=True)` : association animal actif,
+   cohérence de ferme, suivi device, ML, état physique et stockage communs au JSON.
 
-Le décodeur ne doit pas produire `predicted_behavior`, `behavior_confidence` ou
-`animal_id` : ces valeurs appartiennent au backend.
+Le décodeur ne fait ni requête SQL ni inférence. SQLAlchemy et ML s'exécutent
+dans le threadpool FastAPI de la route synchrone.
 
-### 11.4 Factoriser l'ingestion
+### 11.4 Champs non transportés et renvois
 
-La logique métier est actuellement contenue directement dans
-`receive_telemetry()`. Avant d'ajouter le binaire, la structure la plus sûre est :
+| Champ TelemetryCreate | Valeur pour le binaire v1 |
+|---|---|
+| device_id | Device.id résolu par le serveur |
+| sample_rate / window_samples | 10 / 50, constantes du profil v1 |
+| activity_state | absent ; calcul par seuils depuis activity |
+| predicted_behavior / behavior_confidence | calculés par le modèle côté serveur |
+| altitude / speed / temperature / signal_strength | None, stockés NULL |
 
-```text
-Endpoint JSON
-  -> TelemetryCreate automatique par FastAPI
-  -> ingest_telemetry(data, db)
+Le paquet ne contient ni `animal_id` ni `farm_id` : l'affectation actuelle
+reste décidée côté serveur. `Telemetry.time` reçoit le timestamp UTC.
+Aucune colonne `received_at` n'a été ajoutée et `Asia/Tokyo` reste le fuseau métier.
 
-Endpoint binaire
-  -> decode_binary_payload(raw_body)
-  -> Device trouvé via transport_id
-  -> TelemetryCreate.model_validate(decoded_payload)
-  -> ingest_telemetry(data, db)
-```
+Une nouvelle ligne donne `201`. Un renvoi avec la même clé `(animal_id, time)`
+et les mêmes champs sources, normalisés à la précision SQL, rend la ligne
+existante avec `200`. Aucune nouvelle inférence, écriture de batterie ou de
+`last_seen` dans ce cas. Une différence donne `409`, sans modifier la ligne.
+La prédiction n'est pas comparée : un modèle peut changer entre deux envois.
 
-La fonction commune devra garder exactement les responsabilités actuelles :
+Les requêtes d'un device connu utilisent un verrou de ligne, également pris
+au provisioning. Les conflits de clé primaire sont traités de façon ciblée
+après rollback ; les autres erreurs SQL ne sont pas masquées.
 
-1. résolution de l'animal actif ;
-2. synchronisation du device ;
-3. prédiction ML ;
-4. détermination de `activity_state` ;
-5. création du point PostGIS ;
-6. normalisation du timestamp ;
-7. construction de `Telemetry` ;
-8. transaction ;
-9. construction de la réponse.
+### 11.5 Sécurité et limites
 
-Le refactoring doit d'abord être couvert par des tests de non-régression du
-JSON actuel, avant l'ajout du décodeur.
+- `transport_id` n'est pas un authentifiant. `hmac.compare_digest` compare
+  les empreintes de secret ; HTTPS est requis. Ce n'est pas une signature par paquet.
+- Après provisioning, le JSON exige le même secret. Avant provisioning,
+  son ouverture historique reste une limite connue.
+- Le serveur contrôle bornes GPS et satellites, mais ne peut pas prouver qu'un
+  fix est frais. Le firmware futur doit rejeter les positions fictives/anciennes.
+- GGA contient l'heure mais pas la date : utiliser RMC ou ZDA du même récepteur
+  et dater la fin de fenêtre depuis une horloge UTC synchronisée. Ce parsing
+  firmware reste à réaliser, tout comme le traitement des retries embarqués.
+- Purger les paquets en attente avant de réaffecter un device : il n'existe
+  pas encore d'historique des affectations pour résoudre un ancien message.
+- Le v1 reste à 5 secondes. Le profil 15 secondes requiert une autre version,
+  coordonnée avec le modèle et le firmware.
+- LoRaWAN nécessite un adaptateur authentifié et une validation région/datarate.
+  Ne pas ajouter le secret HTTP aux 45 octets radio.
+- Le JSON et le binaire donnent les mêmes résultats pour les mêmes valeurs
+  déjà quantifiées. L'arrondi lui-même peut modifier une prédiction : 3 classes
+  changées sur 2 011 fenêtres locales. Voir le bilan de validation.
 
-### 11.5 Cas d'un code numérique inconnu
+### 11.6 Codes HTTP binaires
 
-Un code numérique inconnu ne contient pas assez d'information pour inventer de
-façon fiable un `devices.id` textuel. Le futur endpoint devrait donc refuser un
-`transport_id` inconnu, probablement avec `404`, plutôt que créer arbitrairement
-un device `M5-<nombre>`.
+| Code | Cas |
+|---:|---|
+| 201 | nouvelle mesure enregistrée |
+| 200 | renvoi identique, ligne existante |
+| 400 | corps incomplet, version non supportée ou ID réservé |
+| 401 | device inconnu/non provisionné ou secret invalide |
+| 413 | corps dépassant 45 octets |
+| 415 | type de contenu ou Content-Encoding non pris en charge |
+| 422 | mesures/date invalides après authentification |
+| 409 | mesures divergentes à la même clé, profil ML incompatible ou ferme incohérente |
+| 404 | aucun animal actif pour un device orphelin connu, comportement historique |
 
-Le device doit être provisionné auparavant avec les deux identifiants :
+## 12. Compatibilité préservée et activation
 
-```text
-id = "M5-001"
-transport_id = 1
-farm_id = ferme autorisée ou NULL avant réclamation
-```
+| Élément | Fonctionnement |
+|---|---|
+| JSON actuel, M5Stack sans timestamp | inchangé tant que le device n'est pas provisionné |
+| JSON minimal sans les 12 features | accepté, sans prédiction ; secret si provisionné |
+| Mobile, IDs textuels et historique | inchangés |
+| Affectation animals.assigned_device | inchangée, animal résolu côté serveur |
+| Binaire transport_id | disponible après provisioning, secret obligatoire |
+| Stockage final telemetry | mêmes colonnes et même service d'ingestion |
 
-### 11.6 Sécurité du futur format
+Migration requise sur une autre installation : `alembic upgrade head` depuis
+`backend`, après sauvegarde et avant de démarrer le nouveau code.
+Les tests binaires utilisent une base jetable, sans provisionner les devices
+réels. Ne pas activer le secret du M5Stack actuel avant adaptation de son firmware.
 
-`transport_id` est un identifiant compact, pas un secret. À lui seul, il ne
-protège pas contre l'usurpation d'un device.
-
-Le protocole binaire devra réserver ou définir séparément :
-
-- une version de protocole ;
-- une longueur contrôlée ;
-- un ordre d'octets explicite ;
-- des facteurs d'échelle explicites pour chaque entier compacté ;
-- une détection des paquets tronqués ;
-- un compteur, numéro de séquence ou identifiant de message ;
-- une stratégie contre les doublons ;
-- une authentification de message ou une sécurité assurée par le transport ;
-- le comportement en cas de timestamp absent ;
-- la distinction entre GPS valide, GPS ancien et GPS absent.
-
-Ces choix doivent être fixés dans une spécification binaire versionnée avant de
-coder le décodeur. Ils ne peuvent pas être déduits uniquement du modèle SQL.
-
-## 12. Compatibilité à préserver
-
-Le résultat attendu après ajout futur du binaire est :
-
-| Élément | Doit continuer à fonctionner |
-|---|:---:|
-| Payload JSON actuel avec `device_id="M5-001"` | oui |
-| Ancien M5Stack sans `timestamp` | oui |
-| Payload minimal sans les 12 features ML | oui, sans prédiction |
-| Application mobile utilisant les IDs textuels | oui |
-| Historique `telemetry.device_id` existant | oui |
-| Affectation par `animals.assigned_device` | oui |
-| Nouveau payload binaire avec `transport_id` | oui, après provisioning |
-| Résolution de l'animal côté serveur | oui |
-| Stockage final dans les mêmes colonnes `telemetry` | oui |
-
-La règle centrale à conserver est donc : **deux formats de transport peuvent
-coexister, mais une seule logique de validation, de correspondance et de
-stockage doit exister côté backend.**
+**Deux formats d'entrée, une seule logique métier d'association et de stockage.**
+Les contraintes de format et d'authentification restent propres à chaque entrée.

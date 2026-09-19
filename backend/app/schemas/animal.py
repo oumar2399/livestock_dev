@@ -1,9 +1,18 @@
 """
 Schémas Pydantic pour Animal - Validation entrées/sorties API
 """
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
+from typing import Annotated, Optional
 from datetime import date, datetime
+
+
+def _birth_date_not_future(value: date) -> date:
+    if value > date.today():
+        raise ValueError('Birth date cannot be in the future')
+    return value
+
+
+BirthDate = Annotated[date, AfterValidator(_birth_date_not_future)]
 
 # ============================================================
 # SCHÉMAS DE BASE
@@ -23,18 +32,10 @@ class AnimalBase(BaseModel):
         pattern="^[MF]$",
         description="M ou F"
     )
-    birth_date: Optional[date] = None
+    birth_date: Optional[BirthDate] = None
     weight: Optional[float] = Field(None, gt=0, le=9999.99, description="Poids en kg")
     assigned_device: Optional[str] = Field(None, max_length=50)
     
-    @field_validator('birth_date')
-    @classmethod
-    def birth_date_not_future(cls, v):
-        """Valide que date naissance pas dans le futur"""
-        if v and v > date.today():
-            raise ValueError('Birth date cannot be in the future')
-        return v
-
 # ============================================================
 # SCHÉMA CRÉATION (POST /animals)
 # ============================================================
@@ -66,20 +67,28 @@ class AnimalUpdate(BaseModel):
     Données modifiables (tous champs optionnels)
     """
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    official_id: Optional[str] = None
-    breed: Optional[str] = None
+    official_id: Optional[str] = Field(None, max_length=50)
+    breed: Optional[str] = Field(None, max_length=100)
     sex: Optional[str] = Field(
         None,
         pattern="^[MF]$",
         description="M ou F"
     )
-    birth_date: Optional[date] = None
+    birth_date: Optional[BirthDate] = None
     weight: Optional[float] = Field(None, gt=0, le=9999.99)
-    assigned_device: Optional[str] = None
+    assigned_device: Optional[str] = Field(None, max_length=50)
     status: Optional[str] = Field(
         None,
         pattern="^(active|sick|sold|deceased)$"
     )
+
+    @field_validator('name', 'status')
+    @classmethod
+    def supplied_value_not_null(cls, value):
+        # Omitted fields are unchanged; explicitly clearing these is invalid.
+        if value is None:
+            raise ValueError('Field cannot be null')
+        return value
 
 # ============================================================
 # SCHÉMA RÉPONSE (GET /animals, GET /animals/{id})

@@ -1,6 +1,5 @@
 """Focused regression tests for data-integrity hardening."""
 
-import asyncio
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -179,12 +178,10 @@ def test_password_change_requires_current_password(mock_verify):
     user.password_hash = "hashed"
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(
-            update_me(
-                data=UserUpdate(password="new-password", current_password="wrong"),
-                current_user=user,
-                db=db,
-            )
+        update_me(
+            data=UserUpdate(password="new-password", current_password="wrong"),
+            current_user=user,
+            db=db,
         )
 
     assert exc.value.status_code == 400
@@ -200,7 +197,7 @@ def test_owner_account_cannot_be_deleted_while_it_owns_a_farm():
     db.query.side_effect = [user_query, farm_query]
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(delete_user(user_id=7, current_user=_user(user_id=1, role="admin"), db=db))
+        delete_user(user_id=7, current_user=_user(user_id=1, role="admin"), db=db)
 
     assert exc.value.status_code == 409
     db.delete.assert_not_called()
@@ -224,7 +221,7 @@ def test_last_membership_owner_cannot_be_deleted():
     ]
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(delete_user(user_id=7, current_user=_user(user_id=1, role="admin"), db=db))
+        delete_user(user_id=7, current_user=_user(user_id=1, role="admin"), db=db)
 
     assert exc.value.status_code == 409
     db.delete.assert_not_called()

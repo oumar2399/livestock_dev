@@ -28,6 +28,7 @@ from app.core.access import (
     resolve_farm_scope,
 )
 from app.services.device_assignment import validate_device_assignment
+from app.services.telemetry_quality import animal_position_clause
 
 router = APIRouter(
     prefix="/animals",
@@ -39,7 +40,7 @@ router = APIRouter(
 # ============================================================
 
 @router.get("/", response_model=AnimalList)
-async def list_animals(
+def list_animals(
     farm_id: Optional[int] = Query(None, description="Filter by farm"),
     status: Optional[str] = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -64,14 +65,27 @@ async def list_animals(
 
     # Pagination
     offset = (page - 1) * page_size
-    animals = query.offset(offset).limit(page_size).all()
+    animals = query.order_by(Animal.id).offset(offset).limit(page_size).all()
+
+    # Fetch only the latest position per animal on this page (PostgreSQL DISTINCT ON).
+    latest_by_animal = {}
+    if animals:
+        latest_by_animal = {
+            row.animal_id: row
+            for row in db.query(
+                Telemetry.animal_id, Telemetry.time, Telemetry.latitude, Telemetry.longitude
+            )
+            .filter(Telemetry.animal_id.in_([animal.id for animal in animals]))
+            .filter(animal_position_clause())
+            .distinct(Telemetry.animal_id)
+            .order_by(Telemetry.animal_id, Telemetry.time.desc())
+            .all()
+        }
 
     # Build response with last telemetry
     animal_responses = []
     for animal in animals:
-        last_telemetry = db.query(Telemetry).filter(
-            Telemetry.animal_id == animal.id
-        ).order_by(Telemetry.time.desc()).first()
+        last_telemetry = latest_by_animal.get(animal.id)
 
         animal_dict = {
             "id": animal.id,
@@ -107,7 +121,7 @@ async def list_animals(
 # ============================================================
 
 @router.get("/{animal_id}", response_model=AnimalResponse)
-async def get_animal(
+def get_animal(
     animal_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -119,7 +133,7 @@ async def get_animal(
 
     # Last position
     last_telemetry = db.query(Telemetry).filter(
-        Telemetry.animal_id == animal_id
+        Telemetry.animal_id == animal_id, animal_position_clause(),
     ).order_by(Telemetry.time.desc()).first()
 
     animal_dict = {
@@ -149,7 +163,7 @@ async def get_animal(
 # ============================================================
 
 @router.post("/", response_model=AnimalResponse, status_code=201)
-async def create_animal(
+def create_animal(
     animal_data: AnimalCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -171,7 +185,7 @@ async def create_animal(
                 detail=f"Animal with official_id {animal_data.official_id} already exists"
             )
 
-    create_data = animal_data.dict()
+    create_data = animal_data.model_dump()
     create_data["assigned_device"] = validate_device_assignment(
         db,
         current_user,
@@ -198,7 +212,7 @@ async def create_animal(
 # ============================================================
 
 @router.put("/{animal_id}", response_model=AnimalResponse)
-async def update_animal(
+def update_animal(
     animal_id: int,
     animal_data: AnimalUpdate,
     db: Session = Depends(get_db),
@@ -209,7 +223,7 @@ async def update_animal(
     """
     animal = require_animal_access(current_user, animal_id, "edit_animals", db)
 
-    update_data = animal_data.dict(exclude_unset=True)
+    update_data = animal_data.model_dump(exclude_unset=True)
     if "assigned_device" in update_data:
         update_data["assigned_device"] = validate_device_assignment(
             db,
@@ -239,14 +253,14 @@ async def update_animal(
 # ============================================================
 
 @router.delete("/{animal_id}", status_code=204)
-async def delete_animal(
+def delete_animal(
     animal_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Delete animal — requires edit_animals permission on the animal's farm.
-    CASCADE deletes telemetry and alerts.
+    Deletes related summaries, alerts and feedback. Raw telemetry is retained.
     """
     animal = require_animal_access(current_user, animal_id, "edit_animals", db)
 

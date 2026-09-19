@@ -15,6 +15,7 @@ from app.models.animal import Animal
 from app.models.telemetry import Telemetry
 from app.models.daily_summary import DailyBehaviorSummary
 from app.core.timezone import TARGET_TZ
+from app.services.telemetry_quality import eligible_clause, lock_behavior
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ def aggregate_daily_behavior(
     db: Session,
     animal_id: int,
     target_date: date,
+    *, commit: bool = True,
 ) -> Optional[DailyBehaviorSummary]:
     """
     Aggregate telemetry predictions for an animal on a target-timezone date.
@@ -42,6 +44,7 @@ def aggregate_daily_behavior(
     Optional[DailyBehaviorSummary]
         The created/updated summary instance, or None if n_predictions == 0.
     """
+    lock_behavior(db, animal_id)
     start_dt, end_dt = get_target_date_bounds(target_date)
 
     # Filter telemetry for this animal and date window with valid ML predictions
@@ -52,12 +55,16 @@ def aggregate_daily_behavior(
             Telemetry.time >= start_dt,
             Telemetry.time <= end_dt,
             Telemetry.predicted_behavior.in_(("Active", "Resting")),
+            eligible_clause(),
         )
         .all()
     )
 
     n_predictions = len(records)
     if n_predictions == 0:
+        db.query(DailyBehaviorSummary).filter_by(animal_id=animal_id, date=target_date).delete()
+        if commit:
+            db.commit()
         logger.debug(f"Animal #{animal_id} on {target_date}: 0 predictions found. Skipping summary.")
         return None
 
@@ -101,8 +108,11 @@ def aggregate_daily_behavior(
         db.add(summary)
         logger.info(f"Created DailyBehaviorSummary for Animal #{animal_id} on {target_date}")
 
-    db.commit()
-    db.refresh(summary)
+    if commit:
+        db.commit()
+        db.refresh(summary)
+    else:
+        db.flush()
     return summary
 
 
@@ -118,7 +128,7 @@ def aggregate_all_daily_behaviors(
         yesterday = (datetime.now(TARGET_TZ) - timedelta(days=1)).date()
         target_date = yesterday
 
-    animals = db.query(Animal).all()
+    animals = db.query(Animal).order_by(Animal.id).all()
     summaries = []
 
     for animal in animals:

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 class ReportDataset(str, Enum):
     TELEMETRY = "telemetry"
+    UNTIMED_TELEMETRY = "untimed_telemetry"
     DAILY_SUMMARIES = "daily_summaries"
     ALERTS = "alerts"
     PREDICTION_FEEDBACKS = "prediction_feedbacks"

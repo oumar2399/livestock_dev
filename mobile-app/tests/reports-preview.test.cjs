@@ -114,3 +114,31 @@ test('non-admin users cannot request or export report data', async () => {
   assert.equal(h.previewCalls.length, 0);
   assert.equal(h.control('Export and share CSV'), undefined);
 });
+
+test('untimed archive uses reception dates and identical device filters for preview and export', async () => {
+  const h = await harness();
+  await act(async () => h.control('Untimed windows').props.onPress());
+  assert.match(h.text(), /RECEPTION PERIOD.*Received from.*Received to/);
+  assert.equal(h.host('Screen')[0].props.subtitle, 'Reception context: Farm 1');
+  assert.equal(h.control('Device ID').props.maxLength, 50);
+  await h.change('Device ID', ' COLLAR-1 ');
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 650)));
+  const params = h.previewCalls.at(-1).params;
+  assert.equal(params.dataset, 'untimed_telemetry');
+  assert.equal(params.deviceId, 'COLLAR-1');
+  await act(async () => h.control('Export and share CSV').props.onPress());
+  assert.deepEqual(h.exportReport.mock.calls[0].arguments[0], params);
+  await act(async () => h.control('Telemetry').props.onPress());
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 650)));
+  assert.equal(h.previewCalls.at(-1).params.deviceId, undefined);
+  assert.equal(h.control('Device ID'), undefined);
+});
+
+test('untimed archive requires both reception dates', async () => {
+  const h = await harness();
+  await act(async () => h.control('Untimed windows').props.onPress());
+  await h.change('Received from date', '');
+  assert.equal(h.previewCalls.at(-1).enabled, false);
+  assert.equal(h.control('Export and share CSV').props.disabled, true);
+  assert.match(h.text(), /Both reception dates are required/);
+});

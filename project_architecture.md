@@ -2,7 +2,11 @@
 
 > Document séparé, dédié uniquement à l'architecture du système. Complète le `project_master_handoff.md` (qui couvre le contenu fonctionnel, les décisions et la roadmap). Ici : comment les composants s'articulent entre eux, comment une donnée circule de bout en bout, comment une requête est traitée.
 >
-> **État vérifié le 2 septembre 2026** : architecture et schéma réconciliés à la révision Alembic `2c8e0f6a7b9d`. Les fonctionnalités marquées comme existantes ci-dessous ont été vérifiées dans le code et par les suites de tests concernées.
+> **Mise à jour du 7 septembre 2026** : ingestion HTTP JSON/binaire commune et provisioning device livrés ; schéma réconcilié à `3d9f1b2c4a6e`. Tests backend, `alembic check` et reconstruction isolée validés. Le firmware reste en JSON ; les validations matérielle et LoRaWAN sont distinctes (voir `docs/validation_telemetrie_binaire.md`).
+
+> **État logiciel actualisé le 15 septembre 2026** : profils binaires v1/v2, révocation, provenance et exclusions partagées conservés ; ajout de la v3 sans UTC fiable et de `untimed_telemetry`, archive séparée. Migration locale `5f1b3d4e6c8a`. V2, v3 et modèle 15s désactivés par défaut ; journal firmware v3 optionnel, pas de flash matériel réalisé. Bilans : `docs/validation_b4.md` et `docs/validation_fenetres_heure_incertaine.md`. Les mises à jour antérieures restent historiques.
+
+> **Validation matérielle, point documentaire du 17 septembre 2026** : test 1 isolé retenu comme validé dans les deux runs rapportés ; test 2 partiel, avec latence du traitement GPS non résolue malgré CPU à 240 MHz. Prochaine étape : test 3 du transport binaire en banc isolé avec temps de référence synthétique, sans changement du contrat de temps en production. Résultats et réserves : [validation M5Stack avant LoRa](docs/validation_m5stack_avant_lora.md). Aucun firmware, modèle, schéma ni réglage modifié dans ce point documentaire.
 
 ---
 
@@ -15,10 +19,10 @@
 └───────────────────────────┬───────────────────────────────────────┘
                             │ HTTP POST (JSON, sans auth)
 ┌───────────────────────────▼───────────────────────────────────────┐
-│  BACKEND (FastAPI, Python 3.10, Uvicorn — un seul processus)      │
+│  BACKEND (FastAPI, Python 3.11, Uvicorn — un seul processus)      │
 │  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  ┌─────────┐ │
 │  │  Ingestion  │  │  ML Inference│  │  Scheduler   │  │  CRUD   │ │
-│  │  /telemetry │→ │  (singleton) │  │  (APScheduler)│  │  métier │ │
+│  │  /telemetry │→ │  (profils ML)│  │  (APScheduler)│  │  métier │ │
 │  └─────────────┘  └─────────────┘  └──────────────┘  └─────────┘ │
 └───────────────────────────┬───────────────────────────────────────┘
                             │ SQLAlchemy (synchrone)
@@ -34,7 +38,11 @@
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Caractéristique clé de cette architecture** : un seul processus backend (pas de microservices), une seule base de données, communication synchrone partout. C'est un choix délibérément simple, cohérent avec un projet de recherche solo — pas une architecture distribuée à la légère.
+**Caractéristique clé de cette architecture** : un seul processus backend, une seule base et des échanges HTTP requête/réponse. SQLAlchemy et ML sont synchrones ; les routes SQL et les dépendances d'authentification `def` les exécutent dans le threadpool FastAPI. La lecture du corps binaire et le wrapper de validation des devices restent asynchrones. Aucun microservice ni worker externe n'est ajouté.
+
+Le lien matériel du schéma représente le firmware actuel non provisionné.
+Le backend accepte aussi un client HTTP binaire authentifié ; après provisioning,
+le JSON du même device exige également `X-Device-Secret`.
 
 Le même backend héberge aussi les sondes de santé, les exports CSV, l'historique des jobs, la timeline multi-source et le CRUD des géofences. Ces fonctions réutilisent l'authentification, l'isolation multi-ferme et la session SQLAlchemy existantes ; elles n'ajoutent aucun service distribué.
 
@@ -54,7 +62,9 @@ C'est le chemin complet que suit une mesure d'accélération, depuis le capteur 
        │ POST /api/v1/telemetry/  (JSON, SANS JWT — device ne gère pas l'auth)
        ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  BACKEND — endpoint d'ingestion (telemetry.py)                    │
+│  BACKEND — route telemetry.py + telemetry_ingestion.py            │
+│                                                                    │
+│  Avant ingestion : secret vérifié si device provisionné           │
 │                                                                    │
 │  Étape 1 : résoudre l'animal via device_id                        │
 │    ├─ SI aucun animal trouvé :                                    │
@@ -132,7 +142,77 @@ C'est le chemin complet que suit une mesure d'accélération, depuis le capteur 
                                        └────────────────────────────────────┘
 ```
 
-**Point à retenir** : il y a deux rythmes bien distincts dans ce flux — le rythme **temps réel** (chaque télémétrie, toutes les ~10s par animal) pour la classification et le badge live, et le rythme **journalier** (une fois par jour, ou à la demande) pour l'agrégation et la détection d'anomalie. Ne jamais confondre les deux : l'anomalie ne se calcule jamais à chaque télémétrie, seulement sur le résumé du jour précédent.
+**Point à retenir** : le firmware actuel attend 10 secondes puis collecte pendant 5 secondes, soit environ 15 secondes entre envois, plus les délais. La classification suit chaque mesure reçue ; l'agrégation et la détection d'anomalie suivent un rythme journalier. Le contrôle de ferme peut donner `409`, et non `404`, pour un device connu rattaché mais sans animal actif. Dans le firmware, la lecture GPS précède la fenêtre IMU ; dans le service, l'inférence précède la construction de l'enregistrement.
+
+### 2.1 Entrée binaire HTTP et traitement commun
+
+```text
+POST /api/v1/telemetry/binary, application/octet-stream
+  -> read_binary_body (async) : 45 octets v1/v2, 58 octets v3
+  -> receive_binary_telemetry (def, threadpool FastAPI)
+  -> header minimal : version et transport_id
+  -> Device connu, verrou de ligne, vérification X-Device-Secret
+  -> v1/v2 : decode_binary_payload vers les champs TelemetryCreate
+  -> validation GPS/heure/features ; GPS facultatif en v2 uniquement
+  -> Device.id textuel ajouté par le serveur
+  -> ingest_telemetry(data, db, idempotent=True)
+  -> TelemetryResponse : 201 nouveau, 200 renvoi identique, 409 conflit
+
+  branche v3 apres authentification :
+  -> decode_untimed_payload -> UntimedTelemetryCreate (aucun timestamp UTC)
+  -> ingest_untimed -> table untimed_telemetry (pas Telemetry)
+  -> UntimedTelemetryResponse : 201 apres commit, 200 replay, 409 conflit
+
+POST /api/v1/telemetry/ (JSON, def)
+  -> TelemetryCreate validé par FastAPI
+  -> Device connu verrouillé ; secret exigé si provisionné
+  -> ingest_telemetry(data, db), comportement historique
+```
+
+- **Contrat daté v1/v2** : `core/binary_protocol.py`, little-endian `<BHIiiBB12h2H`, 45 octets. v1 = 10 Hz / 50 échantillons ; v2 = 10 Hz / 150 échantillons, mêmes échelles et `ddof=0`. V1 impose le GPS ; v2 et v3 acceptent la paire GPS `(-2147483648,-2147483648)` avec satellites=0 comme absence de position.
+- **Temps** : Unix UTC de fin de fenêtre requis, depuis 2020 et au plus 300 secondes dans le futur. JSON sans timestamp : heure serveur après inférence, inchangée. `received_at` et `time_source` décrivent séparément la réception et la provenance ; les anciennes lignes ne sont pas remplies rétrospectivement. Fuseau métier `Asia/Tokyo` inchangé.
+- **Stockage** : même table Telemetry, clé animal/time inchangée ; aucun POINT créé sans coordonnées. Colonnes supplémentaires de protocole et d'éligibilité. `device_loss_periods` historise les pertes ; `behavior_rebuilds` conserve les recalculs à reprendre. Les mesures brutes restent distinctes de leurs usages comportementaux.
+- **Renvois** : comparaison des champs sources selon la précision SQL, sans comparer la prédiction ; aucune réécriture de batterie ni nouvelle inférence pour un renvoi identique. Verrou device par requête et traitement ciblé des conflits de clé primaire. Les affectations historiques ne sont pas résolues : purger les messages en attente avant de réaffecter un collier.
+- **Sécurité** : PATCH réservé aux droits adéquats, secret écrit mais jamais lu, comparaison constante conservée. `ingestion_revoked_at` bloque JSON et binaire, même les replays. `retired` révoque ; `lost` conserve la réception mais exclut les usages comportementaux. Retour actif et rotation ne lèvent pas une révocation : restauration explicite et nouveau secret requis. Le JSON non provisionné reste ouvert hors révocation.
+- **GPS B.4** : `b4_protocol.py` parse GGA/RMC/ZDA et entretient UTC via compteur monotone borné. GPS absent mais horloge fiable : v2 recevable sans position. Sans heure fiable : pas de paquet v2 présenté comme correctement daté. Les tests PC ne prouvent pas la qualité du récepteur réel ; firmware optionnel via `TELEMETRY_MODE="binary_v2"`, réservé au banc isolé tant que TLS n'est pas validé.
+- **Modèles** : registre par profil, jamais de swap global par requête. V2 désactivée par défaut ; modèle 15s configuré séparément. Un collier lost n'a pas besoin du ML pour transmettre à des fins de recherche/audit.
+- **Qualité** : fenêtre chevauchant une période de perte exclue du ML, du fallback physique, des graphiques, résumés et baselines. Corrections explicites avec audit, invalidation et recalculs durables. `ANOMALY_MIN_COVERAGE_SECONDS` doit être défini avant les conclusions sur les nouvelles journées qualifiées. Les positions et leurs dates sont distinctes des dernières mesures reçues ; un collier perdu n'est pas un marqueur animal.
+- **LoRaWAN** : endpoint HTTP brut, pas un webhook ChirpStack prêt à l'emploi. L'adaptateur devra vérifier l'identité LoRaWAN, extraire le payload et appeler les services existants. Le secret HTTP reste hors paquet radio ; le budget dépend du profil régional réel.
+
+Contrat exhaustif : `docs/plan_implementation_telemetrie_binaire.md`.
+Résultats v1 : `docs/validation_telemetrie_binaire.md`. Évolutions B.4, commandes et limites actuelles : `docs/validation_b4.md`.
+
+### 2.2 Archive v3 sans heure fiable
+
+- **Contrat distinct** : `<BHQIIBiiBB12h2H`, soit 58 octets ; session uint64 bornée à 2^63-1, séquence uint32, temps relatif de fin de fenêtre et raison de l'incertitude. Profil fixe 10 Hz / 150, mêmes features/échelles ; aucun UTC ni repli sur l'heure serveur. Format exact de référence : `core/binary_protocol.py`.
+- **Table** : `UntimedTelemetry` / `untimed_telemetry`, PostgreSQL ordinaire, clé unique `(device_id, session_id, sequence)`, FK device RESTRICT. `measured_at=NULL`, `time_reliable=false`, `raw_packet` exact ; index `(received_at,id)` et `(device_id,received_at,id)`. Snapshots ferme/animal/statut à réception, sans attribution prouvée à l'acquisition. Aucune modification de l'hypertable datée.
+- **Service** : `services/untimed_telemetry.py`, isolé de `ingest_telemetry`. Même verrou et authentification avant mesures ; replay reconnu seulement après contrôle de révocation, octets divergents refusés. V3 OFF : nouvelles archives 503, anciennes reconnues. Réponse spécifique avec `id` et `session_id` sous forme de chaînes décimales.
+- **ML** : diagnostic du signal avec empreinte SHA-256 du profil 15s ; pending_model ou inference_failed préserve le stockage. Contexte de perte/non actif : excluded_context. Reprise explicite bornée via `scripts/classify_untimed.py`, pas de recalcul sur renvoi. Jamais de source pour les résumés, anomalies, graphiques datés, géofence ou positions actuelles.
+- **Accès** : aperçu/export existants, dataset `untimed_telemetry`, admin plateforme uniquement. Dates portent sur received_at, filtres ferme/animal sur snapshots ; device optionnel. L'appartenance actuelle à une ferme ne confère pas un accès à ces archives.
+- **Firmware** : `UNTIMED_ARCHIVE_ENABLED=false` par défaut ; en B.4 optionnel, absence UTC produit v3 avec journal à deux banques (`untimed_store.py`). Identité réservée durablement, quota et retries bornés, ancienne file conservée si pleine. Le retour UTC ne convertit pas les archives en v2. V2 reste non persistante ; aucune garantie matérielle de durabilité sans banc.
+- **Limites** : `BINARY_V3_ENABLED=false` localement ; JSON et Tokyo inchangés. 58 octets dépassent 51, pas de fragmentation implicite ni intégration LoRaWAN. L'analyse des pertes est un chantier de thèse distinct, pas une correction automatique du biais.
+
+Bilan, migration, provisioning et tests : `docs/validation_fenetres_heure_incertaine.md`.
+
+### 2.3 État des essais matériels avant LoRa
+
+| Élément | Observation rapportée | Portée |
+| --- | --- | --- |
+| Capture IMU dédiée, test 1 | Deux runs 150/150 à ±4g en 15,01 s, aucune erreur I2C ni saturation observée ; Welford/batch de l'ordre de 1e-7 à 1e-8 | Validation isolée au banc, pas du runtime IMU/GPS/HTTP/journal complet ni sur animal. |
+| Horloge, test 2 | Maintien simulé 10 s, expiration vers 30 s, reprises observées | Partiel : précision, perte/reprise physique et seuils terrain non validés. |
+| Diagnostic GPS | UART seule 1 ms max ; `GPSClock.feed` 249 à 480 ms sur trames synthétiques, jusqu'à 4 363 ms sur un bloc réel | Retard de traitement/environnement constaté ; cause exacte à isoler, zéro invalidation sur ce court diagnostic ne prouve pas zéro perte. |
+| Ressources mesurées | MicroPython 1.12.0, CPU lu à 240 MHz, environ 60 Ko de tas libres après collecte, collectes manuelles de 3 ms | N'établit ni saturation CPU ni cause RAM ; ne justifie pas à lui seul un changement de carte. |
+
+La lecture GPS et la construction de l'heure fiable ne sont donc pas encore
+validées pour la chaîne intégrée en continu. Augmenter une tolérance ne corrige
+pas une référence déjà retardée. Les défauts JSON/5s et les règles de provenance
+restent inchangés ; les secondes de maintien du banc ne deviennent pas des seuils
+de production. Test 3 isolé autorisé, test 4 des pannes et validation radio encore
+à faire ; timestamp de test uniquement sur environnement/données de test, jamais
+une nouvelle source de temps acceptée implicitement pour les mesures réelles.
+
+Preuves, scripts exacts, journal du diagnostic et points différés :
+`docs/validation_m5stack_avant_lora.md`. Procédure GPS : `docs/test_2_horloge_gps.md`.
 
 ---
 
@@ -227,7 +307,17 @@ Ferme sélectionnée → GET /farms/{farm_id}/members
                   → invitation atomique : compte existant ou création + membership
 ```
 
-### 3.1 Flux opérationnels ajoutés
+### 3.1 Fiabilité des sessions et des animaux (9 septembre 2026)
+
+Le mobile utilise un seul `QueryClient`, défini dans `src/api/queryClient.ts`. `authStore.logout()` efface immédiatement l'état de session, les fermes et ce cache, quel que soit l'écran appelant. `sessionLifecycle.ts` fournit une génération de session et une file d'opérations AsyncStorage : une ancienne réponse ou écriture ne peut pas restaurer un compte déconnecté. Axios associe la génération à chaque requête dès son appel, refuse les réponses périmées et ne rejoue pas une requête d'un compte avec les identifiants d'un autre. `farmStore` invalide aussi les chargements et sélections dépassés.
+
+Les renouvellements simultanés sont mutualisés par session. Une panne réseau ou une erreur serveur conserve les identifiants ; seul un échec d'authentification confirmé justifie leur suppression automatique. Une session non vérifiée au démarrage n'ouvre pas l'application hors ligne. Les mutations TanStack Query n'ont plus de retry automatique, mais cela n'ajoute pas de clé d'idempotence aux routes de création.
+
+`GET /animals/` ordonne la page par `Animal.id`, puis charge ses dernières positions en une requête PostgreSQL `DISTINCT ON (animal_id)`. La portée reste celle des fermes accessibles. `AnimalUpdate` applique les mêmes bornes de champs que la création et partage son validateur de date de naissance. Les champs omis restent inchangés, les champs facultatifs peuvent être effacés, mais `name` et `status` ne peuvent pas recevoir `null`.
+
+La suppression d'un animal utilise la cascade existante des résumés, alertes et feedbacks. La relation ORM des résumés combine `cascade="all, delete-orphan"` et `passive_deletes=True`, compatible avec des enfants chargés ou non. Les mesures brutes `telemetry`, sans clé étrangère vers `animals`, restent conservées. Aucune migration supplémentaire ni purge de données pour ce lot. Validation : `docs/validation_fiabilisation_code.md`.
+
+### 3.2 Flux opérationnels ajoutés
 
 **Santé et diagnostic**
 ```
@@ -328,14 +418,18 @@ Farm ──── Geofence (type API: pasture|danger, polygon PostGIS,
 
 **Points structurels à retenir** :
 - `Animal.assigned_device` est un lien applicatif vers `Device.id` : le backend vérifie existence et ferme, tandis que l'index unique `uq_animals_assigned_device` garantit qu'un collier ne peut pas être affecté à plusieurs animaux. Un transfert de device exige une désaffectation explicite préalable.
+- `Device.transport_id INTEGER NULL` est unique et borné à 1..65535 ; `Device.device_secret VARCHAR(64) NULL` contient une empreinte. Contrainte de paire : les deux champs sont nuls ou renseignés. Aucun changement des clés textuelles ni de l'affectation animal/device.
 - `Telemetry` n'a pas de PK séquentielle simple — c'est pourquoi `PredictionFeedback` utilise une clé naturelle composite `(animal_id, telemetry_time)` plutôt qu'une simple `telemetry_id`
 - `PredictionFeedback` et `AlertFeedback` sont deux tables **séparées** volontairement — pas de table polymorphe (voir document maître, section A.7, pour la justification complète)
 - `Alert` sert à la fois aux futures alertes de geofencing et aux alertes d'anomalie existantes — un seul système d'alerte générique, différencié par `type`
 - `DailyJobRun` est volontairement global à l'exploitation : une exécution planifiée n'a pas d'utilisateur initiateur, tandis qu'une exécution manuelle conserve l'administrateur dans `initiated_by`
 
-**État de synchronisation du schéma (2 septembre 2026)** :
-- les modèles SQLAlchemy, le schéma PostgreSQL courant et l'historique Alembic sont réconciliés à la révision `2c8e0f6a7b9d`
+**État de synchronisation du schéma (13 septembre 2026)** :
+- les modèles SQLAlchemy, le schéma PostgreSQL courant et l'historique Alembic sont réconciliés à la révision `5f1b3d4e6c8a`
 - la migration `f0a6b8c3d4e5` garantit l'index spatial GiST des géofences ; `1b7d9e4c5a6f` impose un device unique par animal assigné ; `2c8e0f6a7b9d` réconcilie les anciennes affectations dépourvues de ligne `Device`
+- `3d9f1b2c4a6e` ajoute les deux colonnes device et leurs contraintes. Migration locale appliquée après sauvegarde, sans provisioning automatique. Le nouveau code requiert `alembic upgrade head` sur toute autre base existante.
+- `4e0a2c3d5b7f` ajoute révocation, provenance, périodes de perte et demandes de recalcul. Migration additive appliquée après sauvegarde ; aucun statut ni secret historique modifié.
+- `5f1b3d4e6c8a` ajoute uniquement `untimed_telemetry`, avec contraintes et index ; aucun backfill. Appliquée localement après sauvegarde, 3 978 mesures datées et 12 devices conservés, v3 désactivée.
 - `alembic check` ne détecte plus aucune opération manquante ; la table système PostGIS `spatial_ref_sys` est volontairement exclue de l'autogénération
 - une base neuve est reproductible par `init.sql`, puis `alembic upgrade head` ; `backend/scripts/verify_schema_rebuild.py` vérifie ce parcours dans une base temporaire isolée
 - `telemetry` est bien une hypertable TimescaleDB, mais aucune politique de compression/columnstore n'est activée par défaut ; cette option reste une décision d'exploitation à valider avec la rétention et les écritures historiques
@@ -358,8 +452,8 @@ Farm ──── Geofence (type API: pasture|danger, polygon PostGIS,
 │       │                                                    │
 │       ▼                                                    │
 │  Fenêtrage NON-CHEVAUCHANT sur (animal_id, segment_id)      │
-│  (artifact prod + firmware : 5s ; artifact staged 15s        │
-│   déjà produit, swap en attente de la réécriture firmware)  │
+│  (5s par défaut ; artifact 15s dans un slot séparé,          │
+│   activation après validation du firmware au banc)          │
 │       │                                                    │
 │       ▼                                                    │
 │  Seuil de pureté (actuellement 80% fixe)                   │
@@ -383,14 +477,14 @@ Farm ──── Geofence (type API: pasture|danger, polygon PostGIS,
 ┌─────────────────────────────────────────────────────────┐
 │  INFÉRENCE (runtime, backend/app/services/ml_inference.py)│
 │                                                            │
-│  Chargement SINGLETON au démarrage FastAPI                 │
-│  (une seule fois, pas rechargé à chaque requête)            │
+│  Chargement des profils au démarrage FastAPI               │
+│  (une seule fois, sélection 5s/15s par metadata)             │
 │       │                                                    │
 │       ▼                                                    │
 │  predict_with_confidence(features: dict)                   │
 │    1. Validation présence des 12 features                  │
 │    2. Validation bornes physiques (min≤mean≤max, etc.)      │
-│    3. model.predict() + model.predict_proba()               │
+│    3. model.predict_proba() puis argmax                     │
 │    4. Retourne (classe, confidence)                         │
 │       │                                                    │
 │       ├── Appelé directement par POST /telemetry            │
@@ -401,9 +495,9 @@ Farm ──── Geofence (type API: pasture|danger, polygon PostGIS,
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Pourquoi le singleton est important** : sans lui, chaque requête `/telemetry` rechargerait le fichier `.pkl` depuis le disque — coûteux et inutile puisque le modèle ne change jamais en cours d'exécution du serveur.
+**Pourquoi charger les profils une seule fois** : les requêtes `/telemetry` ne relisent pas les `.pkl` depuis le disque. Elles sélectionnent le profil correspondant aux metadata de la fenêtre, sans modifier un modèle global partagé avec les autres requêtes. Le chargement valide le contrat, les classes et les métriques exposées par l'API ; un artifact incohérent est déclaré indisponible.
 
-**État de la fenêtre ML** : l'ablation est terminée et a retenu 15 secondes avec une pureté de 0.80. Le modèle correspondant a été entraîné et sauvegardé (`behavior_classifier_v3_staged.pkl`), mais n'est **pas encore déployé** : l'artifact de production actif et le firmware restent synchronisés sur 5 secondes, volontairement, jusqu'à ce que le firmware soit réécrit pour envoyer des fenêtres de 15 secondes (B.4). Le swap staged → prod se fait au moment de cette réécriture, jamais avant.
+**État de la fenêtre ML** : l'ablation a retenu 15 secondes / pureté 0.80 et l'artifact staged existe. Le backend sait le charger dans un emplacement distinct du modèle 5s ; aucun écrasement staged → prod. La capture isolée 15s/150 à ±4g est retenue comme validée dans les deux runs matériels rapportés ; le runtime complet 15s avec GPS et transport ne l'est pas encore. Le modèle 5s et le firmware JSON restent les défauts ; une activation 15s pour le test 3 sera explicite et limitée au banc, avec le modèle correspondant.
 
 ---
 

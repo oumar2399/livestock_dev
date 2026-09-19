@@ -71,7 +71,7 @@ def _make_token_response(user: User) -> TokenResponse:
 # ─── POST /auth/login ─────────────────────────────────────────────────────────
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
+def login(
     login_data: LoginRequest,
     db: Session = Depends(get_db)
 ):
@@ -102,7 +102,7 @@ async def login(
     return _make_token_response(user)
 
 @router.put("/users/{user_id}/password")
-async def reset_password(
+def reset_password(
     user_id: int,
     data: PasswordReset,  # ← Pydantic model = OK
     current_user = Depends(require_admin),
@@ -121,7 +121,7 @@ async def reset_password(
 # Compatible OAuth2PasswordRequestForm (Swagger UI "Authorize" button)
 
 @router.post("/login/form", response_model=TokenResponse, include_in_schema=False)
-async def login_form(
+def login_form(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
@@ -143,7 +143,7 @@ async def login_form(
 # ─── POST /auth/register ──────────────────────────────────────────────────────
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-async def register(
+def register(
     data: RegisterRequest,
     db: Session = Depends(get_db)
 ):
@@ -194,7 +194,7 @@ async def register(
 # ─── POST /auth/refresh ───────────────────────────────────────────────────────
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(
+def refresh_token(
     data: RefreshRequest,
     db: Session = Depends(get_db)
 ):
@@ -227,7 +227,7 @@ async def refresh_token(
 # ─── GET /auth/me ─────────────────────────────────────────────────────────────
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user)):
     """
     Retourne le profil de l'utilisateur connecté
     Nécessite : Authorization: Bearer <token>
@@ -238,7 +238,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 # ─── PUT /auth/me ─────────────────────────────────────────────────────────────
 
 @router.put("/me", response_model=UserResponse)
-async def update_me(
+def update_me(
     data: UserUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -276,7 +276,7 @@ async def update_me(
 # ─── GET /auth/users - Admin ──────────────────────────────────────────────────
 
 @router.get("/users", response_model=List[UserResponse])
-async def list_users(
+def list_users(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -290,7 +290,7 @@ async def list_users(
 # ─── PUT /auth/users/{id}/role - Admin ───────────────────────────────────────
 
 @router.put("/users/{user_id}/role", response_model=UserResponse)
-async def update_user_role(
+def update_user_role(
     user_id: int,
     data: UserUpdateRole,
     current_user: User = Depends(require_admin),
@@ -313,7 +313,7 @@ async def update_user_role(
 # ─── DELETE /auth/users/{id} - Admin ─────────────────────────────────────────
 
 @router.delete("/users/{user_id}", status_code=204)
-async def delete_user(
+def delete_user(
     user_id: int,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)

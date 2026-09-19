@@ -66,7 +66,7 @@ function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: Telemetr
   const statusColor = animalStatusColor(animal.status);
 
   // Use the ML-predicted state from the backend (or fallback to threshold)
-  const activityState = telemetry
+  const activityState = telemetry && telemetry.behavior_eligible !== false
     ? (telemetry.activity_state ?? (telemetry.activity < 0.5 ? 'Resting' : 'Active'))
     : null;
   const behaviorColor = activityStateColor(activityState as any);

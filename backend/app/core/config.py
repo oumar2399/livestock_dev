@@ -12,6 +12,8 @@ load_dotenv()
 
 
 TARGET_TIMEZONE = "Asia/Tokyo"  # TODO: basculer vers "Africa/Abidjan" avant tout déploiement terrain
+BINARY_MIN_TIMESTAMP = 1577836800  # 2020-01-01T00:00:00Z
+BINARY_MAX_CLOCK_SKEW_SECONDS = 300
 _DEVELOPMENT_SECRET = "livestock-secret-key-change-in-production-2024"
 
 
@@ -28,6 +30,15 @@ def _env_list(name: str, default: list[str]) -> list[str]:
 
 
 class Settings:
+    BINARY_V2_ENABLED: bool = _env_bool("BINARY_V2_ENABLED", False)
+    BINARY_V3_ENABLED: bool = _env_bool("BINARY_V3_ENABLED", False)
+    MODEL_15S_ENABLED: bool = _env_bool("MODEL_15S_ENABLED", False)
+    MODEL_15S_PATH: str = os.getenv("MODEL_15S_PATH", "")
+    # No unvalidated coverage threshold: new qualified days cannot raise anomalies until configured.
+    ANOMALY_MIN_COVERAGE_SECONDS: float | None = (
+        float(os.environ["ANOMALY_MIN_COVERAGE_SECONDS"])
+        if os.getenv("ANOMALY_MIN_COVERAGE_SECONDS") else None
+    )
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
     DEBUG: bool = _env_bool("DEBUG", ENVIRONMENT == "development")
 
@@ -63,6 +74,9 @@ class Settings:
 
 
 settings = Settings()
+
+if settings.ANOMALY_MIN_COVERAGE_SECONDS is not None and not 0 < settings.ANOMALY_MIN_COVERAGE_SECONDS <= 86400:
+    raise RuntimeError("ANOMALY_MIN_COVERAGE_SECONDS must be in (0, 86400]")
 
 if settings.ENVIRONMENT not in {"development", "test"} and settings.SECRET_KEY == _DEVELOPMENT_SECRET:
     raise RuntimeError("SECRET_KEY must be configured outside development and test")

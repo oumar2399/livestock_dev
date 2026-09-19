@@ -1,7 +1,7 @@
 """
 Modèle Telemetry - Données capteurs (GPS, activité, température)
 """
-from sqlalchemy import Column, Integer, String, DateTime, DECIMAL, Float, Index, desc
+from sqlalchemy import Column, Integer, String, DateTime, DECIMAL, Float, Index, desc, Boolean
 from geoalchemy2 import Geography
 from app.db.database import Base
 
@@ -12,6 +12,11 @@ class Telemetry(Base):
     animal_id = Column(Integer, primary_key=True, nullable=False)
     time      = Column(DateTime(timezone=True), primary_key=True, nullable=False)
     device_id = Column(String(50), nullable=False)
+    received_at = Column(DateTime(timezone=True))
+    time_source = Column(String(24))
+    protocol_version = Column(Integer)
+    behavior_eligible = Column(Boolean)
+    exclusion_reason = Column(String(50))
     
     # GPS
     location  = Column(Geography(geometry_type='POINT', srid=4326))

@@ -2,6 +2,10 @@
 Sécurité - Hachage passwords (bcrypt) + JWT tokens
 """
 from datetime import datetime, timedelta
+import hashlib
+import hmac
+import re
+import secrets
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -18,6 +22,31 @@ REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
 # ─── Bcrypt ───────────────────────────────────────────────────────────────────
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+DEVICE_SECRET_HEADER = "X-Device-Secret"
+_DEVICE_SECRET_FORMAT = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def valid_device_secret(value: str) -> bool:
+    return isinstance(value, str) and _DEVICE_SECRET_FORMAT.fullmatch(value) is not None
+
+
+def generate_device_secret() -> str:
+    return secrets.token_hex(32)
+
+
+def hash_device_secret(value: str) -> str:
+    if not valid_device_secret(value):
+        raise ValueError("Device secret must contain 64 lowercase hexadecimal characters")
+    return hashlib.sha256(value.encode("ascii")).hexdigest()
+
+
+def verify_device_secret(value: Optional[str], fingerprint: Optional[str]) -> bool:
+    if not valid_device_secret(value):
+        return False
+    digest = hash_device_secret(value)
+    matches = hmac.compare_digest(digest, fingerprint or "0" * 64)
+    return fingerprint is not None and matches
 
 def hash_password(password: str) -> str:
     """Hache un mot de passe avec bcrypt"""

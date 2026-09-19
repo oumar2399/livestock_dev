@@ -183,6 +183,7 @@ def model_info(
         "features":                  info.get("features"),
         "window_samples":            info.get("window_samples", 50),
         "target_freq_hz":            info.get("target_freq", 10),
+        "profiles":                  ml_inference.get_profile_status(),
         "overall_balanced_accuracy": loao.get("mean_accuracy"),
         "mean_per_fold_accuracy":    loao.get("mean_accuracy"),
         "std_per_fold_accuracy":     loao.get("std_accuracy"),
