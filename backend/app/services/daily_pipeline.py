@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.services.daily_summary import aggregate_all_daily_behaviors
 from app.services.anomaly_detection import evaluate_all_anomalies
 from app.core.timezone import TARGET_TZ, utc_now
+from app.services.telemetry_quality import process_behavior_rebuilds
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ def run_daily_pipeline(
 
     logger.info(f"🚀 Starting daily behavior pipeline for target date: {target_date}")
 
+    process_behavior_rebuilds(db)
     # 1. Daily Aggregation (must run first)
     summaries = aggregate_all_daily_behaviors(db, target_date=target_date)
 

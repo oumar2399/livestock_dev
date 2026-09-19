@@ -6,7 +6,7 @@ import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
@@ -14,22 +14,9 @@ import { StyleSheet } from 'react-native';
 import RootNavigator from './src/navigation/RootNavigator';
 import { useAuthStore } from './src/store/authStore';
 import { Colors } from './src/constants/config';
+import { queryClient } from './src/api/queryClient';
 
 // ─── React Query Client ───────────────────────────────────────────────────────
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
-      // Ne pas refetch au focus si données < 10s
-      staleTime: 10_000,
-    },
-    mutations: {
-      retry: 1,
-    },
-  },
-});
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 

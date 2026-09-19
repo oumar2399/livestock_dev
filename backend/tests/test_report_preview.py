@@ -22,12 +22,17 @@ from app.models.alert import Alert
 from app.models.daily_summary import DailyBehaviorSummary
 from app.models.feedback import AlertFeedback, PredictionFeedback
 from app.models.telemetry import Telemetry
+from app.models.untimed_telemetry import UntimedTelemetry
 from app.schemas.report import ReportDataset
 from app.services.csv_export import HEADERS, preview_dataset, stream_dataset
 
 
 def sample_row(dataset):
     stamp = datetime(2026, 9, 4, 15, tzinfo=UTC)
+    if dataset == ReportDataset.UNTIMED_TELEMETRY:
+        return UntimedTelemetry(id=1, device_id='=Animal name', received_at=stamp,
+            farm_id_at_reception=3, animal_id_at_reception=7, session_id=2**62,
+            measured_at=None, time_reliable=False, attribution_status='unknown')
     records = {
         ReportDataset.TELEMETRY: Telemetry(animal_id=7, time=stamp, device_id='M5-test', altitude=Decimal('12.30')),
         ReportDataset.DAILY_SUMMARIES: DailyBehaviorSummary(animal_id=7, date=date(2026, 9, 5), pct_active=60, created_at=stamp),
@@ -38,9 +43,9 @@ def sample_row(dataset):
         ReportDataset.ALERT_FEEDBACKS: AlertFeedback(id=1, animal_id=7, user_id=2, created_at=stamp, notes='@unsafe'),
     }
     row = (records[dataset], '=Animal name', 3, 'Farm, name\nSecond line')
-    return row + ('user@example.com',) if dataset in (
-        ReportDataset.PREDICTION_FEEDBACKS, ReportDataset.ALERT_FEEDBACKS
-    ) else row
+    if dataset in (ReportDataset.PREDICTION_FEEDBACKS, ReportDataset.ALERT_FEEDBACKS):
+        row += ('user@example.com',)
+    return row + (True,) if dataset in (ReportDataset.TELEMETRY, ReportDataset.PREDICTION_FEEDBACKS, ReportDataset.ALERT_FEEDBACKS) else row
 
 
 @pytest.fixture

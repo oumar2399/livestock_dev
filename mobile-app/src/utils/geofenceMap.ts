@@ -1,17 +1,23 @@
-import type { GeoPoint, TelemetryLatest } from '../types';
+import type { GeoPoint, TelemetryLatest, PositionedTelemetry } from '../types';
 
 // Freshness of received telemetry, not a guarantee of a live GPS fix.
 export const RECENT_POSITION_MS = 30 * 60 * 1000;
 export const GEOFENCE_POSITION_LIMIT = 100;
 
-export function isMapPoint(point: GeoPoint): boolean {
-  return Number.isFinite(point.latitude) && Number.isFinite(point.longitude)
+export function isMapPoint(point: { latitude: number | null; longitude: number | null }): point is GeoPoint {
+  return typeof point.latitude === 'number' && typeof point.longitude === 'number'
+    && Number.isFinite(point.latitude) && Number.isFinite(point.longitude)
     && Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180;
 }
 
-export function mapAnimals(records: TelemetryLatest[]): TelemetryLatest[] {
-  return records.filter((record) => isMapPoint(record))
+export function mapAnimals(records: TelemetryLatest[]): PositionedTelemetry[] {
+  return records.filter((record): record is PositionedTelemetry => isMapPoint(record))
+    .map((record) => ({ ...record, last_update: record.position_time ?? record.last_update }))
     .sort((a, b) => a.animal_name.localeCompare(b.animal_name));
+}
+
+export function positionLabel(record: TelemetryLatest): string {
+  return record.position_is_animal === false ? 'Lost collar: ' + record.device_id : record.animal_name;
 }
 
 export function positionRecency(timestamp: string, now: number): 'recent' | 'old' | 'unknown' {

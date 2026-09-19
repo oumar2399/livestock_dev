@@ -65,7 +65,7 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
   const isOnline = !!telemetry;
 
   // Use the ML-predicted state from the backend (or fallback to threshold)
-  const activityState = telemetry
+  const activityState = telemetry && telemetry.behavior_eligible !== false
     ? (telemetry.activity_state ?? (telemetry.activity < 0.5 ? 'Resting' : 'Active'))
     : null;
 

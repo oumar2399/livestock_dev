@@ -26,14 +26,20 @@ def _validate_filters(
     animal_id: Optional[int],
     date_from: Optional[date],
     date_to: Optional[date],
+    device_id: Optional[str] = None,
 ):
     if date_from and date_to and date_to < date_from:
         raise HTTPException(status_code=400, detail="date_to must be on or after date_from")
-    if dataset == ReportDataset.TELEMETRY and (date_from is None or date_to is None):
+    if dataset in (ReportDataset.TELEMETRY, ReportDataset.UNTIMED_TELEMETRY) and (date_from is None or date_to is None):
         raise HTTPException(
             status_code=400,
             detail="date_from and date_to are required for telemetry exports",
         )
+    if device_id is not None and dataset != ReportDataset.UNTIMED_TELEMETRY:
+        raise HTTPException(400, "device_id is supported only for untimed telemetry")
+    if dataset == ReportDataset.UNTIMED_TELEMETRY:
+        # Snapshot IDs are not proof of current ownership or current assignment.
+        return
 
     if farm_id is not None and not db.query(Farm.id).filter(Farm.id == farm_id).first():
         raise HTTPException(status_code=404, detail="Farm not found")
@@ -55,11 +61,12 @@ def get_dataset_preview(
     date_to: Optional[date] = Query(None),
     resolved: Optional[bool] = Query(None),
     limit: int = Query(20, ge=1, le=50),
+    device_id: Optional[str] = Query(None, min_length=1, max_length=50),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    _validate_filters(db, dataset, farm_id, animal_id, date_from, date_to)
-    return preview_dataset(db, dataset, farm_id, animal_id, date_from, date_to, resolved, limit)
+    _validate_filters(db, dataset, farm_id, animal_id, date_from, date_to, device_id)
+    return preview_dataset(db, dataset, farm_id, animal_id, date_from, date_to, resolved, limit, device_id)
 
 
 @router.get("/export/{dataset}")
@@ -70,10 +77,11 @@ def export_dataset(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     resolved: Optional[bool] = Query(None),
+    device_id: Optional[str] = Query(None, min_length=1, max_length=50),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    _validate_filters(db, dataset, farm_id, animal_id, date_from, date_to)
+    _validate_filters(db, dataset, farm_id, animal_id, date_from, date_to, device_id)
 
     from_label = date_from.isoformat() if date_from else "all"
     to_label = date_to.isoformat() if date_to else "all"
@@ -89,6 +97,7 @@ def export_dataset(
             date_from=date_from,
             date_to=date_to,
             resolved=resolved,
+            device_id=device_id,
         ),
         media_type="text/csv; charset=utf-8",
         headers=headers,

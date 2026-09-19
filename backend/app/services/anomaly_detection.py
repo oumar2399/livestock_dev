@@ -21,6 +21,10 @@ from app.models.daily_summary import DailyBehaviorSummary
 from app.models.alert import Alert
 from app.schemas.alert import AlertType, AlertSeverity
 from app.core.timezone import TARGET_TZ, utc_now
+from app.core.config import TARGET_TIMEZONE
+from app.services.telemetry_quality import eligible_clause, lock_behavior
+from app.models.telemetry_quality import BehaviorRebuild
+from app.services.behavior_coverage import insufficient_coverage_days
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +47,11 @@ def has_sufficient_history(
     cutoff_time = utc_now() - timedelta(days=max_window_days)
 
     distinct_days_count = (
-        db.query(func.count(func.distinct(cast(Telemetry.time, Date))))
+        db.query(func.count(func.distinct(cast(func.timezone(TARGET_TIMEZONE, Telemetry.time), Date))))
         .filter(
             Telemetry.animal_id == animal_id,
             Telemetry.time >= cutoff_time,
+            eligible_clause(),
         )
         .scalar()
     ) or 0
@@ -108,6 +113,15 @@ def evaluate_animal_anomaly(
       - pct_active > median -> 'activity_deviation_high'
     - Dynamic unit formatting: '%' if median > 0, ' pts' if median == 0.
     """
+    lock_behavior(db, animal_id)
+    if db.query(BehaviorRebuild).filter_by(animal_id=animal_id).first():
+        return None
+    if db.query(Alert.id).filter(
+        Alert.animal_id == animal_id,
+        Alert.alert_metadata["target_date"].astext == target_date.isoformat(),
+        Alert.alert_metadata["quality_invalidated_at"].astext.is_not(None),
+    ).first():
+        return None
     # 1. Warm-up safeguard
     if not has_sufficient_history(db, animal_id, min_days=min_days, max_window_days=max_window_days):
         logger.info(f"Animal #{animal_id}: Insufficient history for anomaly detection on {target_date}. Skipping.")
@@ -127,6 +141,11 @@ def evaluate_animal_anomaly(
         logger.warning(f"Animal #{animal_id}: No DailyBehaviorSummary on {target_date}. Skipping anomaly evaluation.")
         return None
 
+    excluded_days = insufficient_coverage_days(db, animal_id, target_date - timedelta(days=max_window_days), target_date)
+    if target_date in excluded_days:
+        logger.info("Insufficient or unconfigured window coverage for animal %s", animal_id)
+        return None
+
     # 3. Get baseline window summaries (excluding target_date)
     start_date = target_date - timedelta(days=max_window_days)
     baseline_summaries = (
@@ -139,7 +158,7 @@ def evaluate_animal_anomaly(
         .all()
     )
 
-    baseline_pcts = [s.pct_active for s in baseline_summaries]
+    baseline_pcts = [s.pct_active for s in baseline_summaries if s.date not in excluded_days]
     if len(baseline_pcts) < min_days:
         logger.info(f"Animal #{animal_id}: Baseline count ({len(baseline_pcts)}) < {min_days} on {target_date}. Skipping.")
         return None
@@ -239,7 +258,7 @@ def evaluate_all_anomalies(
         yesterday = (datetime.now(TARGET_TZ) - timedelta(days=1)).date()
         target_date = yesterday
 
-    animals = db.query(Animal).all()
+    animals = db.query(Animal).order_by(Animal.id).all()
     created_alerts = []
 
     for animal in animals:

@@ -14,6 +14,8 @@ from app.models.feedback import PredictionFeedback, AlertFeedback
 from app.models.daily_summary import DailyBehaviorSummary
 from app.models.membership import FarmMembership
 from app.models.job_run import DailyJobRun
+from app.models.telemetry_quality import DeviceLossPeriod, BehaviorRebuild
+from app.models.untimed_telemetry import UntimedTelemetry
 
 __all__ = [
     "Base",
@@ -22,6 +24,7 @@ __all__ = [
     "FarmMembership",
     "Animal",
     "Telemetry",
+    "UntimedTelemetry",
     "Alert",
     "Geofence",
     "PredictionFeedback",

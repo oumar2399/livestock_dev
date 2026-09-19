@@ -3,7 +3,15 @@
 .env.*
 !.env.example
 !**/.env.example
-m5stack/tests/device_config.py
+m5stack/device_config.py
+m5stack/**/device_config.py
+!m5stack/**/device_config.example.py
+!m5stack/device_config.example.py
+m5stack/tests/test3_config.py
+m5stack/tests/test4_config.py
+m5stack/**/test*_config.py
+!m5stack/**/test*_config.example.py
+/.bench/
 
 # Certificats et clés privées
 *.pem

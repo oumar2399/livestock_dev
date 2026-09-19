@@ -31,7 +31,7 @@ router = APIRouter(
 # ============================================================
 
 @router.get("/", response_model=AlertList)
-async def list_alerts(
+def list_alerts(
     farm_id: Optional[int] = Query(None, description="Filter by farm"),
     resolved: Optional[bool] = Query(None, description="Filter resolved/unresolved"),
     severity: Optional[AlertSeverity] = Query(None, description="Filter by severity"),
@@ -100,7 +100,7 @@ async def list_alerts(
 # ============================================================
 
 @router.patch("/{alert_id}", response_model=AlertResponse)
-async def update_alert(
+def update_alert(
     alert_id: int,
     update_data: AlertUpdate,
     db: Session = Depends(get_db),

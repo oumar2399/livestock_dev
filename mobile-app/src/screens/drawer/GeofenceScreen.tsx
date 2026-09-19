@@ -16,11 +16,11 @@ import { useCreateGeofence, useDeleteGeofence, useGeofences, useUpdateGeofence }
 import { useTelemetryLatest } from '../../hooks/useTelemetry';
 import { useAuthStore } from '../../store/authStore';
 import { useFarmStore } from '../../store/farmStore';
-import { FarmAccess, GeoPoint, Geofence, GeofenceType, TelemetryLatest } from '../../types';
+import { FarmAccess, GeoPoint, Geofence, GeofenceType, PositionedTelemetry as TelemetryLatest } from '../../types';
 import { timeAgo } from '../../utils/helpers';
 import {
   editablePoints, GEOFENCE_POSITION_LIMIT, initialMapRegion, isMapPoint,
-  mapAnimals, positionRecency,
+  mapAnimals, positionRecency, positionLabel,
 } from '../../utils/geofenceMap';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -265,7 +265,7 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
               const recent = positionRecency(animal.last_update, now) === 'recent';
               return (
                 <Marker key={'animal-' + animal.animal_id} identifier={'animal-' + animal.animal_id} coordinate={animal}
-                  title={animal.animal_name} description={'Last update ' + timeAgo(animal.last_update)}
+                  title={positionLabel(animal)} description={'Position ' + timeAgo(animal.last_update)}
                   pinColor={recent ? Colors.primary : Colors.status.offline}
                   zIndex={selectedAnimalId === animal.animal_id ? 3 : 2} stopPropagation
                   onPress={(event) => { event.stopPropagation(); selectAnimal(animal, false); }} />
@@ -346,7 +346,7 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
                     <Ionicons name={tab === 'zones' ? 'map-outline' : 'paw-outline'} size={17}
                       color={panelTab === tab ? Colors.primaryLight : Colors.text.secondary} />
                     <Text style={[styles.tabText, panelTab === tab && styles.tabTextActive]}>
-                      {tab === 'zones' ? 'Zones (' + zones.length + ')' : 'Animals (' + animals.length + ')'}
+                      {tab === 'zones' ? 'Zones (' + zones.length + ')' : 'Positions (' + animals.length + ')'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -370,7 +370,7 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
                         onPress={() => selectAnimal(animal, true)}>
                         <Ionicons name="paw" size={20} color={color} />
                         <View style={styles.rowBody}>
-                          <Text style={styles.rowName} numberOfLines={1}>{animal.animal_name}</Text>
+                          <Text style={styles.rowName} numberOfLines={1}>{positionLabel(animal)}</Text>
                           <Text style={styles.meta}>{recency === 'unknown' ? 'Update time unknown' : 'Last update ' + timeAgo(animal.last_update)}</Text>
                           <Text style={styles.coordinates}>{animal.latitude.toFixed(5)}, {animal.longitude.toFixed(5)}</Text>
                         </View>

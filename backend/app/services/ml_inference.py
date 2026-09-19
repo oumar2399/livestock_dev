@@ -22,9 +22,12 @@ The model artifact (.pkl) bundles:
 import pickle
 import logging
 import math
+import hashlib
 import numpy as np
 from pathlib import Path
 from typing import Optional, Tuple
+from app.core.config import settings
+from app.core.binary_protocol import FEATURE_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,35 @@ _MODEL_PATH = Path(__file__).resolve().parent.parent.parent / "ml" / "models" / 
 
 # ── Module-level singleton — loaded once, reused for every request ────────────
 _artifact: Optional[dict] = None
+_profiles: dict[tuple[int, int], dict] = {}
+
+
+def _load_artifact(path: Path, profile: tuple[int, int]) -> Optional[dict]:
+    """Only administrator-configured local pickle artifacts may be loaded."""
+    try:
+        raw = path.read_bytes()
+        artifact = pickle.loads(raw)
+        if (artifact["target_freq"], artifact["window_samples"]) != profile:
+            raise ValueError("Model profile does not match its configured slot")
+        if list(artifact["features"]) != list(FEATURE_NAMES):
+            raise ValueError("Unexpected feature order")
+        if set(artifact["label_encoder"].classes_) != {"Active", "Resting"}:
+            raise ValueError("Unexpected behavior classes")
+        if not callable(getattr(artifact["model"], "predict_proba", None)):
+            raise ValueError("Model cannot predict probabilities")
+        if list(artifact["model"].classes_) != [0, 1]:
+            raise ValueError("Model classes do not match the label encoder")
+        if artifact["model"].n_features_in_ != len(FEATURE_NAMES):
+            raise ValueError("Model feature count does not match the contract")
+        for name in ("mean_per_fold_accuracy", "std_per_fold_accuracy", "ci_95_low", "ci_95_high"):
+            if not math.isfinite(artifact["loao_metrics"][name]):
+                raise ValueError("Invalid model validation metadata")
+        artifact = {**artifact, "artifact_sha256": hashlib.sha256(raw).hexdigest()}
+        logger.info("Model loaded: profile=%s sha256=%s", profile, artifact["artifact_sha256"])
+        return artifact
+    except Exception:
+        logger.exception("Model unavailable for profile %s", profile)
+        return None
 
 
 def load_model() -> None:
@@ -44,24 +76,33 @@ def load_model() -> None:
     If the file is missing or corrupted, the server still starts but
     predict() will return None and log a warning on every call.
     """
-    global _artifact
+    global _artifact, _profiles
+    _artifact = _load_artifact(_MODEL_PATH, (10, 50))
+    profiles = {}
+    if settings.MODEL_15S_ENABLED and settings.MODEL_15S_PATH:
+        model_15s_path = Path(settings.MODEL_15S_PATH)
+        if not model_15s_path.is_absolute():
+            model_15s_path = Path(__file__).resolve().parent.parent.parent / model_15s_path
+        artifact = _load_artifact(model_15s_path, (10, 150))
+        if artifact is not None:
+            profiles[(10, 150)] = artifact
+    _profiles = profiles
 
-    if not _MODEL_PATH.exists():
-        logger.error(
-            f"Model file not found at {_MODEL_PATH}. "
-            f"Run 'python -m ml.train' from backend/ to generate it."
-        )
-        return
 
-    with open(_MODEL_PATH, "rb") as f:
-        _artifact = pickle.load(f)
+def profile_ready(profile: tuple[int, int]) -> bool:
+    return (_artifact is not None) if profile == (10, 50) else profile in _profiles
 
-    model_features = _artifact["features"]
-    classes = list(_artifact["label_encoder"].classes_)
-    logger.info(f"✅ ML model loaded from {_MODEL_PATH}")
-    logger.info(f"   Classes       : {classes}")
-    logger.info(f"   Features ({len(model_features)}): {model_features}")
-    logger.info(f"   LOAO accuracy : {_artifact['loao_metrics']['mean_per_fold_accuracy']}")
+
+def get_profile_status() -> list[dict]:
+    return [{"sample_rate": rate, "window_samples": samples,
+             "loaded": profile_ready((rate, samples)),
+             "enabled": samples == 50 or settings.MODEL_15S_ENABLED}
+            for rate, samples in ((10, 50), (10, 150))]
+
+
+def get_profile_fingerprint(profile: tuple[int, int]) -> Optional[str]:
+    artifact = _artifact if profile == (10, 50) else _profiles.get(profile)
+    return artifact.get("artifact_sha256") if artifact is not None else None
 
 
 def _validated_feature_values(features: dict, expected_features: list[str]) -> Optional[list[float]]:
@@ -104,11 +145,15 @@ def predict_with_confidence(features: dict) -> Tuple[Optional[str], Optional[flo
         ("Active"/"Resting", 0.925) or (None, None) if model is missing
         or missing 3-axis accelerometer features.
     """
-    if _artifact is None:
+    profile = (features.get("sample_rate"), features.get("window_samples"))
+    if profile == (None, None):
+        profile = (10, 50)
+    artifact = _artifact if profile == (10, 50) else _profiles.get(profile)
+    if artifact is None:
         logger.warning("predict_with_confidence() called but no model is loaded.")
         return None, None
 
-    expected_features = _artifact["features"]
+    expected_features = artifact["features"]
 
     feature_values = _validated_feature_values(features, expected_features)
     if feature_values is None:
@@ -117,9 +162,9 @@ def predict_with_confidence(features: dict) -> Tuple[Optional[str], Optional[flo
     # Build the feature vector in the exact order the model expects
     X = np.array([feature_values])
 
-    proba = _artifact["model"].predict_proba(X)[0]
+    proba = artifact["model"].predict_proba(X)[0]
     pred_idx = int(np.argmax(proba))
-    prediction_str = _artifact["label_encoder"].inverse_transform([pred_idx])[0]
+    prediction_str = artifact["label_encoder"].inverse_transform([pred_idx])[0]
     confidence = float(proba[pred_idx])
 
     return str(prediction_str), round(confidence, 4)

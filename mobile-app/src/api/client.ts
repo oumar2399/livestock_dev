@@ -13,10 +13,13 @@ import axios, {
   AxiosError,
   AxiosInstance,
   AxiosResponse,
+  CanceledError,
   InternalAxiosRequestConfig,
+  isCancel,
 } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Config } from '../constants/config';
+import { getSessionEpoch, onSessionChange, withSessionStorage } from '../store/sessionLifecycle';
 
 // ─── Types d'erreur ───────────────────────────────────────────────────────────
 
@@ -52,19 +55,34 @@ const apiClient: AxiosInstance = axios.create({
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+  _sessionEpoch?: number;
 }
 
-let refreshPromise: Promise<boolean> | null = null;
+// Axios copies defaults when a request is called, before its async interceptors.
+const sessionDefaults = apiClient.defaults as typeof apiClient.defaults & { _sessionEpoch: number };
+sessionDefaults._sessionEpoch = getSessionEpoch();
+onSessionChange((epoch) => { sessionDefaults._sessionEpoch = epoch; });
+
+function assertCurrentSession(config?: RetryableRequestConfig) {
+  if (config?._sessionEpoch !== undefined && config._sessionEpoch !== getSessionEpoch()) {
+    throw new CanceledError('Session changed');
+  }
+}
 
 // ─── Intercepteur REQUEST - injection token ───────────────────────────────────
 
 apiClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
+  async (config: RetryableRequestConfig) => {
+    config._sessionEpoch ??= getSessionEpoch();
+    assertCurrentSession(config);
     // Récupérer token depuis AsyncStorage
-    const token = await AsyncStorage.getItem(Config.STORAGE.ACCESS_TOKEN);
+    const token = await withSessionStorage(() => AsyncStorage.getItem(Config.STORAGE.ACCESS_TOKEN));
+    assertCurrentSession(config);
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      config.headers.delete('Authorization');
     }
 
     // Log en dev uniquement
@@ -81,12 +99,15 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    assertCurrentSession(response.config);
     if (__DEV__) {
       console.log(`[API] ← ${response.status} ${response.config.url}`);
     }
     return response;
   },
   async (error: AxiosError) => {
+    if (isCancel(error)) return Promise.reject(error);
+    assertCurrentSession(error.config);
     // Pas de réponse = problème réseau / serveur non joignable
     if (!error.response) {
       return Promise.reject(new NetworkError());
@@ -95,8 +116,8 @@ apiClient.interceptors.response.use(
     const { status, data } = error.response;
 
     // Extraire message d'erreur FastAPI (format: { detail: "..." })
-    const detail = (data as { detail?: string })?.detail;
-    const message = detail ?? getDefaultMessage(status);
+    const detail = (data as { detail?: unknown })?.detail;
+    const message = typeof detail === 'string' ? detail : getDefaultMessage(status);
 
     const requestConfig = error.config as RetryableRequestConfig | undefined;
     const isAuthenticationRequest = [
@@ -108,20 +129,12 @@ apiClient.interceptors.response.use(
     if (status === 401 && requestConfig && !requestConfig._retry && !isAuthenticationRequest) {
       requestConfig._retry = true;
 
-      if (!refreshPromise) {
-        refreshPromise = import('../store/authStore')
-          .then(({ useAuthStore }) => useAuthStore.getState().refreshToken())
-          .finally(() => {
-            refreshPromise = null;
-          });
-      }
-
-      if (await refreshPromise) {
-        const token = await AsyncStorage.getItem(Config.STORAGE.ACCESS_TOKEN);
-        if (token) {
-          requestConfig.headers.Authorization = `Bearer ${token}`;
-          return apiClient(requestConfig);
-        }
+      const { useAuthStore } = await import('../store/authStore');
+      assertCurrentSession(requestConfig);
+      // The store coalesces refreshes within this session, never across accounts.
+      if (await useAuthStore.getState().refreshToken()) {
+        assertCurrentSession(requestConfig);
+        return apiClient(requestConfig);
       }
     }
 

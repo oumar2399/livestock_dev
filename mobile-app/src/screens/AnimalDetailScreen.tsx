@@ -239,8 +239,10 @@ export default function AnimalDetailScreen() {
   const historyQuery = useTelemetryHistory(animalId, historyHours);
 
   const animal      = animalQuery.data;
-  const records     = historyQuery.data ?? [];
-  const latestRecord = records[records.length - 1];
+  const history = historyQuery.data ?? [];
+  const records = history.filter((record) => record.behavior_eligible !== false);
+  const newest = history[history.length - 1];
+  const latestRecord = newest?.behavior_eligible === false ? undefined : newest;
 
   console.log('=== DEBUG ===');
   console.log('records count:', records.length);

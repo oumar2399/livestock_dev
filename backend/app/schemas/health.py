@@ -24,6 +24,7 @@ class DatabaseHealth(BaseModel):
 class ModelHealth(BaseModel):
     status: Literal["loaded", "unavailable"]
     classes: list[str] = Field(default_factory=list)
+    profiles: list[dict] = Field(default_factory=list)
 
 
 class SchemaHealth(BaseModel):

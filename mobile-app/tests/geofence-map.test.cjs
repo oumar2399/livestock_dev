@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { test } = require('node:test');
 const { loadTypeScript } = require('./helpers/load-typescript.cjs');
-const { isMapPoint, mapAnimals, positionRecency, editablePoints, initialMapRegion, RECENT_POSITION_MS } =
+const { isMapPoint, mapAnimals, positionLabel, positionRecency, editablePoints, initialMapRegion, RECENT_POSITION_MS } =
   loadTypeScript(path.resolve(__dirname, '../src/utils/geofenceMap.ts'));
 
 test('accepts geographic bounds and rejects malformed coordinates', () => {
@@ -52,4 +52,19 @@ test('initial framing uses real input coordinates and no fixed Tokyo location', 
   const region = initialMapRegion([{ latitude: 5.3, longitude: -4, animal_name: 'Ari' }]);
   assert.deepEqual(region, { latitude: 5.3, longitude: -4, latitudeDelta: 0.02, longitudeDelta: 0.02 });
   assert.equal(initialMapRegion([]).longitudeDelta, 300);
+});
+
+test('a new behavior measurement never refreshes an old position timestamp', () => {
+  const row = { animal_name: 'Ari', latitude: 5, longitude: -4,
+    last_update: '2026-09-13T12:00:00Z', position_time: '2026-09-12T12:00:00Z' };
+  const mapped = mapAnimals([row])[0];
+  assert.equal(mapped.last_update, row.position_time);
+  assert.equal(row.last_update, '2026-09-13T12:00:00Z');
+  assert.equal(positionRecency(mapped.last_update, Date.parse(row.last_update)), 'old');
+  assert.equal(mapAnimals([{ ...row, latitude: null, longitude: null }]).length, 0);
+});
+
+test('a lost collar is labelled as equipment instead of an animal position', () => {
+  assert.equal(positionLabel({ animal_name: 'Ari', device_id: 'M5-001', position_is_animal: false }), 'Lost collar: M5-001');
+  assert.equal(positionLabel({ animal_name: 'Ari', position_is_animal: true }), 'Ari');
 });

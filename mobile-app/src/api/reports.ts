@@ -9,6 +9,7 @@ export interface ReportExportParams {
   dataset: ReportDataset;
   farmId?: number;
   animalId?: number;
+  deviceId?: string;
   dateFrom?: string;
   dateTo?: string;
   resolved?: boolean;
@@ -18,6 +19,7 @@ function reportQuery(params: ReportExportParams): URLSearchParams {
   const query = new URLSearchParams();
   if (params.farmId) query.set('farm_id', String(params.farmId));
   if (params.animalId) query.set('animal_id', String(params.animalId));
+  if (params.deviceId) query.set('device_id', params.deviceId);
   if (params.dateFrom) query.set('date_from', params.dateFrom);
   if (params.dateTo) query.set('date_to', params.dateTo);
   if (params.resolved !== undefined) query.set('resolved', String(params.resolved));

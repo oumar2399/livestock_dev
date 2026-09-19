@@ -17,8 +17,11 @@ from app.models.daily_summary import DailyBehaviorSummary
 from app.models.farm import Farm
 from app.models.feedback import AlertFeedback, PredictionFeedback
 from app.models.telemetry import Telemetry
+from app.models.untimed_telemetry import UntimedTelemetry
+from app.core.binary_protocol import FEATURE_NAMES
 from app.models.user import User
 from app.schemas.report import ReportDataset, ReportPreview
+from app.services.telemetry_quality import eligible_clause, feedback_eligible_clause
 
 
 FORMULA_PREFIXES = ("=", "+", "-", "@")
@@ -82,7 +85,7 @@ def _bounded_rows(query, limit, batch_size):
 
 def _telemetry_rows(db, farm_id, animal_id, start, end, limit=None):
     query = (
-        db.query(Telemetry, Animal.name, Animal.farm_id, Farm.name)
+        db.query(Telemetry, Animal.name, Animal.farm_id, Farm.name, eligible_clause())
         .join(Animal, Animal.id == Telemetry.animal_id)
         .join(Farm, Farm.id == Animal.farm_id)
     )
@@ -95,7 +98,7 @@ def _telemetry_rows(db, farm_id, animal_id, start, end, limit=None):
     if end:
         query = query.filter(Telemetry.time < end)
 
-    for telemetry, animal_name, row_farm_id, farm_name in _bounded_rows(
+    for telemetry, animal_name, row_farm_id, farm_name, eligible in _bounded_rows(
         query.order_by(Telemetry.time, Telemetry.animal_id), limit, 1000
     ):
         yield (
@@ -111,6 +114,8 @@ def _telemetry_rows(db, farm_id, animal_id, start, end, limit=None):
             telemetry.accel_z_min, telemetry.accel_z_max, telemetry.sample_rate,
             telemetry.window_samples, telemetry.temperature,
             telemetry.battery_level, telemetry.signal_strength,
+            telemetry.received_at, telemetry.time_source, telemetry.protocol_version,
+            eligible, telemetry.exclusion_reason or (None if eligible else "loss_period"),
         )
 
 
@@ -168,7 +173,8 @@ def _alert_rows(db, farm_id, animal_id, start, end, resolved, limit=None):
 
 def _prediction_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
     query = (
-        db.query(PredictionFeedback, Animal.name, Animal.farm_id, Farm.name, User.email)
+        db.query(PredictionFeedback, Animal.name, Animal.farm_id, Farm.name, User.email,
+                 feedback_eligible_clause())
         .join(Animal, Animal.id == PredictionFeedback.animal_id)
         .join(Farm, Farm.id == Animal.farm_id)
         .join(User, User.id == PredictionFeedback.user_id)
@@ -181,7 +187,7 @@ def _prediction_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
         query, PredictionFeedback.created_at, start, end
     )
 
-    for feedback, animal_name, row_farm_id, farm_name, user_email in _bounded_rows(
+    for feedback, animal_name, row_farm_id, farm_name, user_email, eligible in _bounded_rows(
         query.order_by(PredictionFeedback.created_at, PredictionFeedback.id), limit, 500
     ):
         yield (
@@ -189,13 +195,16 @@ def _prediction_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
             feedback.animal_id, animal_name, feedback.user_id, user_email,
             feedback.telemetry_time, feedback.predicted_behavior,
             feedback.confidence, feedback.verdict, feedback.correction,
+            eligible,
         )
 
 
 def _alert_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
     query = (
-        db.query(AlertFeedback, Animal.name, Animal.farm_id, Farm.name, User.email)
+        db.query(AlertFeedback, Animal.name, Animal.farm_id, Farm.name, User.email,
+                 Alert.alert_metadata["quality_invalidated_at"].astext.is_(None))
         .join(Animal, Animal.id == AlertFeedback.animal_id)
+        .join(Alert, Alert.id == AlertFeedback.alert_id)
         .join(Farm, Farm.id == Animal.farm_id)
         .join(User, User.id == AlertFeedback.user_id)
     )
@@ -205,7 +214,7 @@ def _alert_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
         query = query.filter(AlertFeedback.animal_id == animal_id)
     query = _apply_naive_datetime_filters(query, AlertFeedback.created_at, start, end)
 
-    for feedback, animal_name, row_farm_id, farm_name, user_email in _bounded_rows(
+    for feedback, animal_name, row_farm_id, farm_name, user_email, eligible in _bounded_rows(
         query.order_by(AlertFeedback.created_at, AlertFeedback.id), limit, 500
     ):
         yield (
@@ -213,10 +222,41 @@ def _alert_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
             feedback.animal_id, animal_name, feedback.user_id, user_email,
             feedback.alert_id, feedback.alert_type, feedback.z_score,
             feedback.verdict, feedback.notes,
+            eligible,
         )
 
 
+UNTIMED_FIELDS = (
+    "id", "device_id", "transport_id_at_reception", "session_id", "sequence",
+    "window_end_elapsed_ms", "protocol_version", "received_at", "measured_at",
+    "time_reliable", "time_uncertainty_reason", "farm_id_at_reception",
+    "animal_id_at_reception", "device_status_at_reception", "attribution_status",
+    "latitude", "longitude", "satellites", "battery_level", *FEATURE_NAMES,
+    "activity", "activity_std", "sample_rate", "window_samples", "classification_status",
+    "exclusion_reason", "predicted_behavior", "behavior_confidence", "model_sha256", "classified_at",
+)
+
+
+def _untimed_rows(db, farm_id, animal_id, start, end, limit=None, device_id=None):
+    query = db.query(UntimedTelemetry)
+    for column, value in ((UntimedTelemetry.farm_id_at_reception, farm_id),
+                          (UntimedTelemetry.animal_id_at_reception, animal_id),
+                          (UntimedTelemetry.device_id, device_id)):
+        if value is not None:
+            query = query.filter(column == value)
+    if start:
+        query = query.filter(UntimedTelemetry.received_at >= start)
+    if end:
+        query = query.filter(UntimedTelemetry.received_at < end)
+    for row in _bounded_rows(query.order_by(UntimedTelemetry.received_at, UntimedTelemetry.id), limit, 500):
+        yield tuple(getattr(row, name) for name in UNTIMED_FIELDS)
+
+
 HEADERS = {
+    ReportDataset.UNTIMED_TELEMETRY: tuple(
+        name + "_utc" if name in ("received_at", "measured_at", "classified_at") else name
+        for name in UNTIMED_FIELDS
+    ),
     ReportDataset.TELEMETRY: (
         "time_utc", "farm_id", "farm_name", "animal_id", "animal_name",
         "device_id", "latitude", "longitude", "altitude", "speed",
@@ -226,6 +266,7 @@ HEADERS = {
         "accel_y_std", "accel_y_min", "accel_y_max", "accel_z_mean",
         "accel_z_std", "accel_z_min", "accel_z_max", "sample_rate",
         "window_samples", "temperature", "battery_level", "signal_strength",
+        "received_at_utc", "time_source", "protocol_version", "behavior_eligible", "exclusion_reason",
     ),
     ReportDataset.DAILY_SUMMARIES: (
         "target_date", "farm_id", "farm_name", "animal_id", "animal_name",
@@ -242,11 +283,13 @@ HEADERS = {
         "feedback_id", "created_at_utc", "farm_id", "farm_name", "animal_id",
         "animal_name", "user_id", "user_email", "telemetry_time_utc",
         "predicted_behavior", "confidence", "verdict", "correction",
+        "behavior_eligible",
     ),
     ReportDataset.ALERT_FEEDBACKS: (
         "feedback_id", "created_at_utc", "farm_id", "farm_name", "animal_id",
         "animal_name", "user_id", "user_email", "alert_id", "alert_type",
         "z_score", "verdict", "notes",
+        "source_alert_valid",
     ),
 }
 
@@ -260,9 +303,12 @@ def _dataset_rows(
     date_to: Optional[date],
     resolved: Optional[bool],
     limit: Optional[int] = None,
+    device_id: Optional[str] = None,
 ) -> Iterable[Sequence[object]]:
     start, end = _target_bounds(date_from, date_to)
-    if dataset == ReportDataset.TELEMETRY:
+    if dataset == ReportDataset.UNTIMED_TELEMETRY:
+        return _untimed_rows(db, farm_id, animal_id, start, end, limit, device_id)
+    elif dataset == ReportDataset.TELEMETRY:
         return _telemetry_rows(
             db, farm_id, animal_id, start, end, limit
         )
@@ -285,11 +331,12 @@ def preview_dataset(
     date_to: Optional[date],
     resolved: Optional[bool],
     limit: int = 20,
+    device_id: Optional[str] = None,
 ) -> ReportPreview:
     if not 1 <= limit <= 50:
         raise ValueError("Preview limit must be between 1 and 50")
     # One extra row detects truncation without a COUNT or an unbounded export.
-    rows = list(_dataset_rows(db, dataset, farm_id, animal_id, date_from, date_to, resolved, limit + 1))
+    rows = list(_dataset_rows(db, dataset, farm_id, animal_id, date_from, date_to, resolved, limit + 1, device_id))
     return ReportPreview(
         dataset=dataset,
         columns=list(HEADERS[dataset]),
@@ -309,8 +356,9 @@ def stream_dataset(
     date_from: Optional[date],
     date_to: Optional[date],
     resolved: Optional[bool],
+    device_id: Optional[str] = None,
 ) -> Iterator[str]:
-    rows = _dataset_rows(db, dataset, farm_id, animal_id, date_from, date_to, resolved)
+    rows = _dataset_rows(db, dataset, farm_id, animal_id, date_from, date_to, resolved, device_id=device_id)
 
     yield _csv_line(HEADERS[dataset], include_bom=True)
     for row in rows:

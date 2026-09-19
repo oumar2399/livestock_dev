@@ -14,6 +14,7 @@ DATABASE_URL = settings.DATABASE_URL
 engine = create_engine(
     DATABASE_URL,
     echo=settings.SQL_ECHO,
+    hide_parameters=True,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10

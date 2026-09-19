@@ -23,6 +23,7 @@ from app.core.dependencies import get_current_user
 from app.core.access import require_animal_access
 from app.core.timezone import TARGET_TZ, ensure_utc
 from app.services.daily_summary import get_target_date_bounds
+from app.services.telemetry_quality import eligible_clause
 
 router = APIRouter(prefix="/activity", tags=["activity"])
 
@@ -118,7 +119,7 @@ def _build_hourly(records: list[Telemetry]) -> list[HourlyBreakdown]:
 # ============================================================
 
 @router.get("/summary/{animal_id}", response_model=ActivitySummary)
-async def get_activity_summary(
+def get_activity_summary(
     animal_id: int,
     target_date: Optional[date] = Query(
         None,
@@ -144,6 +145,7 @@ async def get_activity_summary(
             Telemetry.animal_id == animal_id,
             Telemetry.time >= day_start,
             Telemetry.time <  day_end,
+            eligible_clause(),
         )
         .order_by(Telemetry.time.asc())
         .all()
@@ -191,7 +193,7 @@ async def get_activity_summary(
 # ============================================================
 
 @router.get("/weekly/{animal_id}")
-async def get_weekly_summary(
+def get_weekly_summary(
     animal_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -217,6 +219,7 @@ async def get_weekly_summary(
                 Telemetry.animal_id == animal_id,
                 Telemetry.time >= day_start,
                 Telemetry.time <  day_end,
+                eligible_clause(),
             )
             .all()
         )

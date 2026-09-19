@@ -34,6 +34,7 @@ from app.core.access import (
     get_accessible_farm_ids,
 )
 from app.core.timezone import ensure_utc, to_utc_naive
+from app.services.telemetry_quality import eligible_clause, feedback_eligible_clause
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,9 @@ def submit_prediction_feedback(
             detail=f"No telemetry found for animal {payload.animal_id}",
         )
 
+    if not db.query(Telemetry).filter(Telemetry.animal_id == telemetry.animal_id,
+                                     Telemetry.time == telemetry.time, eligible_clause()).first():
+        raise HTTPException(409, "This measurement is excluded from animal behavior")
     predicted_behavior = telemetry.predicted_behavior
     confidence = telemetry.behavior_confidence
     telemetry_time = to_utc_naive(telemetry.time)
@@ -235,7 +239,7 @@ def get_feedback_stats(
     pred_base = (
         db.query(PredictionFeedback)
         .join(Animal, PredictionFeedback.animal_id == Animal.id)
-        .filter(Animal.farm_id.in_(accessible))
+        .filter(Animal.farm_id.in_(accessible), feedback_eligible_clause())
     )
     total_pred = pred_base.count()
     correct_pred = pred_base.filter(PredictionFeedback.verdict == "correct").count()
@@ -245,6 +249,8 @@ def get_feedback_stats(
     alert_base = (
         db.query(AlertFeedback)
         .join(Animal, AlertFeedback.animal_id == Animal.id)
+        .join(Alert, Alert.id == AlertFeedback.alert_id)
+        .filter(Alert.alert_metadata["quality_invalidated_at"].astext.is_(None))
         .filter(Animal.farm_id.in_(accessible))
     )
     total_alert = alert_base.count()

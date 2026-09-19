@@ -1,7 +1,7 @@
 """
 Schémas Pydantic pour Telemetry - Données capteurs
 """
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional
 from datetime import datetime
 
@@ -83,6 +83,13 @@ class TelemetryCreate(TelemetryBase):
 
 
 class TelemetryResponse(TelemetryBase):
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    received_at: Optional[datetime] = None
+    time_source: Optional[str] = None
+    protocol_version: Optional[int] = None
+    behavior_eligible: Optional[bool] = None
+    exclusion_reason: Optional[str] = None
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     time                : datetime
@@ -93,13 +100,28 @@ class TelemetryResponse(TelemetryBase):
     feedback_verdict    : Optional[str] = None
     feedback_correction : Optional[str] = None
 
+class BinaryTelemetryCreate(TelemetryCreate):
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def coordinate_pair(self):
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("Coordinates must both be present or absent")
+        return self
+
+
 class TelemetryLatest(BaseModel):
     """Dernière position d'un animal (vue optimisée)"""
     animal_id   : int
     animal_name : str
     device_id   : str
-    latitude    : float
-    longitude   : float
+    latitude    : Optional[float]
+    longitude   : Optional[float]
+    position_time: Optional[datetime] = None
+    position_is_animal: bool = True
+    device_status: Optional[str] = None
+    behavior_eligible: Optional[bool] = None
     activity    : float
     activity_state : Optional[str] = None
     battery     : int

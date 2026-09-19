@@ -3,6 +3,7 @@
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from alembic.script import ScriptDirectory
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -113,7 +114,8 @@ def test_transactional_features() -> None:
 
         status = build_system_status(db)
         assert status["database"]["status"] == "up"
-        assert status["schema"]["revision"] == "2c8e0f6a7b9d"
+        migrations = ScriptDirectory(str(Path(__file__).resolve().parent.parent / "alembic"))
+        assert status["schema"]["revision"] == migrations.get_current_head()
         assert status["target_timezone"] == "Asia/Tokyo"
     finally:
         db.rollback()

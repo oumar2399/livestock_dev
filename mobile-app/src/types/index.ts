@@ -64,8 +64,12 @@ export interface TelemetryRecord {
   time: string;
   device_id: string;
   animal_id: number | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
+  behavior_eligible?: boolean | null;
+  exclusion_reason?: string | null;
+  received_at?: string | null;
+  time_source?: string | null;
   altitude: number | null;
   speed: number | null;
   satellites: number | null;
@@ -84,8 +88,12 @@ export interface TelemetryLatest {
   animal_id: number;
   animal_name: string;
   device_id: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
+  position_time?: string | null;
+  position_is_animal?: boolean;
+  device_status?: string | null;
+  behavior_eligible?: boolean | null;
   activity: number;
   activity_state: ActivityState | null;
   predicted_behavior?: string | null;
@@ -93,6 +101,8 @@ export interface TelemetryLatest {
   battery: number;
   last_update: string;
 }
+
+export type PositionedTelemetry = TelemetryLatest & { latitude: number; longitude: number };
 
 export interface TelemetryCreate {
   device_id: string;
@@ -247,6 +257,7 @@ export interface FeedbackStatsResponse {
 // ─── Operations, exports and history ─────────────────────────────────────────
 
 export type ReportDataset =
+  | 'untimed_telemetry'
   | 'telemetry'
   | 'daily_summaries'
   | 'alerts'

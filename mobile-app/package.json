@@ -12,6 +12,7 @@
     "test:geofence": "node --test tests/geofence-map.test.cjs tests/geofence-screen.test.cjs",
     "test:previews": "node --test tests/service-previews.test.cjs",
     "test:reports": "node --test tests/reports-preview.test.cjs",
+    "test:sessions": "node --test tests/session-regressions.test.cjs",
     "install-all": "npm install && npx expo install",
     "reset": "npx expo start -c"
   },

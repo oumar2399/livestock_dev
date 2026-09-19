@@ -8,7 +8,7 @@ Used for long-term anomaly detection baselines and mobile time budget.
 
 from datetime import datetime
 from sqlalchemy import Column, Integer, Float, Date, DateTime, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 
 from app.db.database import Base
 
@@ -27,7 +27,12 @@ class DailyBehaviorSummary(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    animal = relationship("Animal", backref="daily_behavior_summaries")
+    animal = relationship(
+        "Animal",
+        backref=backref(
+            "daily_behavior_summaries", cascade="all, delete-orphan", passive_deletes=True
+        ),
+    )
 
     __table_args__ = (
         UniqueConstraint("animal_id", "date", name="uq_animal_date"),
