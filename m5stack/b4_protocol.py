@@ -145,6 +145,23 @@ def parse_sentence(line):
     return None
 
 
+def _is_used_nmea_bytes(line):
+    """Fast byte-level header check for GGA/RMC/ZDA from GP/GN talkers."""
+    if len(line) < 7:
+        return False
+
+    # $ G P/N X X X ,
+    if line[0] != 36 or line[1] != 71 or line[2] not in (80, 78) or line[6] != 44:
+        return False
+
+    a, b, c = line[3], line[4], line[5]
+    return (
+        (a == 71 and b == 71 and c == 65) or   # GGA
+        (a == 82 and b == 77 and c == 67) or   # RMC
+        (a == 90 and b == 68 and c == 65)      # ZDA
+    )
+
+
 class GPSClock:
     def __init__(self, ticks_diff, max_age_ms, gps_age_ms, coherence_ms, jump_ms):
         self.diff = ticks_diff
@@ -154,7 +171,7 @@ class GPSClock:
         self.jump = jump_ms
         self.base = self.base_tick = None
         self.fix = self.fix_tick = self.fix_tod = None
-        self.buffer = ""
+        self.buffer = b""
         self.invalid_sentences = 0
         self.uncertainty_reason = 1
 
@@ -169,21 +186,46 @@ class GPSClock:
         return self.base + age
 
     def feed(self, data, tick):
-        self.buffer += data.decode("ascii", "ignore")
-        if len(self.buffer) > 1024:
-            self.buffer = ""
+        """Frame NMEA as bytes and decode only GGA/RMC/ZDA sentences."""
+        # b4_runtime currently resets gps.buffer to "" at each cycle. Accept
+        # that reset without requiring a runtime change.
+        previous = self.buffer
+        if not isinstance(previous, bytes):
+            previous = b""
+
+        raw = previous + data
+        if len(raw) > 1024:
+            self.buffer = b""
             self.invalid_sentences += 1
             return
-        while "\n" in self.buffer:
-            line, self.buffer = self.buffer.split("\n", 1)
+
+        start = 0
+        while True:
+            end = raw.find(b"\n", start)
+            if end < 0:
+                break
+
+            line = raw[start:end]
+            start = end + 1
+
+            if line and line[-1] == 13:  # CR from CRLF
+                line = line[:-1]
+
+            # Reject unsupported NMEA families before any text decoding,
+            # checksum work or comma splitting.
+            if not _is_used_nmea_bytes(line):
+                continue
+
             try:
-                result = parse_sentence(line.strip())
+                result = parse_sentence(line.decode("ascii"))
                 if result is None:
                     continue
+
                 kind, stamp, fix = result
+
                 if kind == "clock":
-                    previous = self.utc_ms(tick)
-                    if previous is not None and abs(previous - stamp) > self.jump:
+                    current = self.utc_ms(tick)
+                    if current is not None and abs(current - stamp) > self.jump:
                         self.base = None
                         self.uncertainty_reason = 3
                         self.invalid_sentences += 1
@@ -192,8 +234,11 @@ class GPSClock:
                     self.uncertainty_reason = None
                 else:
                     self.fix, self.fix_tick, self.fix_tod = fix, tick, stamp
-            except (ValueError, IndexError, TypeError):
+
+            except (ValueError, IndexError, TypeError, UnicodeError):
                 self.invalid_sentences += 1
+
+        self.buffer = raw[start:]
 
     def position(self, tick):
         utc = self.utc_ms(tick)
