@@ -1,26 +1,41 @@
 """
-Test script for Anomaly Detection Warm-up Safeguard.
+Manual check for the anomaly detection warm-up safeguard.
 Inserts test telemetry records across multiple days for a test animal
 and asserts that has_sufficient_history() returns False for < 10 days and True for >= 10 days.
+
+Writes to the database it is given. The URL is mandatory and must name a
+disposable database (same prefixes as backend/tests/conftest.py):
+
+    python scripts/test_anomaly_warmup.py --database-url postgresql://.../livestock_audit_xxx
 """
 
-import sys
+import argparse
 import os
+import sys
 from pathlib import Path
 from datetime import datetime, timedelta
+
+from sqlalchemy.engine import make_url
 
 # Add backend directory to path
 backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from app.db.database import SessionLocal
-from app.models.animal import Animal
-from app.models.farm import Farm
-from app.models.telemetry import Telemetry
-from app.services.anomaly_detection import has_sufficient_history
+ALLOWED_DATABASE_PREFIXES = (
+    "livestock_review_",
+    "livestock_binary_test_",
+    "livestock_audit_",
+    "livestock_schema_check_",
+)
 
 
 def run_test():
+    from app.db.database import SessionLocal
+    from app.models.animal import Animal
+    from app.models.farm import Farm
+    from app.models.telemetry import Telemetry
+    from app.services.anomaly_detection import has_sufficient_history
+
     db = SessionLocal()
     print("[TEST] Running Anomaly Detection Warm-up Test...")
 
@@ -99,5 +114,19 @@ def run_test():
         db.close()
 
 
-if __name__ == "__main__":
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
+    parser.add_argument("--database-url", required=True, help="URL of a disposable database")
+    args = parser.parse_args(argv)
+    database = make_url(args.database_url).database or ""
+    if not database.startswith(ALLOWED_DATABASE_PREFIXES):
+        parser.error(
+            f"refusing database {database!r}; allowed prefixes: {', '.join(ALLOWED_DATABASE_PREFIXES)}"
+        )
+    # Must be set before app.core.config is imported; load_dotenv never overrides it.
+    os.environ["DATABASE_URL"] = args.database_url
     run_test()
+
+
+if __name__ == "__main__":
+    main()

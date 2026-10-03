@@ -10,9 +10,36 @@ Tests that:
 - Device orphan claim + denied
 - Device transfer requires both farms (4 cases)
 - Soft revoke + last owner guard
+
+Manual script (not collected by pytest). Writes to the database it is given;
+the URL is mandatory and must name a disposable database (same prefixes as
+backend/tests/conftest.py):
+
+    python scripts/test_isolation.py --database-url postgresql://.../livestock_audit_xxx
 """
+import argparse
 import sys
 import os
+
+from sqlalchemy.engine import make_url
+
+ALLOWED_DATABASE_PREFIXES = (
+    "livestock_review_",
+    "livestock_binary_test_",
+    "livestock_audit_",
+    "livestock_schema_check_",
+)
+
+_parser = argparse.ArgumentParser(description="Farm-scoped access isolation checks")
+_parser.add_argument("--database-url", required=True, help="URL of a disposable database")
+_args = _parser.parse_args()
+_database = make_url(_args.database_url).database or ""
+if not _database.startswith(ALLOWED_DATABASE_PREFIXES):
+    _parser.error(
+        f"refusing database {_database!r}; allowed prefixes: {', '.join(ALLOWED_DATABASE_PREFIXES)}"
+    )
+# Must be set before app.core.config is imported; load_dotenv never overrides it.
+os.environ["DATABASE_URL"] = _args.database_url
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
 
