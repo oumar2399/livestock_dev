@@ -2,8 +2,8 @@
 
 Vérifie :
 1. Calcul de l'oracle de référence et conformité du vecteur binaire (45 octets).
-2. Validation de la prédiction ML attendue : pour la variance élevée (0.50 à 0.75g),
-   la classe comportementale DOIT être 'Active' et activity_state 'standing'.
+2. Verification du routage et de la persistance de la prediction simulee.
+   Ce test d'ingestion ne valide pas scientifiquement le modele ML.
 3. Ingestion réelle de l'oracle via POST /api/v1/telemetry/binary :
    - Insertion initiale -> 201 Created
    - Replay du même paquet -> 200 OK (idempotence)
@@ -17,7 +17,7 @@ import pytest
 from app.core.config import settings
 from app.models.telemetry import Telemetry
 from app.services import ml_inference
-from backend.scripts.test3_binary_bench import compute_oracle
+from scripts.test3_binary_bench import compute_oracle
 
 
 def test_oracle_mathematical_invariants():
@@ -84,8 +84,8 @@ def test_test3_end_to_end_ingestion_and_idempotence(binary_case, binary_client, 
     assert float(row.accel_z_mean) == 0.25
     assert float(row.activity) == 0.291
     assert float(row.activity_std) == 0.145
-    assert row.predicted_behavior == "Active"
-    assert row.behavior_confidence is not None and row.behavior_confidence > 0.50
+    assert row.predicted_behavior == case.prediction.return_value[0]
+    assert row.behavior_confidence == pytest.approx(case.prediction.return_value[1])
     assert row.latitude is None and row.longitude is None and row.location is None
 
     # 3. Deuxième envoi du même paquet (Replay) -> 200 OK (Idempotence)

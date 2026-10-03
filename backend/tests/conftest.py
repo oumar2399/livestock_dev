@@ -11,6 +11,23 @@ backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from app.db.database import SessionLocal, engine
+
+# Tests may only target disposable databases. This is a name check on the
+# configured URL; it runs before any connection is opened.
+ALLOWED_TEST_DATABASE_PREFIXES = (
+    "livestock_review_",
+    "livestock_binary_test_",
+    "livestock_audit_",
+    "livestock_schema_check_",
+)
+_test_database = engine.url.database or ""
+if not _test_database.startswith(ALLOWED_TEST_DATABASE_PREFIXES):
+    pytest.exit(
+        f"Refusing to run tests against database {_test_database!r}. "
+        f"Allowed prefixes: {', '.join(ALLOWED_TEST_DATABASE_PREFIXES)}. "
+        "Use scripts/run_isolated_tests.py or a disposable DATABASE_URL.",
+        returncode=4,
+    )
 from app.models.animal import Animal
 from app.models.farm import Farm
 from app.models.membership import FarmMembership
@@ -90,6 +107,7 @@ def binary_case(binary_db, monkeypatch):
     db.add_all([device, animal])
     db.commit()
     monkeypatch.setattr(ml_inference, "_artifact", None)
+    monkeypatch.setattr(ml_inference, "_profiles", {(10, 150): {}})
     prediction = MagicMock(return_value=("Resting", 0.9))
     monkeypatch.setattr(ml_inference, "predict_with_confidence", prediction)
     return SimpleNamespace(db=db, user=user, farm=farm, other_farm=other_farm,

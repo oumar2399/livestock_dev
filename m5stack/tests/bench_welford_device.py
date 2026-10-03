@@ -1,6 +1,9 @@
 """
-m5stack/tests/test_welford_firmware.py
-=========================================
+m5stack/tests/bench_welford_device.py
+=====================================
+On-device bench (MicroPython, M5Stack only). Not collected by pytest.
+PC counterpart: backend/tests/test_welford_consistency.py.
+
 Validation B.3 (partie firmware) : la formule Welford, deja validee en
 Python/float64 (backend/tests/test_welford_consistency.py, ecart max 3.41e-13),
 doit aussi tenir sur le vrai hardware -- MicroPython/ESP32 calcule en
@@ -36,7 +39,7 @@ Trois familles de verification :
 Usage :
   Copier ce fichier sur le M5Stack (Thonny : File > Save as > MicroPython
   device), puis executer depuis le REPL :
-    >>> exec(open('test_welford_firmware.py').read())
+    >>> exec(open('bench_welford_device.py').read())
 """
 from machine import I2C
 from mpu6886 import MPU6886
