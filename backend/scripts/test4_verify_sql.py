@@ -28,29 +28,26 @@ from sqlalchemy.orm import Session
 
 
 def verify_telemetry(animal_id: int = None, timestamp: int = None, database_url: str = None, clean: bool = False):
+    if clean:
+        raise ValueError("Verification is read-only. Use clean_test4_bench.py with explicit identities.")
     url = database_url or os.environ.get("DATABASE_URL") or settings.DATABASE_URL
     engine = create_engine(url)
 
     with engine.connect() as conn:
         current_db = conn.execute(text("SELECT current_database();")).scalar()
-        if not any(k in current_db for k in ("bench", "test", "dev")):
+        if current_db not in ("livestock_bench", "livestock_dev"):
             print(f"[ERREUR] Refus d'exécution : la base courante '{current_db}' n'est pas une base autorisée (bench/test/dev) !")
             sys.exit(1)
 
         # Resolve animal_id if not given
         if animal_id is None:
-            aid = conn.execute(text("SELECT a.id FROM animals a JOIN devices d ON a.assigned_device = d.id WHERE d.id = 'M5-TEST4-BENCH' OR d.transport_id = 102;")).scalar()
-            animal_id = aid if aid is not None else 267
+            animal_id = conn.execute(text("SELECT a.id FROM animals a JOIN devices d ON a.assigned_device = d.id WHERE d.id = 'M5-TEST4-BENCH';")).scalar_one_or_none()
+            if animal_id is None:
+                raise ValueError("No dedicated Test 4 animal found; provide --animal-id explicitly")
 
         print(f"============================================================")
         print(f"[VÉRIFICATION SQL] Base: {current_db} | Animal ID: {animal_id}")
         print(f"============================================================")
-
-        if clean:
-            deleted = conn.execute(text("DELETE FROM telemetry WHERE animal_id = :aid;"), {"aid": animal_id}).rowcount
-            conn.commit()
-            print(f"[NETTOYAGE] {deleted} ligne(s) de télémétrie supprimée(s) pour animal_id={animal_id}.")
-            return True
 
         if timestamp is not None:
             ts_dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
@@ -92,7 +89,8 @@ def verify_telemetry(animal_id: int = None, timestamp: int = None, database_url:
         # Si un timestamp précis était vérifié (test d'idempotence)
         if timestamp is not None:
             if len(rows) == 1:
-                print(f"\n[PASS] IDEMPOTENCE VALIDÉE : Exactement 1 ligne présente pour la clé (animal_id={animal_id}, time={ts_dt.isoformat()}).")
+                print(f"\n[PASS] Une ligne pour la cle (animal_id={animal_id}, time={ts_dt.isoformat()}).")
+                print("Ce controle seul ne prouve pas l'idempotence : comparer les champs avant/apres replay.")
                 return True
             else:
                 print(f"\n[FAIL] ÉCHEC D'IDEMPOTENCE : {len(rows)} lignes trouvées (doublon détecté !) pour la même clé temporelle.")

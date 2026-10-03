@@ -4,6 +4,7 @@ import os
 import json
 import struct
 import binascii
+import gc
 
 MAGIC = b"UTJ1"
 MAX_BYTES = 65536
@@ -45,17 +46,21 @@ class FileBanks:
         return self.directory + "/untimed." + str(slot)
 
     def read(self, slot):
+        path = self._path(slot)
         try:
-            with open(self._path(slot), "rb") as stream:
-                value = stream.read(MAX_BYTES + 1)
+            size = os.stat(path)[6]
+            if size > MAX_BYTES:
+                raise ValueError("Oversized journal bank")
+            with open(path, "rb") as stream:
+                value = stream.read(size)
         except OSError as exc:
-            if getattr(exc, "errno", None) == 2 or (exc.args and exc.args[0] == 2) or isinstance(exc, FileNotFoundError):
+            if getattr(exc, "errno", None) == 2 or (exc.args and exc.args[0] == 2):
                 return None
             if "ENOENT" in str(exc) or "No such file" in str(exc):
                 return None
-            return None
-        if len(value) > MAX_BYTES:
-            raise ValueError("Oversized journal bank")
+            raise
+        if len(value) != size:
+            raise OSError("Incomplete journal read")
         return value
 
     def write(self, slot, value):
@@ -143,6 +148,7 @@ class UntimedJournal:
     def _save(self, state):
         if self.failed:
             raise OSError("Journal requires reload after a failed write")
+        gc.collect()
         candidate = _clone(state)
         candidate["generation"] = self.state["generation"] + 1
         self._validate(candidate)
@@ -210,6 +216,7 @@ class UntimedJournal:
 
 def initialize_journal(banks, identity, transport_id, capacity, quarantine_capacity, last_reserved_session):
     """Explicit provisioning only; never overwrite or auto-reset existing banks."""
+    gc.collect()
     if any(banks.read(slot) is not None for slot in (0, 1)):
         raise ValueError("Journal already exists; automatic reset is forbidden")
     state = {"generation": 0, "session_counter": last_reserved_session, "identity": identity,

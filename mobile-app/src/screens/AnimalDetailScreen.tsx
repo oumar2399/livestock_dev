@@ -22,9 +22,10 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { AnimalsStackParamList, ActivityState, TelemetryRecord } from '../types';
 import { useAnimal } from '../hooks/useAnimals';
-import { useTelemetryHistory } from '../hooks/useTelemetry';
+import { useTelemetryHistory, useTelemetryLatest } from '../hooks/useTelemetry';
 import { useSubmitPredictionFeedback } from '../hooks/useFeedback';
 import { useActivitySummary, ActivityBudgetItem } from '../hooks/useActivity';
+import { useAnimalLocation } from '../hooks/useLocations';
 import { useFarmStore } from '../store/farmStore';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import apiClient from '../api/client';
@@ -36,6 +37,9 @@ import {
   formatWeight,
   formatDate,
   formatTemperature,
+  formatDeviceTemperature,
+  formatBattery,
+  evaluateFreshness,
   activityStateColor,
   activityStateLabel,
   batteryColor,
@@ -70,8 +74,6 @@ const BUDGET_LABELS = {
   Active:  'Active',
   Resting: 'Resting',
 };
-
-// ─── Activity Chart ───────────────────────────────────────────────────────────
 
 // ─── Activity Chart ───────────────────────────────────────────────────────────
 
@@ -237,6 +239,10 @@ export default function AnimalDetailScreen() {
 
   const animalQuery  = useAnimal(animalId);
   const historyQuery = useTelemetryHistory(animalId, historyHours);
+  const positionQuery = useTelemetryLatest({ animal_id: animalId, limit: 1 });
+  const locationQuery = useAnimalLocation(animalId);
+  const position = positionQuery.data?.[0];
+  const location = locationQuery.data;
 
   const animal      = animalQuery.data;
   const history = historyQuery.data ?? [];
@@ -261,6 +267,8 @@ export default function AnimalDetailScreen() {
     setSubmittedCorrection(null);
     animalQuery.refetch();
     historyQuery.refetch();
+    positionQuery.refetch();
+    locationQuery.refetch();
   };
 
   if (animalQuery.isLoading) return <LoadingState message="Loading animal profile…" />;
@@ -269,7 +277,15 @@ export default function AnimalDetailScreen() {
   }
 
   const statusColor  = animalStatusColor(animal.status);
-  const isLive       = isRecentUpdate(animal.last_update);
+  const freshness    = evaluateFreshness({
+    telemetryTime: latestRecord?.time ?? animal.last_update,
+    positionTime: position?.position_time,
+    latitude: position?.latitude,
+    longitude: position?.longitude,
+    satellites: latestRecord?.satellites,
+    deviceStatus: position?.device_status ?? 'unknown',
+    battery: latestRecord?.battery,
+  });
   const currentState = latestRecord?.activity_state as ActivityState | null;
 
   // Search backwards for the most recent record that has NOT been annotated yet
@@ -328,7 +344,8 @@ export default function AnimalDetailScreen() {
             <Text style={styles.heroName}>{animal.name}</Text>
             <View style={styles.heroBadges}>
               <StatusBadge label={animalStatusLabel(animal.status)} color={statusColor} />
-              {isLive && currentState && (
+              <StatusBadge label={freshness.telemetryLabel} color={freshness.telemetryColor} />
+              {freshness.telemetryFreshness === 'recent' && currentState && (
                 <StatusBadge
                   label={latestRecord?.predicted_behavior
                     ? `${latestRecord.predicted_behavior} (${(latestRecord.behavior_confidence! * 100).toFixed(0)}%)`
@@ -345,10 +362,10 @@ export default function AnimalDetailScreen() {
               <Ionicons
                 name={batteryIcon(latestRecord.battery) as any}
                 size={20}
-                color={batteryColor(latestRecord.battery)}
+                color={freshness.batteryColor}
               />
-              <Text style={[styles.heroBatteryText, { color: batteryColor(latestRecord.battery) }]}>
-                {latestRecord.battery}%
+              <Text style={[styles.heroBatteryText, { color: freshness.batteryColor }]}>
+                {freshness.batteryLabel}
               </Text>
             </View>
           )}
@@ -424,16 +441,77 @@ export default function AnimalDetailScreen() {
           <View style={styles.cardHeader}>
             <Ionicons name="location-outline" size={18} color={Colors.primary} />
             <Text style={styles.cardTitle}>GPS Position</Text>
-            {isLive && <View style={styles.liveDot} />}
+            <View style={{ marginLeft: 'auto' }}>
+              <StatusBadge
+                label={
+                  location?.freshness === 'recent'
+                    ? 'Recent (<5m)'
+                    : location?.freshness === 'stale'
+                    ? 'Stale (<30m)'
+                    : freshness.gpsLabel
+                }
+                color={
+                  location?.freshness === 'recent'
+                    ? '#27AE60'
+                    : location?.freshness === 'stale'
+                    ? '#F39C12'
+                    : freshness.gpsColor
+                }
+              />
+            </View>
           </View>
+
+          {location && (!location.position_is_animal || location.device_status === 'lost') && (
+            <View style={styles.lostCollarBanner}>
+              <Ionicons name="warning-outline" size={16} color="#E67E22" />
+              <Text style={styles.lostCollarText}>
+                {location.device_status === 'lost'
+                  ? 'Collier déclaré égaré — position de l’équipement seul, pas de l’animal.'
+                  : 'Matériel seul — position non garantie de l’animal.'}
+              </Text>
+            </View>
+          )}
+
           <Text style={styles.coordText}>
-            {formatCoords(animal.last_latitude, animal.last_longitude)}
+            {formatCoords(
+              location?.latitude ?? position?.latitude ?? null,
+              location?.longitude ?? position?.longitude ?? null,
+            )}
           </Text>
-          <Text style={styles.coordMeta}>
-            {animal.last_update
-              ? `Last updated: ${timeAgo(animal.last_update)}`
-              : 'No position recorded'}
-          </Text>
+
+          <View style={styles.gpsTimestamps}>
+            <View style={styles.gpsMetaRow}>
+              <Text style={styles.gpsMetaLabel}>Position fixée :</Text>
+              <Text style={styles.gpsMetaValue}>
+                {location?.position_time
+                  ? `${format(parseISO(location.position_time), 'dd/MM/yyyy HH:mm')} (${timeAgo(location.position_time)})`
+                  : position?.position_time
+                  ? `${timeAgo(position.position_time)}`
+                  : 'Aucune position'}
+              </Text>
+            </View>
+            <View style={styles.gpsMetaRow}>
+              <Text style={styles.gpsMetaLabel}>Dernière télémétrie :</Text>
+              <Text style={styles.gpsMetaValue}>
+                {latestRecord?.time
+                  ? `${format(parseISO(latestRecord.time), 'dd/MM/yyyy HH:mm')} (${timeAgo(latestRecord.time)})`
+                  : animal.last_update
+                  ? timeAgo(animal.last_update)
+                  : 'Aucune trame'}
+              </Text>
+            </View>
+          </View>
+
+          {(location?.latitude != null || position?.latitude != null) && (
+            <TouchableOpacity
+              style={styles.locateMapBtn}
+              onPress={() => navigation.navigate('Map', { focusAnimalId: animal.id, showTrack: true })}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="navigate-outline" size={16} color="#fff" />
+              <Text style={styles.locateMapBtnText}>Localiser & Voir le trajet sur la carte</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── Information ─────────────────────────── */}
@@ -504,16 +582,16 @@ export default function AnimalDetailScreen() {
                 icon="analytics-outline"
               />
             )}
-            {latestRecord.temperature && (
-              <InfoRow label="Temperature" value={formatTemperature(latestRecord.temperature)} icon="thermometer-outline" />
+            {latestRecord.temperature != null && (
+              <InfoRow label="Device Enclosure Temp" value={formatDeviceTemperature(latestRecord.temperature)} icon="thermometer-outline" />
             )}
-            {latestRecord.speed != null && (
+            {latestRecord.speed != null && latestRecord.speed >= 0 && (
               <InfoRow label="GPS Speed"  value={`${latestRecord.speed.toFixed(1)} km/h`}  icon="speedometer-outline" />
             )}
             {latestRecord.satellites != null && (
               <InfoRow label="Satellites" value={String(latestRecord.satellites)}           icon="planet-outline"      />
             )}
-            <InfoRow label="Battery"      value={`${latestRecord.battery}%`}               icon="battery-half-outline" last />
+            <InfoRow label="Battery"      value={freshness.batteryLabel}                    icon="battery-half-outline" last />
           </View>
         )}
 
@@ -718,4 +796,58 @@ const styles = StyleSheet.create({
   modalCancelText: { color: Colors.text.muted, fontSize: Typography.sm },
   modalSubmitBtn: { backgroundColor: Colors.primary, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.md },
   modalSubmitText: { color: '#fff', fontSize: Typography.sm, fontWeight: '700' },
+
+  // GPS card enhancements (Lot B)
+  lostCollarBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: '#E67E2218',
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#E67E2240',
+  },
+  lostCollarText: {
+    flex: 1,
+    fontSize: Typography.xs,
+    color: '#E67E22',
+    fontWeight: '600',
+  },
+  gpsTimestamps: {
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.sm,
+    gap: 4,
+  },
+  gpsMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  gpsMetaLabel: {
+    fontSize: Typography.xs,
+    color: Colors.text.muted,
+  },
+  gpsMetaValue: {
+    fontSize: Typography.xs,
+    color: Colors.text.primary,
+    fontWeight: '500',
+  },
+  locateMapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.base,
+    borderRadius: Radius.md,
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  locateMapBtnText: {
+    color: '#fff',
+    fontSize: Typography.sm,
+    fontWeight: '700',
+  },
 });

@@ -52,6 +52,92 @@ def _check_config():
         raise RuntimeError("B4_ISOLATED_BENCH doit etre positionne a True dans test4_config.py")
 
 
+class TransportAudit:
+    """Bounded summary only; independent of the LCD/watchdog status callback."""
+    def __init__(self, timeout_s, attempts, tolerance_ms=500):
+        if not 0 <= tolerance_ms <= 2000 or tolerance_ms >= timeout_s * 1000:
+            raise ValueError("Fixer une tolerance positive inferieure au budget avant le banc")
+        self.budget = int(timeout_s * 1000)
+        self.expected = attempts
+        self.tolerance = tolerance_ms
+        self.count = 0
+        self.http_count = 0
+        self.silent = 0
+        self.address_ms = 0
+        self.started = None
+        self.elapsed_ms = 0
+        self.violation = None
+        self.pending = False
+        self.incomplete = False
+        self.connection_failures = 0
+
+    def observe(self, event, data):
+        if event == "http":
+            self.http_count += 1
+            if self.pending:
+                self.violation = "Observations HTTP dupliquees"
+            self.pending = data
+            self.address_ms += data["address_ms"]
+            if data["http_ms"] > self.budget + self.tolerance:
+                self.violation = "Plafond TCP/HTTP depasse"
+            if (data["connected"] and data["request_complete"] and
+                    data["phase"] == "response" and data["status"] is None and
+                    data["received_bytes"] == 0 and data["error"] is not None and
+                    self.budget - self.tolerance <= data["http_ms"] <= self.budget + self.tolerance):
+                self.silent += 1
+            print("TEST4_HTTP", data)
+        elif event == "attempt":
+            self.count += 1
+            now = time.ticks_ms()
+            if self.started is None:
+                self.started = time.ticks_add(now, -data["elapsed_ms"])
+            self.elapsed_ms = time.ticks_diff(now, self.started)
+            if data["number"] != self.count or data["version"] != 2:
+                self.violation = "Sequence de tentatives inattendue"
+            if data["wifi_ms"] > self.budget + self.tolerance:
+                self.violation = "Plafond Wi-Fi depasse"
+            if data.get("error") in ("ValueError", "AttributeError", "TypeError"):
+                self.violation = "Erreur locale, pas un echec reseau qualifie"
+            if not self.pending:
+                self.incomplete = True
+            elif (data.get("phase") != "http" or data.get("error") != "OSError" or
+                  data.get("status") is not None):
+                self.incomplete = True
+            elif (self.pending["phase"] == "connect" and not self.pending["connected"] and
+                  self.pending["error"] == "OSError"):
+                self.connection_failures += 1
+            self.pending = False
+            print("TEST4_ATTEMPT", data)
+
+    def verdict(self, counters, blackhole=False, server_connections=None):
+        backoff = sum(min(2 ** n, 30) * 1000 for n in range(self.expected - 1))
+        limit = self.expected * (2 * self.budget + self.tolerance) + backoff
+        if self.violation:
+            return "FAIL", self.violation
+        if (counters.get("sent") != 0 or counters.get("send_dropped") != 1 or
+                counters.get("imu_invalid", 0) or counters.get("no_clock", 0)):
+            return "FAIL", "Drop non attribuable au transport attendu"
+        if self.count != self.expected or self.pending or self.incomplete:
+            return "INCONCLUSIF", "Journal incomplet ou nombre de tentatives incorrect"
+        if self.elapsed_ms - self.address_ms > limit:
+            return "FAIL", "Budget transport hors preparation adresse depasse"
+        if blackhole:
+            if self.http_count != self.expected or self.silent != self.expected:
+                return "FAIL", "Silence TCP et durees non prouves pour chaque tentative"
+            if server_connections is None:
+                return "INCONCLUSIF", "Confirmer les connexions acceptees dans le journal du serveur"
+            if server_connections != self.expected:
+                return "FAIL", "Nombre de connexions serveur incorrect"
+        elif self.connection_failures != self.expected:
+            return "INCONCLUSIF", "Echec de connexion TCP non prouve (Wi-Fi, adresse ou autre phase)"
+        return "PASS", "Phases bornees observees ; preparation adresse mesuree sans garantie de borne"
+
+
+def _audit():
+    return TransportAudit(config.HTTP_TIMEOUT_S, config.MAX_SEND_ATTEMPTS,
+                          getattr(config, "TEST4_TIMING_TOLERANCE_MS", 500))
+
+
 def test_runtime_nominal():
     """Palier 4.0 : Smoke test nominal de b4_runtime.run()."""
     _check_config()
@@ -72,21 +158,21 @@ def test_unreachable_server():
     print("\n=== PALIER 4.1 : Serveur Inaccessible (3 retries attendus) ===")
     clock = BenchClock()
     orig_url = config.API_BASE_URL
+    audit = _audit()
     try:
         config.API_BASE_URL = "http://192.0.2.1:8000"
         t0 = time.ticks_ms()
-        counters = b4_runtime.run(config, max_cycles=1, bench_clock=clock)
+        counters = b4_runtime.run(config, max_cycles=1, bench_clock=clock, on_transport=audit.observe)
         duration_s = time.ticks_diff(time.ticks_ms(), t0) / 1000
         print("Duree totale : %.1fs | Compteurs : %s" % (duration_s, counters))
-        if counters.get("send_dropped") == 1 and counters.get("sent") == 0:
-            print("[PASS] Palier 4.1 reussi : drop borne apres epuisement des retries.")
-        else:
-            print("[FAIL] Palier 4.1 echoue.")
+        verdict = audit.verdict(counters)
+        print("[%s] Palier 4.1 : %s" % verdict)
+        return {"counters": counters, "audit": audit, "verdict": verdict}
     finally:
         config.API_BASE_URL = orig_url
 
 
-def test_blackhole_server(blackhole_url=None):
+def test_blackhole_server(blackhole_url=None, server_connections=None):
     """Palier 4.1b : Serveur silencieux trou noir (mesure precise du timeout)."""
     _check_config()
     target_url = blackhole_url or config.API_BASE_URL.replace(":8000", ":8002")
@@ -94,16 +180,18 @@ def test_blackhole_server(blackhole_url=None):
     print("Verifiez que python test4_blackhole.py tourne sur le PC port 8002 !")
     clock = BenchClock()
     orig_url = config.API_BASE_URL
+    audit = _audit()
     try:
         config.API_BASE_URL = target_url
         t0 = time.ticks_ms()
-        counters = b4_runtime.run(config, max_cycles=1, bench_clock=clock)
+        counters = b4_runtime.run(config, max_cycles=1, bench_clock=clock, on_transport=audit.observe)
         duration_s = time.ticks_diff(time.ticks_ms(), t0) / 1000
         print("Duree totale : %.1fs | Compteurs : %s" % (duration_s, counters))
-        if counters.get("send_dropped") == 1 and duration_s >= 25.0:
-            print("[PASS] Palier 4.1b reussi : timeout respecte (~%.1fs attendu pour 3x10s)." % duration_s)
-        else:
-            print("[ATTENTION] Palier 4.1b : duree=%.1fs (attendu >=25s). Verifier le timeout." % duration_s)
+        verdict = audit.verdict(counters, blackhole=True, server_connections=server_connections)
+        print("[%s] Palier 4.1b : %s" % verdict)
+        print("Preparation adresse totale (non bornee):", audit.address_ms, "ms")
+        print("Conservez ce resultat ; confirmez les connexions du serveur avant un PASS final.")
+        return {"counters": counters, "audit": audit, "verdict": verdict}
     finally:
         config.API_BASE_URL = orig_url
 

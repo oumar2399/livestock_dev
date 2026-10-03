@@ -42,6 +42,7 @@ def ingestion_client(monkeypatch):
     db.add.side_effect = state.saved.append
     prediction = MagicMock(return_value=(None, None))
     monkeypatch.setattr(ml_inference, "predict_with_confidence", prediction)
+    monkeypatch.setattr(ml_inference, "profile_ready", lambda profile: profile == (10, 150))
     app = FastAPI()
     app.include_router(telemetry_api.router, prefix="/api/v1")
     app.dependency_overrides[get_db] = lambda: db
@@ -50,8 +51,8 @@ def ingestion_client(monkeypatch):
 
 
 def payload(**changes):
-    return dict(device_id="M5-test", latitude=34.6901, longitude=135.1955,
-                activity=0.12, battery=78, **changes)
+    return dict(dict(device_id="M5-test", latitude=34.6901, longitude=135.1955,
+                     activity=0.12, battery=78, sample_rate=10, window_samples=150), **changes)
 
 
 def inserted(state):
@@ -70,7 +71,7 @@ def test_minimal_json_preserves_response_and_server_time(ingestion_client):
     row = inserted(state)
     assert before <= row.time <= after
     assert row.location == "POINT(135.1955 34.6901)"
-    assert row.predicted_behavior is None and row.sample_rate is None
+    assert row.predicted_behavior is None and row.sample_rate == 10
     assert state.device.battery_capacity == 78
     db.commit.assert_called_once()
 
@@ -96,7 +97,7 @@ def test_complete_json_preserves_source_fields_and_separates_ml(ingestion_client
     client, state, _, prediction = ingestion_client
     prediction.return_value = ("Active", 0.82)
     data = payload(activity_state="standing", activity_std=0.02, sample_rate=10,
-                   window_samples=50, altitude=12.3, speed=0, satellites=8,
+                   window_samples=150, altitude=12.3, speed=0, satellites=8,
                    temperature=38, signal_strength=-70,
                    predicted_behavior="client-value", behavior_confidence=1)
     for axis in "xyz":

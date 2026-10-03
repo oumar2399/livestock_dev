@@ -42,19 +42,13 @@ except ImportError:
 try:
     import device_config as config
 except ImportError:
-    try:
-        from tests import device_config as config
-    except ImportError:
-        config = None
+    config = None
 
 # Import du runtime B.4
 try:
     import b4_runtime
 except ImportError:
-    try:
-        from tests import b4_runtime
-    except ImportError:
-        b4_runtime = None
+    b4_runtime = None
 
 
 # --- PALETTE COULEURS LCD (Theme sombre pastoral KIC) ---

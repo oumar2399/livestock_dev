@@ -216,9 +216,13 @@ def evaluate_animal_anomaly(
         logger.info(f"Existing alert #{existing_alert.id} found for Animal #{animal_id} on {target_date}. Skipping duplicate.")
         return existing_alert
 
+    animal = db.query(Animal).filter(Animal.id == animal_id).first()
+    farm_id = animal.farm_id if animal else None
+
     # Create and save new Alert
     alert = Alert(
         animal_id=animal_id,
+        farm_id=farm_id,
         type=alert_type,
         severity=severity,
         title=title,
@@ -238,6 +242,13 @@ def evaluate_animal_anomaly(
     db.add(alert)
     db.commit()
     db.refresh(alert)
+
+    try:
+        from app.services.notification_service import enqueue_alert_notification
+        enqueue_alert_notification(db, alert)
+        db.commit()
+    except Exception:
+        logger.exception("Failed to enqueue notification for anomaly alert %s", alert.id)
 
     logger.warning(
         f"ANOMALY ALERT CREATED: [{severity.upper()}] {title} - {message} (Z={z_score:.2f})"

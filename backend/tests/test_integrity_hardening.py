@@ -128,6 +128,8 @@ def test_predict_endpoint_does_not_write_telemetry(mock_predict, mock_info, mock
     mock_info.return_value = {"classes": ["Active", "Resting"], "loao_metrics": {}}
     db = MagicMock()
     payload = PredictRequest(
+        sample_rate=10,
+        window_samples=150,
         accel_x_mean=0,
         accel_x_std=0.1,
         accel_x_min=-0.1,

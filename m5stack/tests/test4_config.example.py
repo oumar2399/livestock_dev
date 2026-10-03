@@ -17,5 +17,6 @@ CLOCK_MAX_JUMP_MS = 5000
 MAX_SAMPLE_JITTER_MS = 20
 MAX_SEND_ATTEMPTS = 3
 HTTP_TIMEOUT_S = 10
+TEST4_TIMING_TOLERANCE_MS = 500  # Fixer avant le banc ; pas une qualification materielle acquise
 POST_SEND_DELAY_S = 1
 BENCH_PREPARE_DELAY_S = 0  # Pause (secondes) avant transmission pour test de coupure Wi-Fi

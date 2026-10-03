@@ -12,6 +12,7 @@ class TimelineEventType(str, Enum):
     PREDICTION_FEEDBACK = "prediction_feedback"
     ALERT_FEEDBACK = "alert_feedback"
     DAILY_SUMMARY = "daily_summary"
+    VETERINARY_ENTRY = "veterinary_entry"
 
 
 class TimelineItem(BaseModel):

@@ -96,8 +96,6 @@ def compute_oracle(transport_id: int, timestamp: int, gps: tuple = None, battery
         pred_label, confidence = ml_inference.predict_with_confidence(
             {**feature_dict, "sample_rate": 10, "window_samples": 150}
         )
-    elif ml_inference.profile_ready((10, 50)):
-        pred_label, confidence = ml_inference.predict_with_confidence(feature_dict)
 
     # Règle d'état physique
     # lying < 0.08 <= standing < 0.25 (ou selon seuils de la base)

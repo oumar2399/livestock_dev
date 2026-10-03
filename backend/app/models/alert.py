@@ -15,6 +15,7 @@ class Alert(Base):
     
     id = Column(Integer, primary_key=True)
     animal_id = Column(Integer, ForeignKey("animals.id", ondelete="CASCADE"), nullable=False)
+    farm_id = Column(Integer, ForeignKey("farms.id", ondelete="CASCADE"), nullable=True)
     type = Column(String(50), nullable=False)  # health, geofence, battery, offline
     severity = Column(String(20), nullable=False)  # info, warning, critical
     title = Column(String(255))
@@ -27,8 +28,10 @@ class Alert(Base):
     
     # Relations
     animal = relationship("Animal", back_populates="alerts")
+    farm = relationship("Farm")
 
     __table_args__ = (
+        Index("idx_alerts_farm", "farm_id", desc("triggered_at")),
         Index("idx_alerts_animal", "animal_id", desc("triggered_at")),
         Index("idx_alerts_severity", "severity", desc("triggered_at")),
         Index(

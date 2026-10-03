@@ -11,14 +11,15 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT, Circle } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_DEFAULT, Circle, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 import { useTelemetryLatest } from '../hooks/useTelemetry';
+import { useLocationHistory } from '../hooks/useLocations';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
-import { PositionedTelemetry as TelemetryLatest, ActivityState } from '../types';
+import { PositionedTelemetry as TelemetryLatest, ActivityState, LocationHistoryResponse } from '../types';
 import { mapAnimals, positionRecency } from '../utils/geofenceMap';
 import {
   activityStateColor,
@@ -26,6 +27,7 @@ import {
   timeAgo,
   batteryColor,
   batteryIcon,
+  formatBattery,
 } from '../utils/helpers';
 import { LoadingState, ErrorState } from '../components/ui';
 
@@ -213,16 +215,32 @@ function AnimalInfoSheet({
   isIsolated,
   onClose,
   onNavigate,
+  showTrack,
+  onToggleTrack,
+  trackHours,
+  onSelectHours,
+  historyData,
+  isHistoryLoading,
+  onFitTrack,
 }: {
   point: TelemetryLatest | null;
   isIsolated: boolean;
   onClose: () => void;
   onNavigate: (id: number) => void;
+  showTrack: boolean;
+  onToggleTrack: () => void;
+  trackHours: number;
+  onSelectHours: (hours: number) => void;
+  historyData?: LocationHistoryResponse;
+  isHistoryLoading: boolean;
+  onFitTrack: () => void;
 }) {
   if (!point) return null;
   const state      = resolveActivityState(point);
   const stateColor = activityStateColor(state);
   const batColor   = batteryColor(point.battery);
+
+  const isLostOrEquipmentOnly = point.position_is_animal === false || point.device_status === 'lost';
 
   return (
     <View style={styles.infoSheet}>
@@ -234,6 +252,18 @@ function AnimalInfoSheet({
           <Ionicons name="warning-outline" size={16} color={Colors.severity.critical} />
           <Text style={styles.isolationText}>
             Animal away from the herd (&gt; {ISOLATION_THRESHOLD_KM * 1000}m)
+          </Text>
+        </View>
+      )}
+
+      {/* Bannière collier perdu / matériel seul (Lot B) */}
+      {isLostOrEquipmentOnly && (
+        <View style={styles.lostCollarMapBanner}>
+          <Ionicons name="alert-circle-outline" size={16} color="#E67E22" />
+          <Text style={styles.lostCollarMapText}>
+            {point.device_status === 'lost'
+              ? 'Collier égaré — position du matériel seul, pas de l’animal.'
+              : 'Matériel seul — position non garantie de l’animal.'}
           </Text>
         </View>
       )}
@@ -275,12 +305,82 @@ function AnimalInfoSheet({
             <Ionicons name={batteryIcon(point.battery) as any} size={18} color={batColor} />
           </View>
           <Text style={styles.infoStatLabel}>Battery</Text>
-          <Text style={[styles.infoStatValue, { color: batColor }]}>{point.battery}%</Text>
+          <Text style={[styles.infoStatValue, { color: batColor }]}>{formatBattery(point.battery)}</Text>
+        </View>
+      </View>
+
+      {/* Trajet GPS controls (Lot B) */}
+      <View style={styles.trackActionSection}>
+        <View style={styles.trackActionHeader}>
+          <TouchableOpacity
+            style={[styles.trackToggleBtn, showTrack && styles.trackToggleBtnActive]}
+            onPress={onToggleTrack}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={showTrack ? 'trail-sign' : 'trail-sign-outline'}
+              size={16}
+              color={showTrack ? '#fff' : Colors.primary}
+            />
+            <Text style={[styles.trackToggleBtnText, showTrack && styles.trackToggleBtnTextActive]}>
+              {showTrack ? 'Masquer trajet' : 'Voir trajet GPS'}
+            </Text>
+          </TouchableOpacity>
+
+          {showTrack && (
+            <TouchableOpacity style={styles.fitTrackBtn} onPress={onFitTrack} activeOpacity={0.7}>
+              <Ionicons name="scan-outline" size={16} color={Colors.primary} />
+              <Text style={styles.fitTrackBtnText}>Centrer trajet</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {showTrack && (
+          <View style={styles.trackPeriodRow}>
+            {[1, 6, 24].map((h) => (
+              <TouchableOpacity
+                key={h}
+                style={[styles.periodChip, trackHours === h && styles.periodChipActive]}
+                onPress={() => onSelectHours(h)}
+              >
+                <Text style={[styles.periodChipText, trackHours === h && styles.periodChipTextActive]}>
+                  {h} h
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.trackSummaryMeta}>
+              {isHistoryLoading ? (
+                <Text style={styles.trackSummaryText}>Chargement...</Text>
+              ) : historyData ? (
+                <Text style={styles.trackSummaryText}>
+                  {historyData.total_points} pts
+                  {historyData.proven_coverage_ratio != null ? ` · ${Math.round(historyData.proven_coverage_ratio * 100)}% couv.` : ''}
+                  {historyData.gaps.length > 0 ? ` · ${historyData.gaps.length} coupure(s)` : ''}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Timestamps distincts : Position vs Télémétrie (Lot B) */}
+      <View style={styles.timestampContainer}>
+        <View style={styles.timestampRow}>
+          <Text style={styles.timestampLabel}>Position fixée :</Text>
+          <Text style={styles.timestampValue}>
+            {point.position_time ? timeAgo(point.position_time) : 'Inconnue'}
+          </Text>
+        </View>
+        <View style={styles.timestampRow}>
+          <Text style={styles.timestampLabel}>Dernière télémétrie :</Text>
+          <Text style={styles.timestampValue}>
+            {point.last_update ? timeAgo(point.last_update) : 'Inconnue'}
+          </Text>
         </View>
       </View>
 
       <View style={styles.infoFooter}>
-        <Text style={styles.infoUpdated}>Updated {timeAgo(point.last_update)}</Text>
         <TouchableOpacity style={styles.infoDetailBtn} onPress={() => onNavigate(point.animal_id)}>
           <Text style={styles.infoDetailBtnText}>View full profile</Text>
           <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
@@ -366,6 +466,28 @@ export default function MapScreen() {
   const { data, isLoading, isError, refetch } = useTelemetryLatest({ limit: 100 });
   const [showDistantSheet, setShowDistantSheet] = useState(false);
 
+  const mostRecentTimestamp = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    let newest = 0;
+    for (const p of data) {
+      const ts = p.position_time ?? p.last_update;
+      if (ts) {
+        const t = new Date(ts).getTime();
+        if (t > newest) newest = t;
+      }
+    }
+    return newest > 0 ? newest : null;
+  }, [data]);
+
+  const mapFreshness = useMemo(() => {
+    if (!mostRecentTimestamp) return { label: 'No fix', color: '#95A5A6', isRecent: false };
+    const diffMin = Math.floor((Date.now() - mostRecentTimestamp) / 60000);
+    if (diffMin < 5) return { label: diffMin === 0 ? 'Recent (< 1m)' : `Recent (${diffMin}m)`, color: '#27AE60', isRecent: true };
+    if (diffMin < 30) return { label: `Stale (${diffMin}m)`, color: '#F39C12', isRecent: false };
+    const hours = Math.floor(diffMin / 60);
+    return { label: hours > 0 ? `Last fix ${hours}h ago` : `Last fix ${diffMin}m ago`, color: '#95A5A6', isRecent: false };
+  }, [mostRecentTimestamp]);
+
   const allPoints = useMemo(() => {
   return mapAnimals(data ?? []).filter(p => p.position_is_animal !== false).map(p => ({
     ...p,
@@ -385,6 +507,76 @@ export default function MapScreen() {
       return members.length ? { ...current, points: members, ...centroid(members) } : null;
     });
   }, [allPoints]);
+
+  const [showTrack, setShowTrack] = useState(false);
+  const [trackHours, setTrackHours] = useState(24);
+
+  const historyQuery = useLocationHistory(
+    showTrack && selectedAnimal ? selectedAnimal.animal_id : null,
+    { hours: trackHours },
+  );
+  const historyData = historyQuery.data;
+
+  const allTrackCoords = useMemo(() => {
+    if (!historyData) return [];
+    return historyData.segments.flatMap((s) =>
+      s.points.map((p) => ({ latitude: p.latitude, longitude: p.longitude }))
+    );
+  }, [historyData]);
+
+  const firstTrackPoint = useMemo(() => {
+    if (!historyData || historyData.segments.length === 0) return null;
+    const firstSeg = historyData.segments[0];
+    return firstSeg.points.length > 0 ? firstSeg.points[0] : null;
+  }, [historyData]);
+
+  const fitToTrack = useCallback(() => {
+    if (allTrackCoords.length === 0 || !mapRef.current) return;
+    if (allTrackCoords.length === 1) {
+      mapRef.current.animateToRegion({
+        latitude: allTrackCoords[0].latitude,
+        longitude: allTrackCoords[0].longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      }, 600);
+      return;
+    }
+    mapRef.current.fitToCoordinates(allTrackCoords, {
+      edgePadding: { top: 120, right: 60, bottom: 280, left: 60 },
+      animated: true,
+    });
+  }, [allTrackCoords]);
+
+  // Center on track once loaded
+  useEffect(() => {
+    if (showTrack && allTrackCoords.length > 0) {
+      fitToTrack();
+    }
+  }, [showTrack, historyData?.period_start]);
+
+  const route = useRoute<any>();
+  const focusAnimalId = route.params?.focusAnimalId;
+  const initialShowTrack = route.params?.showTrack;
+
+  useEffect(() => {
+    if (focusAnimalId && allPoints.length > 0) {
+      const target = allPoints.find((point) => point.animal_id === focusAnimalId);
+      if (target) {
+        setSelectedAnimal(target);
+        if (initialShowTrack) {
+          setShowTrack(true);
+        }
+        if (mapRef.current && !initialShowTrack) {
+          mapRef.current.animateToRegion({
+            latitude: target.latitude,
+            longitude: target.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          }, 600);
+        }
+      }
+    }
+  }, [focusAnimalId, initialShowTrack, allPoints]);
 
   const { localPoints, distantAnimals } = useMemo(() => {
     if (allPoints.length === 0) return { localPoints: [], distantAnimals: [] as any[] };
@@ -561,6 +753,64 @@ export default function MapScreen() {
             </View>
           </Marker>
         ))}
+
+        {/* ── Trajectoire historique GPS (Lot B) ── */}
+        {showTrack && historyData && historyData.segments.map((segment, sIdx) => {
+          const coords = segment.points.map(pt => ({
+            latitude: pt.latitude,
+            longitude: pt.longitude,
+          }));
+          const strokeColor =
+            segment.quality === 'reliable'
+              ? '#2E86DE'
+              : segment.quality === 'degraded'
+              ? '#E67E22'
+              : '#7F8C8D';
+
+          return (
+            <Polyline
+              key={`segment-${sIdx}`}
+              coordinates={coords}
+              strokeColor={strokeColor}
+              strokeWidth={segment.quality === 'uncertain' ? 2 : 3.5}
+              lineDashPattern={segment.quality === 'uncertain' ? [6, 4] : undefined}
+            />
+          );
+        })}
+
+        {/* Lignes en pointillés pour matérialiser les trous entre segments (Lot B) */}
+        {showTrack && historyData && historyData.segments.length > 1 &&
+          historyData.segments.slice(0, -1).map((seg, idx) => {
+            const nextSeg = historyData.segments[idx + 1];
+            const p1 = seg.points[seg.points.length - 1];
+            const p2 = nextSeg.points[0];
+            if (!p1 || !p2) return null;
+            return (
+              <Polyline
+                key={`gap-link-${idx}`}
+                coordinates={[
+                  { latitude: p1.latitude, longitude: p1.longitude },
+                  { latitude: p2.latitude, longitude: p2.longitude },
+                ]}
+                strokeColor="#BDC3C7"
+                strokeWidth={1.5}
+                lineDashPattern={[4, 4]}
+              />
+            );
+          })
+        }
+
+        {/* Marqueur de début de parcours (Lot B) */}
+        {showTrack && firstTrackPoint && (
+          <Marker
+            coordinate={{ latitude: firstTrackPoint.latitude, longitude: firstTrackPoint.longitude }}
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View style={styles.trackStartMarker}>
+              <Ionicons name="flag" size={14} color="#27AE60" />
+            </View>
+          </Marker>
+        )}
       </MapView>
 
       {/* ── Header ───────────────────────────────────────────────────── */}
@@ -589,9 +839,9 @@ export default function MapScreen() {
               </Text>
             </TouchableOpacity>
           )}
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>Live</Text>
+          <View style={[styles.liveIndicator, { borderColor: mapFreshness.color + '40', backgroundColor: Colors.bg.card }]}>
+            <View style={[styles.liveDot, { backgroundColor: mapFreshness.color }]} />
+            <Text style={[styles.liveText, { color: mapFreshness.color }]}>{mapFreshness.label}</Text>
           </View>
         </View>
       </View>
@@ -651,11 +901,22 @@ export default function MapScreen() {
         <AnimalInfoSheet
           point={selectedAnimal}
           isIsolated={isolatedIds.has(selectedAnimal.animal_id)}
-          onClose={() => setSelectedAnimal(null)}
+          onClose={() => {
+            setSelectedAnimal(null);
+            setShowTrack(false);
+          }}
           onNavigate={(id) => {
             setSelectedAnimal(null);
+            setShowTrack(false);
             navigation.navigate('Animals', { screen: 'AnimalDetail', params: { animalId: id } });
           }}
+          showTrack={showTrack}
+          onToggleTrack={() => setShowTrack((prev) => !prev)}
+          trackHours={trackHours}
+          onSelectHours={setTrackHours}
+          historyData={historyData}
+          isHistoryLoading={historyQuery.isLoading}
+          onFitTrack={fitToTrack}
         />
       )}
       {selectedCluster && !selectedAnimal && (
@@ -832,4 +1093,134 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#9B59B650',
   },
   distantBtnText: { fontSize: Typography.xs, color: '#9B59B6', fontWeight: '700' },
+
+  // ── Trajectoire & Localisation (Lot B) ──
+  trackStartMarker: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#27AE60',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3, elevation: 4,
+  },
+  trackActionSection: {
+    backgroundColor: Colors.bg.elevated,
+    borderRadius: Radius.lg,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  trackActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  trackToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 7,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primary + '18',
+    borderWidth: 1,
+    borderColor: Colors.primary + '40',
+  },
+  trackToggleBtnActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  trackToggleBtnText: {
+    fontSize: Typography.xs,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  trackToggleBtnTextActive: {
+    color: '#fff',
+  },
+  fitTrackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bg.card,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+  },
+  fitTrackBtnText: {
+    fontSize: Typography.xs,
+    color: Colors.text.primary,
+    fontWeight: '600',
+  },
+  trackPeriodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  periodChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bg.card,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+  },
+  periodChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  periodChipText: {
+    fontSize: Typography.xs,
+    color: Colors.text.secondary,
+    fontWeight: '600',
+  },
+  periodChipTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  trackSummaryMeta: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  trackSummaryText: {
+    fontSize: Typography.xs,
+    color: Colors.text.muted,
+  },
+  timestampContainer: {
+    marginBottom: Spacing.sm,
+    gap: 3,
+  },
+  timestampRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timestampLabel: {
+    fontSize: Typography.xs,
+    color: Colors.text.muted,
+  },
+  timestampValue: {
+    fontSize: Typography.xs,
+    color: Colors.text.secondary,
+    fontWeight: '500',
+  },
+  lostCollarMapBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: '#E67E2218',
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#E67E2240',
+  },
+  lostCollarMapText: {
+    flex: 1,
+    fontSize: Typography.xs,
+    color: '#E67E22',
+    fontWeight: '600',
+  },
 });

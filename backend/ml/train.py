@@ -1,4 +1,8 @@
 """
+Current CLI: delegates to train_v2.py (15 s), without changing its algorithm.
+The functions and constants below preserve the historical 5 s experiment.
+Historical execution is explicit via train_historical_5s(), never the CLI default.
+
 ml/train.py — Livestock Behavior Classifier
 ============================================
 Dataset  : Japanese cattle accelerometer dataset (cow1.csv → cow6.csv)
@@ -1285,7 +1289,7 @@ def save_model(
 # Entry point — orchestrates the full pipeline
 # =============================================================================
 
-def main() -> None:
+def train_historical_5s() -> None:
     """
     Run the full training pipeline from raw CSVs to a saved .pkl artifact.
 
@@ -1372,6 +1376,15 @@ def main() -> None:
     save_model(clf, label_encoder, loao_metrics, output_path)
 
     logger.info("✓ Training pipeline complete.")
+
+
+def main() -> None:
+    """Train the nominal 15-second profile; legacy functions stay available for research."""
+    if __package__:
+        from .train_v2 import main as train_15s
+    else:
+        from train_v2 import main as train_15s
+    train_15s()
 
 
 if __name__ == "__main__":

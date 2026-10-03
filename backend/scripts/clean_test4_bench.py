@@ -1,73 +1,80 @@
 #!/usr/bin/env python3
-"""Nettoyage complet des artefacts du Banc de Test 4 dans livestock_dev."""
+"""Explicit Test 4 cleanup. Preview by default; never run during import."""
 
-import sys
+import argparse
 from pathlib import Path
+import sys
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.db.database import SessionLocal
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session
 from app.models.device import Device
 from app.models.animal import Animal
 from app.models.farm import Farm
 from app.models.telemetry import Telemetry
-from sqlalchemy import text
 
-db = SessionLocal()
-try:
-    current_db = db.execute(text("SELECT current_database();")).scalar()
-    print(f"Connexion base: {current_db}")
 
-    # 1. Trouver les IDs concernés
-    device = db.query(Device).filter((Device.id == "M5-TEST4-BENCH") | (Device.transport_id == 102)).first()
-    device_id = device.id if device else "M5-TEST4-BENCH"
-    
-    animal = db.query(Animal).filter((Animal.assigned_device == device_id) | (Animal.name == "Vache-Banc-T4")).first()
-    animal_id = animal.id if animal else None
-
-    # 2. Supprimer la télémétrie
-    tel_deleted = 0
-    if animal_id:
-        tel_deleted = db.query(Telemetry).filter(Telemetry.animal_id == animal_id).delete()
-    if device_id:
-        tel_deleted += db.query(Telemetry).filter(Telemetry.device_id == device_id).delete()
-    print(f"[1/4] Télémétrie supprimée : {tel_deleted} lignes")
-
-    # 3. Supprimer l'animal
-    if animal:
+def clean_bench(db, animal_id, farm_id, transport_id, expected_database, apply=False):
+    if expected_database not in ("livestock_bench", "livestock_dev"):
+        raise ValueError("Only the dedicated bench or historical dev bench is supported")
+    if db.execute(text("SELECT current_database()")).scalar() != expected_database:
+        raise ValueError("Database identity mismatch; no cleanup performed")
+    device = db.query(Device).filter(Device.id == "M5-TEST4-BENCH").one_or_none()
+    animal = db.query(Animal).filter(Animal.id == animal_id).one_or_none()
+    farm = db.query(Farm).filter(Farm.id == farm_id).one_or_none()
+    if not (device and animal and farm and
+            device.transport_id == transport_id and device.farm_id == farm_id and
+            animal.assigned_device == device.id and animal.farm_id == farm_id and
+            animal.name == "Vache-Banc-T4" and farm.name == "Ferme-Banc-Test4"):
+        raise ValueError("Bench identities do not match; no cleanup performed")
+    shared = db.query(Animal).filter(
+        Animal.assigned_device == device.id, Animal.id != animal_id).count()
+    foreign_rows = db.query(Telemetry).filter(
+        (Telemetry.device_id == device.id) | (Telemetry.animal_id == animal_id)
+    ).filter(
+        (Telemetry.device_id.is_(None)) |
+        (Telemetry.device_id != device.id) | (Telemetry.animal_id != animal_id)
+    ).count()
+    if shared or foreign_rows:
+        raise ValueError("Bench identity is shared with other data; manual review required")
+    rows = db.query(Telemetry).filter(
+        Telemetry.animal_id == animal_id, Telemetry.device_id == device.id)
+    count = rows.count()
+    print("PREVIEW telemetry=%d animal=%s device=%s farm=%s (farm retained)" % (
+        count, animal_id, device.id, farm_id))
+    if apply:
+        rows.delete(synchronize_session=False)
         db.delete(animal)
-        print(f"[2/4] Animal supprimé : {animal.name} (ID: {animal.id})")
-    else:
-        print("[2/4] Aucun animal factice trouvé.")
-
-    # 4. Supprimer le device
-    if device:
+        db.flush()
         db.delete(device)
-        print(f"[3/4] Device supprimé : {device.id} (Transport ID: {device.transport_id})")
+        db.commit()
+        print("Cleanup committed. Farm and owner retained.")
     else:
-        print("[3/4] Aucun device factice trouvé.")
+        db.rollback()
+        print("Preview only. Pass --apply after checking these identities.")
+    return count
 
-    # 5. Supprimer la ferme de banc
-    farm = db.query(Farm).filter(Farm.name == "Ferme-Banc-Test4").first()
-    if farm:
-        # Vérifier si la ferme a d'autres animaux
-        other_animals = db.query(Animal).filter(Animal.farm_id == farm.id).count()
-        if other_animals == 0:
-            db.delete(farm)
-            print(f"[4/4] Ferme de banc supprimée : {farm.name} (ID: {farm.id})")
-        else:
-            print(f"[4/4] Ferme conservée ({other_animals} autres animaux présents).")
-    else:
-        print("[4/4] Aucune ferme de banc trouvée.")
 
-    db.commit()
-    print("\n[SUCCÈS] Nettoyage terminé. La base de données est propre.")
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--database-url", required=True)
+    parser.add_argument("--expected-database", choices=("livestock_bench", "livestock_dev"), required=True)
+    parser.add_argument("--animal-id", type=int, required=True)
+    parser.add_argument("--farm-id", type=int, required=True)
+    parser.add_argument("--transport-id", type=int, default=102)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args(argv)
+    engine = create_engine(args.database_url, hide_parameters=True)
+    try:
+        with Session(engine) as db:
+            clean_bench(db, args.animal_id, args.farm_id, args.transport_id,
+                        args.expected_database, args.apply)
+    finally:
+        engine.dispose()
 
-except Exception as exc:
-    db.rollback()
-    print(f"[ERREUR] Échec du nettoyage : {exc}")
-    sys.exit(1)
-finally:
-    db.close()
+
+if __name__ == "__main__":
+    main()

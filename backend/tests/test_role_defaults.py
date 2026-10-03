@@ -22,6 +22,7 @@ def test_owner_has_manage_permissions():
     assert "manage_devices" in perms
     assert "invite_members" in perms
     assert "edit_animals" in perms
+    assert "view_farm_reports" in perms
 
 
 def test_farmer_and_vet_cannot_edit_or_manage():
@@ -32,6 +33,7 @@ def test_farmer_and_vet_cannot_edit_or_manage():
         assert "edit_animals" not in perms
         assert "manage_devices" not in perms
         assert "manage_farm" not in perms
+        assert "view_farm_reports" not in perms
 
 
 def test_role_has_permission_helper():

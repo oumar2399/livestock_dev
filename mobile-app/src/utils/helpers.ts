@@ -54,11 +54,162 @@ export function animalAge(birthDate: string | null): string {
   return m > 0 ? `${y} yrs ${m} mo` : `${y} yr${y > 1 ? 's' : ''}`;
 }
 
-/** Indicateur de fraîcheur de la donnée GPS */
-export function isRecentUpdate(lastUpdate: string | null, maxMinutes = 30): boolean {
+/**
+ * Fraîcheur des données et statut opérationnel (Lot 1)
+ * Séparation stricte de 3 dimensions :
+ * 1. Fraîcheur Télémétrie (IMU / capteurs)
+ * 2. Statut & Fraîcheur GPS (Fix, satellites, coordonnées)
+ * 3. Statut Matériel du boîtier (Actif, perdu, maintenance, etc.)
+ */
+export type TelemetryFreshness = 'recent' | 'stale' | 'silent';
+export type GpsFixStatus = 'fix' | 'weak_fix' | 'stale_fix' | 'no_fix';
+export type DeviceState = 'active' | 'lost' | 'maintenance' | 'retired' | 'revoked' | 'unknown';
+
+export interface FreshnessAssessment {
+  telemetryFreshness: TelemetryFreshness;
+  telemetryLabel: string;
+  telemetryColor: string;
+  telemetryAgeMinutes: number | null;
+
+  gpsStatus: GpsFixStatus;
+  gpsLabel: string;
+  gpsColor: string;
+  hasValidCoords: boolean;
+
+  deviceState: DeviceState;
+  deviceLabel: string;
+  deviceColor: string;
+
+  batteryLabel: string;
+  batteryColor: string;
+}
+
+export const FRESH_TELEMETRY_MINUTES = 5;
+export const STALE_TELEMETRY_MINUTES = 30;
+
+/** Vrai si la donnée a été reçue récemment (< 5 minutes par défaut) */
+export function isRecentUpdate(lastUpdate: string | null, maxMinutes = FRESH_TELEMETRY_MINUTES): boolean {
   if (!lastUpdate) return false;
   const diff = Date.now() - new Date(lastUpdate).getTime();
   return diff < maxMinutes * 60 * 1000;
+}
+
+/**
+ * Évalue la fraîcheur et la qualité des données de façon transparente et indépendante
+ */
+export function evaluateFreshness(params: {
+  telemetryTime?: string | null;
+  positionTime?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  satellites?: number | null;
+  deviceStatus?: string | null;
+  battery?: number | null;
+}): FreshnessAssessment {
+  const {
+    telemetryTime,
+    positionTime,
+    latitude,
+    longitude,
+    satellites,
+    deviceStatus,
+    battery,
+  } = params;
+
+  // 1. Télémétrie
+  let telemetryFreshness: TelemetryFreshness = 'silent';
+  let telemetryAgeMinutes: number | null = null;
+  let telemetryLabel = 'No telemetry';
+  let telemetryColor = '#95A5A6'; // Gris
+
+  if (telemetryTime) {
+    const diffMs = Date.now() - new Date(telemetryTime).getTime();
+    telemetryAgeMinutes = Math.max(0, Math.floor(diffMs / (60 * 1000)));
+
+    if (telemetryAgeMinutes < FRESH_TELEMETRY_MINUTES) {
+      telemetryFreshness = 'recent';
+      telemetryLabel = telemetryAgeMinutes === 0 ? 'Recent (< 1 min)' : `Recent (${telemetryAgeMinutes} min ago)`;
+      telemetryColor = '#27AE60'; // Vert
+    } else if (telemetryAgeMinutes < STALE_TELEMETRY_MINUTES) {
+      telemetryFreshness = 'stale';
+      telemetryLabel = `Stale (${telemetryAgeMinutes} min ago)`;
+      telemetryColor = '#F39C12'; // Orange
+    } else {
+      telemetryFreshness = 'silent';
+      const hours = Math.floor(telemetryAgeMinutes / 60);
+      telemetryLabel = hours > 0 ? `Silent (${hours}h ago)` : `Silent (${telemetryAgeMinutes} min ago)`;
+      telemetryColor = '#95A5A6'; // Gris
+    }
+  }
+
+  // 2. GPS
+  const hasCoords = latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined;
+  const satCount = satellites ?? 0;
+  let gpsStatus: GpsFixStatus = 'no_fix';
+  let gpsLabel = 'No GPS fix';
+  let gpsColor = '#95A5A6';
+
+  if (hasCoords) {
+    const positionAge = positionTime ? Date.now() - new Date(positionTime).getTime() : NaN;
+    if (!Number.isFinite(positionAge) || positionAge < 0 || positionAge >= STALE_TELEMETRY_MINUTES * 60_000) {
+      gpsStatus = 'stale_fix';
+      gpsLabel = positionTime && Number.isFinite(positionAge) && positionAge >= 0
+        ? `Last fix ${timeAgo(positionTime)}` : 'GPS time unknown';
+    } else if (satellites !== null && satellites !== undefined && satCount < 4) {
+      gpsStatus = 'weak_fix';
+      gpsLabel = `Weak fix (${satCount} sats)`;
+      gpsColor = '#E67E22'; // Orange foncé
+    } else {
+      gpsStatus = 'fix';
+      const posAge = positionTime ? timeAgo(positionTime) : null;
+      gpsLabel = posAge ? `Fix ${posAge}` : 'GPS Fix valid';
+      gpsColor = '#27AE60';
+    }
+  }
+
+  // 3. Statut Matériel
+  const rawStatus = (deviceStatus ?? 'unknown').toLowerCase();
+  let deviceState: DeviceState = 'unknown';
+  let deviceLabel = 'Collar unknown';
+  let deviceColor = '#95A5A6';
+
+  if (rawStatus === 'active') {
+    deviceState = 'active';
+    deviceLabel = 'Collar active';
+    deviceColor = '#27AE60';
+  } else if (rawStatus === 'lost') {
+    deviceState = 'lost';
+    deviceLabel = 'Collar lost';
+    deviceColor = '#E74C3C'; // Rouge
+  } else if (rawStatus === 'maintenance') {
+    deviceState = 'maintenance';
+    deviceLabel = 'In maintenance';
+    deviceColor = '#9B59B6'; // Violet
+  } else if (rawStatus === 'retired' || rawStatus === 'revoked') {
+    deviceState = 'retired';
+    deviceLabel = 'Collar retired';
+    deviceColor = '#7F8C8D';
+  }
+
+  // Batterie
+  const batteryLabel = formatBattery(battery);
+  const batteryColorVal = batteryColor(battery ?? null);
+
+  return {
+    telemetryFreshness,
+    telemetryLabel,
+    telemetryColor,
+    telemetryAgeMinutes,
+    gpsStatus,
+    gpsLabel,
+    gpsColor,
+    hasValidCoords: hasCoords,
+    deviceState,
+    deviceLabel,
+    deviceColor,
+    batteryLabel,
+    batteryColor: batteryColorVal,
+  };
 }
 
 // ─── Télémétrie / Comportement ────────────────────────────────────────────────
@@ -104,14 +255,21 @@ export function activityStateIcon(state: ActivityState | null | undefined): stri
  * - Warning <20% (alert type "battery" severity "warning")
  * - Critical <10% (alert type "battery" severity "critical")
  */
-export function batteryColor(level: number): string {
+export function formatBattery(level: number | null | undefined): string {
+  if (level == null || isNaN(level) || level < 0 || level > 100) return 'Unknown';
+  return `${Math.round(level)}%`;
+}
+
+export function batteryColor(level: number | null | undefined): string {
+  if (level == null || isNaN(level) || level < 0 || level > 100) return Colors.text.muted;
   if (level >= 50) return Colors.battery.full;
   if (level >= 20) return Colors.battery.medium;
   return Colors.battery.low;
 }
 
 /** Icône batterie Ionicons */
-export function batteryIcon(level: number): string {
+export function batteryIcon(level: number | null | undefined): string {
+  if (level == null || isNaN(level) || level < 0 || level > 100) return 'battery-dead-outline';
   if (level >= 80) return 'battery-full-outline';
   if (level >= 50) return 'battery-half-outline';
   if (level >= 20) return 'battery-dead-outline';
@@ -214,10 +372,16 @@ export function formatWeight(kg: number | null): string {
   return `${kg.toFixed(0)} kg`;
 }
 
-/** Formate température en "38.5 °C" */
-export function formatTemperature(celsius: number | null): string {
-  if (celsius === null) return '–';
+/** Formate température boîtier (capteur interne/électronique, pas une température corporelle) */
+export function formatTemperature(celsius: number | null | undefined): string {
+  if (celsius === null || celsius === undefined || isNaN(celsius)) return '–';
   return `${celsius.toFixed(1)} °C`;
+}
+
+/** Formate température avec mention explicite boîtier pour éviter toute confusion médicale */
+export function formatDeviceTemperature(celsius: number | null | undefined): string {
+  if (celsius === null || celsius === undefined || isNaN(celsius)) return '–';
+  return `${celsius.toFixed(1)} °C (device)`;
 }
 
 /** Formate activité en g avec indicateur qualitatif */

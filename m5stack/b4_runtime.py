@@ -1,4 +1,4 @@
-"""Opt-in B.4 bench firmware with bounded retries and optional persistent v3 archive."""
+"""Shared autonomous/bench runtime; GPS parsing follows the real IMU window."""
 
 import gc
 import time
@@ -32,73 +32,221 @@ class _Response:
             self._sock = None
 
 
+HTTP_MAX_HEADER_BYTES = 2048
+HTTP_MAX_BODY_BYTES = 4096
+HTTP_READ_CHUNK = 256
+HTTP_WDT_MARGIN_MS = 5000
+
+
+def _observe(observer, event, values):
+    # Diagnostics must not change transport or watchdog behavior.
+    if observer is not None:
+        try:
+            observer(event, values)
+        except Exception:
+            pass
+
+
 def _parse_url(url):
-    """Return (host, port, path) from an http:// URL."""
-    # Strip scheme
-    after = url[7:]  # len("http://") == 7
+    """Accept plain HTTP host/IPv4 URLs; keep address conversion in getaddrinfo."""
+    if (not isinstance(url, str) or not url.startswith("http://") or
+            any(ord(c) <= 32 or ord(c) >= 127 for c in url) or "#" in url):
+        raise ValueError("Unsupported HTTP URL")
+    after = url[7:]
     slash = after.find("/")
-    if slash < 0:
-        hostport = after
-        path = "/"
-    else:
-        hostport = after[:slash]
-        path = after[slash:]
-    colon = hostport.find(":")
-    if colon < 0:
-        return hostport, 80, path
-    return hostport[:colon], int(hostport[colon + 1:]), path
+    hostport, path = (after, "/") if slash < 0 else (after[:slash], after[slash:])
+    parts = hostport.split(":")
+    if len(parts) > 2 or not parts[0] or any(
+            c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_" for c in parts[0]):
+        raise ValueError("Unsupported HTTP host")
+    port = 80
+    if len(parts) == 2:
+        if not parts[1].isdigit():
+            raise ValueError("Invalid HTTP port")
+        port = int(parts[1])
+    if not 1 <= port <= 65535:
+        raise ValueError("Invalid HTTP port")
+    return parts[0], port, path
 
 
-def _http_post(url, data, headers, timeout):
-    """Perform an HTTP POST using raw usocket with settimeout for reliable timeout control.
+def _remaining(deadline):
+    remaining = time.ticks_diff(deadline, time.ticks_ms())
+    if remaining <= 0:
+        raise OSError("HTTP deadline exceeded")
+    return remaining
 
-    Returns a _Response object with .status_code, .json(), .close().
-    Raises OSError on network/timeout failures.
-    """
+
+def _send_all(sock, payload, deadline):
+    offset = 0
+    view = memoryview(payload)
+    while offset < len(view):
+        sock.settimeout(_remaining(deadline) / 1000.0)
+        written = sock.send(view[offset:])
+        _remaining(deadline)
+        if not isinstance(written, int) or not 0 < written <= len(view) - offset:
+            raise OSError("Incomplete HTTP write")
+        offset += written
+
+
+def _recv(sock, size, deadline, metrics):
+    sock.settimeout(_remaining(deadline) / 1000.0)
+    chunk = sock.recv(size)
+    _remaining(deadline)
+    if chunk is None or len(chunk) > size:
+        raise OSError("Invalid HTTP read")
+    metrics["received_bytes"] += len(chunk)
+    return chunk
+
+
+def _header_token(code):
+    return (48 <= code <= 57 or 65 <= code <= 90 or 97 <= code <= 122 or
+            code in (33, 35, 36, 37, 38, 39, 42, 43, 45, 46, 94, 95, 96, 124, 126))
+
+
+def _response_headers(raw):
+    lines = raw.split(b"\r\n")
+    status = lines[0].split(b" ", 2)
+    if (len(status) < 2 or status[0] not in (b"HTTP/1.0", b"HTTP/1.1") or
+            len(status[1]) != 3 or any(c < 48 or c > 57 for c in status[1])):
+        raise OSError("Malformed HTTP status")
+    code = int(status[1])
+    if not 200 <= code <= 599:
+        raise OSError("Unsupported HTTP status")
+    length = None
+    for line in lines[1:]:
+        if (not line or line[:1] in (b" ", b"\t") or b":" not in line or
+                any(c < 32 and c != 9 or c >= 127 for c in line)):
+            raise OSError("Malformed HTTP header")
+        name, value = line.split(b":", 1)
+        if not name or any(not _header_token(c) for c in name):
+            raise OSError("Malformed HTTP header name")
+        name, value = name.lower(), value.strip()
+        if name == b"content-length":
+            if length is not None or not value or len(value) > 10 or any(c < 48 or c > 57 for c in value):
+                raise OSError("Ambiguous HTTP length")
+            length = int(value)
+        elif name == b"transfer-encoding":
+            raise OSError("Unsupported transfer encoding")
+        elif name == b"content-encoding" and value.lower() != b"identity":
+            raise OSError("Unsupported content encoding")
+    return code, length
+
+
+def _read_response(sock, deadline, metrics):
+    metrics["phase"] = "response"
+    buffer = bytearray()
+    scan = 0
+    while True:
+        # MicroPython 1.12 bytearray has no find(); scan only newly received bytes.
+        end = -1
+        for index in range(scan, len(buffer) - 3):
+            if (buffer[index] == 13 and buffer[index + 1] == 10 and
+                    buffer[index + 2] == 13 and buffer[index + 3] == 10):
+                end = index
+                break
+        if end >= 0:
+            if end + 4 > HTTP_MAX_HEADER_BYTES:
+                raise OSError("HTTP headers too large")
+            break
+        if len(buffer) >= HTTP_MAX_HEADER_BYTES:
+            raise OSError("HTTP headers too large")
+        scan = max(0, len(buffer) - 3)
+        chunk = _recv(sock, min(HTTP_READ_CHUNK, HTTP_MAX_HEADER_BYTES - len(buffer)), deadline, metrics)
+        if not chunk:
+            raise OSError("Incomplete HTTP headers")
+        buffer.extend(chunk)
+    code, length = _response_headers(bytes(buffer[:end]))
+    metrics["status"] = code
+    # Authentication failure must not wait for an arbitrary error body.
+    if code == 401:
+        return _Response(code, b"", None)
+    body = bytearray(buffer[end + 4:])
+    del buffer
+    if length is not None and length > HTTP_MAX_BODY_BYTES:
+        raise OSError("HTTP body too large")
+    if length is not None and len(body) > length:
+        raise OSError("HTTP body exceeds declared length")
+    if code in (204, 304):
+        if body or length not in (None, 0):
+            raise OSError("Unexpected HTTP body")
+        return _Response(code, b"", None)
+    while length is None or len(body) < length:
+        capacity = HTTP_MAX_BODY_BYTES + 1 - len(body) if length is None else length - len(body)
+        chunk = _recv(sock, min(HTTP_READ_CHUNK, capacity), deadline, metrics)
+        if not chunk:
+            if length is not None and len(body) != length:
+                raise OSError("Incomplete HTTP body")
+            break
+        if len(body) + len(chunk) > HTTP_MAX_BODY_BYTES:
+            raise OSError("HTTP body too large")
+        body.extend(chunk)
+    return _Response(code, bytes(body), None)
+
+
+def _http_post(url, data, headers, timeout, observer=None):
+    """Bound TCP/HTTP after getaddrinfo; address preparation is not interruptible."""
     import usocket
     host, port, path = _parse_url(url)
-    addr = usocket.getaddrinfo(host, port)[0][-1]
-    sock = usocket.socket()
+    timeout_ms = int(timeout * 1000)
+    half_ticks = (time.ticks_add(0, -1) + 1) // 2
+    if not 0 < timeout_ms < half_ticks:
+        raise ValueError("Invalid HTTP timeout")
+    request = "POST " + path + " HTTP/1.0\r\nHost: " + host + ":" + str(port) + "\r\nConnection: close\r\n"
+    for key in headers:
+        value = headers[key]
+        if (not key or any(not _header_token(ord(c)) for c in key)
+                or not isinstance(value, str) or any(ord(c) < 32 or ord(c) >= 127 for c in value)
+                or key.lower() in ("host", "content-length", "connection", "transfer-encoding")):
+            raise ValueError("Invalid request header")
+        request += key + ": " + value + "\r\n"
+    request += "Content-Length: " + str(len(data)) + "\r\n\r\n"
+    if len(request) > HTTP_MAX_HEADER_BYTES:
+        raise ValueError("HTTP request headers too large")
+    metrics = {"phase": "address", "address_ms": 0, "http_ms": 0,
+               "connected": False, "request_complete": False,
+               "received_bytes": 0, "status": None, "error": None}
+    start = time.ticks_ms()
+    http_start = None
+    sock = None
     try:
-        sock.settimeout(timeout)
+        addr = usocket.getaddrinfo(host, port, 0, usocket.SOCK_STREAM)[0][-1]
+        metrics["address_ms"] = time.ticks_diff(time.ticks_ms(), start)
+        # A late result can be rejected, but this cannot interrupt getaddrinfo.
+        if metrics["address_ms"] >= timeout_ms:
+            raise OSError("Address preparation exceeded observation budget")
+        http_start = time.ticks_ms()
+        deadline = time.ticks_add(http_start, timeout_ms)
+        metrics["phase"] = "connect"
+        sock = usocket.socket()
+        sock.settimeout(_remaining(deadline) / 1000.0)
         sock.connect(addr)
-        # Build the request
-        request = "POST " + path + " HTTP/1.0\r\n"
-        request += "Host: " + host + "\r\n"
-        request += "Connection: close\r\n"
-        for key in headers:
-            request += key + ": " + headers[key] + "\r\n"
-        request += "Content-Length: " + str(len(data)) + "\r\n"
-        request += "\r\n"
-        sock.send(request.encode("utf-8"))
-        sock.send(data)
-        # Read the response (HTTP/1.0 so server closes connection after body)
-        buf = b""
-        while True:
-            chunk = sock.recv(1024)
-            if not chunk:
-                break
-            buf += chunk
-        # Parse status line
-        header_end = buf.find(b"\r\n\r\n")
-        if header_end < 0:
-            raise OSError("Incomplete HTTP response")
-        first_line = buf[:buf.find(b"\r\n")]
-        parts = first_line.split(b" ", 2)
-        if len(parts) < 2:
-            raise OSError("Malformed HTTP status line")
-        status_code = int(parts[1])
-        body = buf[header_end + 4:]
-        return _Response(status_code, body, sock)
-    except Exception:
-        try:
-            sock.close()
-        except OSError:
-            pass
+        _remaining(deadline)
+        metrics["connected"] = True
+        metrics["phase"] = "write"
+        _send_all(sock, request.encode("ascii"), deadline)
+        _send_all(sock, data, deadline)
+        metrics["request_complete"] = True
+        response = _read_response(sock, deadline, metrics)
+        _remaining(deadline)
+        metrics["phase"] = "complete"
+        return response
+    except Exception as error:
+        metrics["error"] = type(error).__name__
         raise
+    finally:
+        if http_start is None:
+            metrics["address_ms"] = time.ticks_diff(time.ticks_ms(), start)
+        else:
+            metrics["http_ms"] = time.ticks_diff(time.ticks_ms(), http_start)
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
+        _observe(observer, "http", metrics)
 
 
-def run(config, max_cycles=None, bench_clock=None, on_status=None):
+def run(config, max_cycles=None, bench_clock=None, on_status=None, on_transport=None):
     import network
     from machine import I2C, UART
     from mpu6886 import MPU6886
@@ -126,6 +274,14 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None):
             0 < coherence <= clock_age and 0 < jump <= clock_age and
             1 <= retry_count <= 10 and 0 < timeout <= 60 and 0 <= delay <= 3600):
         raise ValueError("Invalid bench timing limits")
+    # Account for work after a transmitting callback and before the next feed.
+    # Accepted address preparation takes < timeout; a stuck resolver cannot be bounded here.
+    max_backoff = min(2 ** (retry_count - 2), 30) if retry_count > 1 else 0
+    max_gap_ms = 3000 * timeout + 1000 * max(max_backoff, delay)
+    if getattr(config, "PRODUCTION_MODE", False) and (
+            max_gap_ms + HTTP_WDT_MARGIN_MS >= 60000 or
+            prepare_delay * 1000 + HTTP_WDT_MARGIN_MS >= 60000):
+        raise ValueError("Transport and wait budgets exceed autonomous watchdog margin")
     imu = MPU6886(I2C(0, scl=22, sda=21, freq=400000))
     scale = imu._accel_fs(0x08)
     if scale is not None:
@@ -143,10 +299,7 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None):
     journal = None
     archive_quota = 0
     if getattr(config, "UNTIMED_ARCHIVE_ENABLED", False):
-        try:
-            from untimed_store import FileBanks, UntimedJournal
-        except ImportError:
-            from tests.untimed_store import FileBanks, UntimedJournal
+        from untimed_store import FileBanks, UntimedJournal
         archive_quota = required(config, "UNTIMED_SEND_QUOTA")
         if not isinstance(archive_quota, int) or not 1 <= archive_quota <= 10:
             raise ValueError("Untimed quota must be in [1, 10]")
@@ -167,10 +320,7 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None):
             journal = UntimedJournal(banks, dev_id, transport_id, q_cap, quar_cap)
         except ValueError as e:
             if "No valid journal" in str(e):
-                try:
-                    from untimed_store import initialize_journal
-                except ImportError:
-                    from tests.untimed_store import initialize_journal
+                from untimed_store import initialize_journal
                 initialize_journal(banks, dev_id, transport_id, q_cap, quar_cap, 0)
                 journal = UntimedJournal(banks, dev_id, transport_id, q_cap, quar_cap)
             else:
@@ -225,6 +375,12 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None):
         import struct
         for attempt in range(retry_count):
             response = None
+            attempt_start = time.ticks_ms()
+            wifi_start = attempt_start
+            wifi_ms = None
+            attempt_code = None
+            attempt_error = None
+            attempt_phase = "wifi"
             print("TENTATIVE_ENVOI try=" + str(attempt + 1) + "/" + str(retry_count))
             if on_status:
                 try:
@@ -242,12 +398,17 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None):
                         time.sleep_ms(50)
                     if not wlan.isconnected():
                         raise OSError("WiFi connection timeout")
+                wifi_ms = time.ticks_diff(time.ticks_ms(), wifi_start)
+                attempt_phase = "http"
+                options = {"observer": on_transport} if on_transport is not None else {}
                 response = _http_post(
                     config.API_BASE_URL + "/api/v1/telemetry/binary",
                     data=packet,
                     headers={"Content-Type": "application/octet-stream", "X-Device-Secret": secret},
-                    timeout=timeout)
+                    timeout=timeout, **options)
                 code = response.status_code
+                attempt_phase = "ack"
+                attempt_code = code
                 print("HTTP_STATUS:", code)
                 if code in (200, 201):
                     if packet[0] == 3:
@@ -268,7 +429,8 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None):
                 if code in (400, 404, 409, 413, 415, 422):
                     return code
             except (OSError, ValueError, AttributeError) as e:
-                print("SEND_ERROR:", type(e).__name__, str(e))
+                attempt_error = type(e).__name__
+                print("SEND_ERROR:", attempt_error)
                 
             finally:
                 if response is not None:
@@ -276,6 +438,13 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None):
                         response.close()
                     except OSError:
                         pass
+                _observe(on_transport, "attempt", {
+                    "number": attempt + 1, "version": packet[0],
+                    "phase": attempt_phase,
+                    "elapsed_ms": time.ticks_diff(time.ticks_ms(), attempt_start),
+                    "wifi_ms": (time.ticks_diff(time.ticks_ms(), wifi_start)
+                                if wifi_ms is None else wifi_ms),
+                    "status": attempt_code, "error": attempt_error})
             if attempt + 1 < retry_count:
                 retry_delay = min(2 ** attempt, 30)
                 print("ATTENTE_RECONNEXION delay_s=" + str(retry_delay))
@@ -325,7 +494,7 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None):
         # Discard buffered sentences after blocking transport; they are not fresh fixes.
         if not is_bench_mode and uart.any():
             uart.read(min(uart.any(), 512))
-        gps.buffer = ""
+        gps.buffer = b""
         gps_chunks = []
         max_lateness_ms = 0
         window = Window()

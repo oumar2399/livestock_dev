@@ -13,6 +13,7 @@ from app.core.timezone import TARGET_TZ, UTC, ensure_utc
 from app.models.alert import Alert
 from app.models.daily_summary import DailyBehaviorSummary
 from app.models.feedback import AlertFeedback, PredictionFeedback
+from app.models.veterinary import VeterinaryCase, VeterinaryEntry
 from app.schemas.timeline import TimelineEventType, TimelineItem, TimelinePage
 
 
@@ -222,11 +223,50 @@ def _daily_summary_items(db, animal_id, start, end, cursor, fetch_limit):
     ]
 
 
+def _veterinary_entry_items(db, animal_id, start, end, cursor, fetch_limit):
+    event_type = TimelineEventType.VETERINARY_ENTRY.value
+    query = (
+        db.query(VeterinaryEntry)
+        .join(VeterinaryCase, VeterinaryEntry.case_id == VeterinaryCase.id)
+        .filter(VeterinaryCase.animal_id == animal_id)
+    )
+    query = _apply_bounds(query, VeterinaryEntry.occurred_at, start, end)
+    query = _apply_cursor(
+        query,
+        VeterinaryEntry.occurred_at,
+        VeterinaryEntry.id,
+        event_type,
+        cursor,
+    )
+    rows = query.order_by(
+        VeterinaryEntry.occurred_at.desc(), VeterinaryEntry.id.desc()
+    ).limit(fetch_limit)
+    return [
+        TimelineItem(
+            id=f"veterinary_entry:{row.id}",
+            source_id=row.id,
+            event_type=TimelineEventType.VETERINARY_ENTRY,
+            occurred_at=ensure_utc(row.occurred_at),
+            title=f"Note vétérinaire : {row.entry_type}",
+            summary=row.content[:100] + ("..." if len(row.content) > 100 else ""),
+            data={
+                "entry_id": row.id,
+                "case_id": row.case_id,
+                "entry_type": row.entry_type,
+                "content": row.content,
+                "author_user_id": row.author_user_id,
+            },
+        )
+        for row in rows
+    ]
+
+
 LOADERS = {
     TimelineEventType.ALERT: _alert_items,
     TimelineEventType.PREDICTION_FEEDBACK: _prediction_feedback_items,
     TimelineEventType.ALERT_FEEDBACK: _alert_feedback_items,
     TimelineEventType.DAILY_SUMMARY: _daily_summary_items,
+    TimelineEventType.VETERINARY_ENTRY: _veterinary_entry_items,
 }
 
 

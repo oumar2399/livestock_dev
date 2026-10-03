@@ -34,6 +34,7 @@ export const Config = {
     USER_EMAIL: '@livestock/user_email',
     USER_PROFILE: '@livestock/user_profile',
     FARM_ID: '@livestock/farm_id',
+    PUSH_TOKEN: '@livestock/push_token',
   },
 } as const;
 

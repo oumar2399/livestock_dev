@@ -44,12 +44,24 @@ export const animalKeys = {
 export function useAnimals(
   params?: AnimalsQueryParams,
   options?: Omit<UseQueryOptions<AnimalList>, 'queryKey' | 'queryFn'>,
+  allPages = false,
 ) {
   const currentFarmId = useFarmStore((state) => state.currentFarmId);
   const scopedParams = currentFarmId ? { ...params, farm_id: currentFarmId } : params;
   return useQuery({
-    queryKey: animalKeys.list(scopedParams),
-    queryFn: () => animalsApi.list(scopedParams),
+    queryKey: [...animalKeys.list(scopedParams), { allPages }],
+    queryFn: async ({ signal }) => {
+      if (!allPages) return animalsApi.list(scopedParams, signal);
+      const animals = new Map<number, Animal>();
+      for (let page = 1; page <= 1000; page++) {
+        if (signal.aborted) throw new Error('Request cancelled');
+        const result = await animalsApi.list({ ...scopedParams, page, page_size: 100 }, signal);
+        result.animals.forEach((animal) => animals.set(animal.id, animal));
+        if (page * 100 >= result.total) return { ...result, animals: [...animals.values()] };
+        if (result.animals.length === 0) break;
+      }
+      throw new Error('Unable to load the complete herd. Please refresh.');
+    },
     staleTime: Config.STALE_TIME_MEDIUM,
     refetchInterval: Config.DASHBOARD_REFRESH_INTERVAL,
     ...options,

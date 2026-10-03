@@ -10,7 +10,7 @@ Auth:
 """
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/api/v1", tags=["predict"])
 class PredictRequest(BaseModel):
     """
     The 12 statistical features computed by the M5Stack firmware v2.0
-    over a 50-sample (5-second) window at 10 Hz.
+    over a 150-sample (15-second) window at 10 Hz.
 
     All values are in g (gravitational acceleration units).
     Physical range for cattle: approximately [-6, 6] g.
@@ -58,7 +58,9 @@ class PredictRequest(BaseModel):
     accel_z_min:  float = Field(..., ge=-6.0, le=6.0, description="AccZ minimum (g)")
     accel_z_max:  float = Field(..., ge=-6.0, le=6.0, description="AccZ maximum (g)")
 
-    # ── Optional context ─────────────────────────────────────────────────────
+    sample_rate: Literal[10]
+    window_samples: Literal[150]
+
     animal_id:  Optional[int] = Field(None, gt=0, description="Animal ID for access-scoped context")
     device_id:  Optional[str] = Field(None, description="Device ID for traceability")
 
@@ -83,7 +85,7 @@ class ClassScore(BaseModel):
 
 class PredictResponse(BaseModel):
     """
-    Inference result returned for each 5-second window.
+    Inference result returned for each 15-second window.
     """
     model_config = ConfigDict(protected_namespaces=())
 
@@ -128,7 +130,7 @@ def predict_behavior(
     if pred_label is None or confidence is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Model not loaded or features missing. Check that behavior_classifier.pkl exists.",
+            detail="15-second model unavailable or features missing. Check MODEL_15S_PATH.",
         )
 
     info = ml_inference.get_model_info() or {}
@@ -181,7 +183,7 @@ def model_info(
     return {
         "classes":                   info.get("classes"),
         "features":                  info.get("features"),
-        "window_samples":            info.get("window_samples", 50),
+        "window_samples":            info.get("window_samples", 150),
         "target_freq_hz":            info.get("target_freq", 10),
         "profiles":                  ml_inference.get_profile_status(),
         "overall_balanced_accuracy": loao.get("mean_accuracy"),

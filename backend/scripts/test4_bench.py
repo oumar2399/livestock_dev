@@ -29,14 +29,14 @@ M5STACK_TESTS_DIR = WORKSPACE_DIR / "m5stack" / "tests"
 def get_engine(db_url: str = None):
     url = db_url or os.environ.get("DATABASE_URL")
     if not url:
-        url = "postgresql://postgres:postgres@localhost:5432/livestock_bench"
-    return create_engine(url)
+        raise ValueError("Provide --database-url or DATABASE_URL for livestock_bench")
+    return create_engine(url, hide_parameters=True)
 
 
 def ensure_isolated_database(engine):
     with engine.connect() as conn:
         current_db = conn.execute(text("SELECT current_database();")).scalar()
-        if "bench" not in current_db and "test" not in current_db:
+        if current_db != "livestock_bench":
             print(f"[ERREUR] Refus d'exécution : la base courante '{current_db}' n'est pas une base de banc/test dédiée !")
             print("Veuillez utiliser une URL pointant vers 'livestock_bench' (ex: postgresql://.../livestock_bench)")
             sys.exit(1)
@@ -80,6 +80,14 @@ def ensure_isolated_database(engine):
 
 
 def provision_bench(transport_id: int, api_url: str, db_url: str = None):
+    from urllib.parse import urlsplit
+    parsed_url = urlsplit(api_url)
+    if (not 1 <= transport_id <= 65535 or parsed_url.scheme != "http" or
+            not parsed_url.hostname or parsed_url.username or parsed_url.password or
+            any(c.isspace() for c in api_url) or any(c in api_url for c in ('"', "'", "\\"))):
+        raise ValueError("Provide a valid transport ID and an HTTP bench URL")
+    if (BENCH_DIR / "session.json").exists() or (M5STACK_TESTS_DIR / "test4_config.py").exists():
+        raise ValueError("Existing bench manifest/configuration; archive it before provisioning again")
     engine = get_engine(db_url)
     ensure_isolated_database(engine)
 
@@ -95,6 +103,10 @@ def provision_bench(transport_id: int, api_url: str, db_url: str = None):
     from app.models.animal import Animal
 
     with Session(engine) as db:
+        # Refuse collisions rather than deleting a device, its history or its key.
+        if db.query(Device).filter(
+                (Device.transport_id == transport_id) | (Device.id == device_id)).first():
+            raise ValueError("Device/transport ID already exists; explicit cleanup is required")
         # 1. Utilisateur propriétaire
         user = db.query(User).first()
         if not user:
@@ -110,11 +122,6 @@ def provision_bench(transport_id: int, api_url: str, db_url: str = None):
             db.flush()
 
         # 3. Device dédié avec transport_id
-        # Nettoyage préalable pour éviter les collisions d'unicité
-        db.query(Device).filter(Device.transport_id == transport_id).delete()
-        db.query(Device).filter(Device.id == device_id).delete()
-        db.flush()
-
         device = Device(
             id=device_id,
             farm_id=farm.id,
@@ -145,6 +152,7 @@ def provision_bench(transport_id: int, api_url: str, db_url: str = None):
         animal_id = animal.id
 
     session_manifest = {
+        "database": "livestock_bench",
         "device_id": device_id,
         "transport_id": transport_id,
         "raw_secret": raw_secret,
@@ -177,6 +185,7 @@ CLOCK_MAX_JUMP_MS = 5000
 MAX_SAMPLE_JITTER_MS = 20
 MAX_SEND_ATTEMPTS = 3
 HTTP_TIMEOUT_S = 10
+TEST4_TIMING_TOLERANCE_MS = 500
 POST_SEND_DELAY_S = 1
 BENCH_PREPARE_DELAY_S = 0
 '''

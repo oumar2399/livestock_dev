@@ -11,7 +11,7 @@ try:
 except ImportError:
     import time
 
-from b4_protocol import GPSClock, parse_sentence
+from b4_protocol import GPSClock, parse_sentence, _is_used_nmea_bytes
 
 UART_TX_PIN = 17
 UART_RX_PIN = 16
@@ -86,7 +86,7 @@ def utc_label(stamp_ms, clock_api=None):
 
 
 class GPSReader:
-    """Bounded line framing only. GPSClock validates and synchronizes every frame."""
+    """Bounded framing; GPSClock validates useful frames, others are counted only."""
 
     def __init__(self, uart, gps, clock_api):
         self.uart, self.gps, self.time = uart, gps, clock_api
@@ -98,7 +98,7 @@ class GPSReader:
         self.phase_max_poll_gap_ms = 0
         self.issues = []  # Only the first five rejection diagnostics, no raw positions.
         self.stats = {key: 0 for key in (
-            "rx_bytes", "frames", "accepted_clock_frames", "ignored_bytes",
+            "rx_bytes", "frames", "accepted_clock_frames", "ignored_bytes", "ignored_frames",
             "oversized_lines", "backlog_polls", "uart_errors", "checksum_rejects",
             "field_rejects", "clock_jumps", "other_rejects", "max_uart_pending",
             "max_read_ms", "max_poll_ms", "max_poll_gap_ms", "max_frame_processing_ms",
@@ -177,7 +177,9 @@ class GPSReader:
         self.gps.feed(raw, arrival_tick)
         self.maximum("max_feed_ms", self.time.ticks_diff(self.time.ticks_ms(), feed_start))
         after = (self.gps.base, self.gps.base_tick)
-        if self.gps.invalid_sentences > invalid_before:
+        if not _is_used_nmea_bytes(line):
+            self.stats["ignored_frames"] += 1
+        elif self.gps.invalid_sentences > invalid_before:
             self.rejection(raw, before, arrival_tick)
         elif (len(raw) >= 7 and raw[:1] == b"$" and raw[6:7] == b"," and
               all(65 <= char <= 90 for char in raw[1:6]) and len(self.talkers) < 16):

@@ -9,7 +9,7 @@ Architecture
 ------------
     M5Stack  →  POST /api/v1/telemetry  →  predict(features)  →  "Active" or "Resting"
                                               ↑
-                              behavior_classifier.pkl loaded here
+                              configured 15-second artifact loaded here
 
 The model artifact (.pkl) bundles:
     - model         : RandomForestClassifier (200 trees, all 6 animals)
@@ -32,8 +32,7 @@ from app.core.binary_protocol import FEATURE_NAMES
 logger = logging.getLogger(__name__)
 
 # ── Path to the model artifact ────────────────────────────────────────────────
-# Relative to the backend/ directory: backend/ml/models/behavior_classifier.pkl
-_MODEL_PATH = Path(__file__).resolve().parent.parent.parent / "ml" / "models" / "behavior_classifier.pkl"
+# Artifact path is configured by MODEL_15S_PATH, relative to backend/.
 
 # ── Module-level singleton — loaded once, reused for every request ────────────
 _artifact: Optional[dict] = None
@@ -77,7 +76,7 @@ def load_model() -> None:
     predict() will return None and log a warning on every call.
     """
     global _artifact, _profiles
-    _artifact = _load_artifact(_MODEL_PATH, (10, 50))
+    _artifact = None  # Historical 5-second artifacts are never loaded at runtime.
     profiles = {}
     if settings.MODEL_15S_ENABLED and settings.MODEL_15S_PATH:
         model_15s_path = Path(settings.MODEL_15S_PATH)
@@ -86,22 +85,23 @@ def load_model() -> None:
         artifact = _load_artifact(model_15s_path, (10, 150))
         if artifact is not None:
             profiles[(10, 150)] = artifact
+            _artifact = artifact
     _profiles = profiles
 
 
 def profile_ready(profile: tuple[int, int]) -> bool:
-    return (_artifact is not None) if profile == (10, 50) else profile in _profiles
+    return profile == (10, 150) and profile in _profiles
 
 
 def get_profile_status() -> list[dict]:
     return [{"sample_rate": rate, "window_samples": samples,
              "loaded": profile_ready((rate, samples)),
-             "enabled": samples == 50 or settings.MODEL_15S_ENABLED}
+             "enabled": samples == 150 and settings.MODEL_15S_ENABLED}
             for rate, samples in ((10, 50), (10, 150))]
 
 
 def get_profile_fingerprint(profile: tuple[int, int]) -> Optional[str]:
-    artifact = _artifact if profile == (10, 50) else _profiles.get(profile)
+    artifact = _profiles.get(profile) if profile == (10, 150) else None
     return artifact.get("artifact_sha256") if artifact is not None else None
 
 
@@ -146,9 +146,7 @@ def predict_with_confidence(features: dict) -> Tuple[Optional[str], Optional[flo
         or missing 3-axis accelerometer features.
     """
     profile = (features.get("sample_rate"), features.get("window_samples"))
-    if profile == (None, None):
-        profile = (10, 50)
-    artifact = _artifact if profile == (10, 50) else _profiles.get(profile)
+    artifact = _profiles.get(profile) if profile == (10, 150) else None
     if artifact is None:
         logger.warning("predict_with_confidence() called but no model is loaded.")
         return None, None

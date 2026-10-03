@@ -29,6 +29,7 @@ from app.core.access import (
 )
 from app.services.device_assignment import validate_device_assignment
 from app.services.telemetry_quality import animal_position_clause
+from app.services.provenance_service import record_tracking_period, close_tracking_period
 
 router = APIRouter(
     prefix="/animals",
@@ -195,6 +196,14 @@ def create_animal(
 
     animal = Animal(**create_data)
     db.add(animal)
+    db.flush()
+    record_tracking_period(
+        db=db,
+        animal_id=animal.id,
+        farm_id=animal.farm_id,
+        device_id=animal.assigned_device,
+        source="registration",
+    )
     try:
         db.commit()
     except IntegrityError as exc:
@@ -223,6 +232,9 @@ def update_animal(
     """
     animal = require_animal_access(current_user, animal_id, "edit_animals", db)
 
+    old_device = animal.assigned_device
+    old_farm = animal.farm_id
+
     update_data = animal_data.model_dump(exclude_unset=True)
     if "assigned_device" in update_data:
         update_data["assigned_device"] = validate_device_assignment(
@@ -235,6 +247,15 @@ def update_animal(
 
     for field, value in update_data.items():
         setattr(animal, field, value)
+
+    if animal.assigned_device != old_device or animal.farm_id != old_farm:
+        record_tracking_period(
+            db=db,
+            animal_id=animal.id,
+            farm_id=animal.farm_id,
+            device_id=animal.assigned_device,
+            source="farm_transfer" if animal.farm_id != old_farm else "device_reassignment",
+        )
 
     try:
         db.commit()
@@ -264,6 +285,7 @@ def delete_animal(
     """
     animal = require_animal_access(current_user, animal_id, "edit_animals", db)
 
+    close_tracking_period(db, animal_id, source="deletion")
     db.delete(animal)
     db.commit()
 

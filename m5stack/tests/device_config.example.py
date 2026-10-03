@@ -1,3 +1,8 @@
+"""Historical simulation1.py configuration, not the autonomous main.py template.
+
+For the current firmware use m5stack/device_config.example.py instead.
+"""
+
 WIFI_SSID = "your-wifi-name"
 WIFI_PASSWORD = "your-wifi-password"
 API_BASE_URL = "http://your-backend-host:8000"

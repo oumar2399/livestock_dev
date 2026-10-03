@@ -30,10 +30,10 @@ def _env_list(name: str, default: list[str]) -> list[str]:
 
 
 class Settings:
-    BINARY_V2_ENABLED: bool = _env_bool("BINARY_V2_ENABLED", False)
+    BINARY_V2_ENABLED: bool = _env_bool("BINARY_V2_ENABLED", True)
     BINARY_V3_ENABLED: bool = _env_bool("BINARY_V3_ENABLED", False)
-    MODEL_15S_ENABLED: bool = _env_bool("MODEL_15S_ENABLED", False)
-    MODEL_15S_PATH: str = os.getenv("MODEL_15S_PATH", "")
+    MODEL_15S_ENABLED: bool = _env_bool("MODEL_15S_ENABLED", True)
+    MODEL_15S_PATH: str = os.getenv("MODEL_15S_PATH", "ml/models/behavior_classifier_v3_staged.pkl")
     # No unvalidated coverage threshold: new qualified days cannot raise anomalies until configured.
     ANOMALY_MIN_COVERAGE_SECONDS: float | None = (
         float(os.environ["ANOMALY_MIN_COVERAGE_SECONDS"])

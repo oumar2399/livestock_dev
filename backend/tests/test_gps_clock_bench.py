@@ -377,11 +377,11 @@ def test_rejection_counters_do_not_mix_invalid_frames_after_a_clock_jump(bench_m
     uart.enabled = False
     uart.buffer.extend(clock_sentence(BASE_MS) + clock_sentence(BASE_MS + 5000))
     runner.reader.poll()
-    uart.buffer.extend(b'$GAG,A,123*00\n')
+    uart.buffer.extend(b'$GNZDA,120000.00,13,09,2026,00,00*00\n')
     runner.reader.poll()
     assert runner.reader.stats['clock_jumps'] == 1
     assert runner.reader.stats['checksum_rejects'] == 1
-    assert 'GAG,A' not in runner.reader.talkers
+    assert 'GNZDA' not in runner.reader.talkers
 
 
 def test_long_terminal_pause_cannot_validate_physical_expiry(bench_module):
@@ -427,9 +427,18 @@ def test_frame_timing_includes_rejection_diagnostics(bench_module):
         return original(*args)
 
     runner.reader.rejection = slow_diagnostic
-    runner.reader.frame(b'$GAG,A,123*00', clock.ticks_ms())
+    runner.reader.frame(b'$GNZDA,120000.00,13,09,2026,00,00*00', clock.ticks_ms())
     assert runner.reader.stats['max_feed_ms'] == 0
     assert runner.reader.stats['max_frame_processing_ms'] == 300
+
+
+def test_ignored_frames_are_not_reported_as_validated_checksums(bench_module):
+    runner, clock, uart, _ = bench(bench_module)
+    runner.reader.frame(b'$GPGSV,1,1,00*00', clock.ticks_ms())
+    assert runner.reader.stats['ignored_frames'] == 1
+    assert runner.reader.stats['checksum_rejects'] == 0
+    assert runner.gps.invalid_sentences == 0
+    assert not runner.reader.talkers
 
 
 @pytest.mark.parametrize('timeout_ms', [2500, 4000])

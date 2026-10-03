@@ -20,6 +20,7 @@ const STORAGE_KEYS = {
   USER_ROLE:     Config.STORAGE.USER_ROLE,
   USER_NAME:     Config.STORAGE.USER_NAME,
   USER_EMAIL:    Config.STORAGE.USER_EMAIL,
+  PUSH_TOKEN:    Config.STORAGE.PUSH_TOKEN,
 } as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -238,6 +239,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     const { epoch, cleanup } = resetSession();
     set(SIGNED_OUT);
+    void (async () => {
+      try {
+        const savedToken = await AsyncStorage.getItem(STORAGE_KEYS.PUSH_TOKEN);
+        if (savedToken) {
+          await apiClient.delete(`/notifications/devices/${encodeURIComponent(savedToken)}`).catch(() => {});
+        }
+      } catch {
+        // Ignorer les erreurs de réseau lors de la désactivation du token au logout
+      }
+    })();
     try {
       await cleanup;
     } catch {
