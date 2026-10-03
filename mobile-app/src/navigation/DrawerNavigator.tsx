@@ -4,14 +4,19 @@
  *   DrawerNavigator (overlay)
  *   └── AppStack (NativeStack)
  *       ├── HomeTabs (BottomTabs) ← écran principal avec tabs
- *       ├── Farm, Users, Devices...← écrans secondaires sans tabs
+ *       ├── Farm, FarmOnboarding, Users, Devices...← écrans secondaires sans tabs
  *
  * Le drawer reste accessible depuis tous les écrans via
  * DrawerActions.openDrawer() ou swipe depuis la gauche.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
 } from 'react-native';
 import {
   createDrawerNavigator,
@@ -25,20 +30,24 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Colors, Spacing, Typography, Radius } from '../constants/config';
 import { useAuthStore } from '../store/authStore';
 import { useFarmStore } from '../store/farmStore';
+import { selectedFarmRole } from '../utils/selectedFarmRole';
 
-import MainNavigator    from './MainNavigator';
-import FarmScreen       from '../screens/drawer/FarmScreen';
-import UsersScreen      from '../screens/drawer/UsersScreen';
-import DevicesScreen    from '../screens/drawer/DevicesScreen';
-import GeofenceScreen   from '../screens/drawer/GeofenceScreen';
-import ReportsScreen    from '../screens/drawer/ReportsScreen';
+import MainNavigator from './MainNavigator';
+import FarmScreen from '../screens/drawer/FarmScreen';
+import FarmOnboardingScreen from '../screens/drawer/FarmOnboardingScreen';
+import UsersScreen from '../screens/drawer/UsersScreen';
+import DevicesScreen from '../screens/drawer/DevicesScreen';
+import GeofenceScreen from '../screens/drawer/GeofenceScreen';
+import ReportsScreen from '../screens/drawer/ReportsScreen';
+import FarmReportsScreen from '../screens/drawer/FarmReportsScreen';
 import VetOptionsScreen from '../screens/drawer/VetOptionsScreen';
-import SettingsScreen   from '../screens/drawer/SettingsScreen';
+import SettingsScreen from '../screens/drawer/SettingsScreen';
 import AIAssistantScreen from '../screens/drawer/AIAssistantScreen';
 import MarketplaceScreen from '../screens/drawer/MarketplaceScreen';
 import HistoryScreen from '../screens/drawer/HistoryScreen';
 import VideoMonitoring from '../screens/drawer/VideoMonitoring';
 import AppServSettings from '../screens/drawer/AppServSettings';
+import FarmCreateModal from '../components/FarmCreateModal';
 
 // ─── AppStack ─────────────────────────────────────────────────────────────────
 // Stack qui contient HomeTabs + tous les écrans secondaires.
@@ -49,50 +58,53 @@ const AppStack = createNativeStackNavigator();
 function AppStackNavigator() {
   return (
     <AppStack.Navigator screenOptions={{ headerShown: false }}>
-      <AppStack.Screen name="HomeTabs"    component={MainNavigator} />
-      <AppStack.Screen name="Farm"        component={FarmScreen} />
-      <AppStack.Screen name="Users"       component={UsersScreen} />
-      <AppStack.Screen name="Devices"     component={DevicesScreen} />
-      <AppStack.Screen name="Geofence"    component={GeofenceScreen} />
-      <AppStack.Screen name="Reports"     component={ReportsScreen} />
-      <AppStack.Screen name="VetOptions"  component={VetOptionsScreen} />
-      <AppStack.Screen name="Settings"    component={SettingsScreen} />
-      <AppStack.Screen name="Chatbot"     component={AIAssistantScreen} />
+      <AppStack.Screen name="HomeTabs" component={MainNavigator} />
+      <AppStack.Screen name="Farm" component={FarmScreen} />
+      <AppStack.Screen name="FarmOnboarding" component={FarmOnboardingScreen} />
+      <AppStack.Screen name="Users" component={UsersScreen} />
+      <AppStack.Screen name="Devices" component={DevicesScreen} />
+      <AppStack.Screen name="Geofence" component={GeofenceScreen} />
+      <AppStack.Screen name="Reports" component={ReportsScreen} />
+      <AppStack.Screen name="FarmReports" component={FarmReportsScreen} />
+      <AppStack.Screen name="VetOptions" component={VetOptionsScreen} />
+      <AppStack.Screen name="Settings" component={SettingsScreen} />
+      <AppStack.Screen name="Chatbot" component={AIAssistantScreen} />
       <AppStack.Screen name="Marketplace" component={MarketplaceScreen} />
-      <AppStack.Screen name="History"     component={HistoryScreen} />
+      <AppStack.Screen name="History" component={HistoryScreen} />
       <AppStack.Screen name="VideoMonitoring" component={VideoMonitoring} />
       <AppStack.Screen name="AppServSettings" component={AppServSettings} />
     </AppStack.Navigator>
   );
 }
+
 // ─── Menu structure ───────────────────────────────────────────────────────────
 
 const SECTIONS = [
   {
     title: 'Farm',
     items: [
-      { label: 'Herd',         icon: 'paw-outline',           route: 'HomeTabs' },
-      { label: 'Farm Management',    icon: 'home-outline',          route: 'Farm' },
-      { label: 'Devices M5Stack',  icon: 'hardware-chip-outline', route: 'Devices' },
-      { label: 'Video Monitoring', icon: 'videocam-outline',       route: 'VideoMonitoring', preview: true },
+      { label: 'Herd', icon: 'paw-outline', route: 'HomeTabs' },
+      { label: 'Farm Management', icon: 'home-outline', route: 'Farm' },
+      { label: "Setup Checklist", icon: 'checkbox-outline', route: 'FarmOnboarding' },
+      { label: 'Devices M5Stack', icon: 'hardware-chip-outline', route: 'Devices' },
+      { label: 'Video Monitoring', icon: 'videocam-outline', route: 'VideoMonitoring', preview: true },
     ],
   },
   {
     title: 'Team & Services',
     items: [
-      { label: 'Users',          icon: 'people-outline', route: 'Users' },
-      { label: 'Vet Options',  icon: 'medkit-outline', route: 'VetOptions' },
+      { label: 'Users', icon: 'people-outline', route: 'Users' },
+      { label: 'Vet Options', icon: 'medkit-outline', route: 'VetOptions' },
     ],
   },
   {
     title: 'Land',
-    items: [
-      { label: 'Geofence', icon: 'map-outline', route: 'Geofence' },
-    ],
+    items: [{ label: 'Geofence', icon: 'map-outline', route: 'Geofence' }],
   },
   {
     title: 'Data & Analytics',
     items: [
+      { label: 'Farm Reports', icon: 'document-text-outline', route: 'FarmReports' },
       { label: 'Reports / Exports', icon: 'bar-chart-outline', route: 'Reports' },
       { label: 'History', icon: 'time-outline', route: 'History' },
     ],
@@ -100,18 +112,24 @@ const SECTIONS = [
   {
     title: 'Services',
     items: [
-      { label: 'AI Assistant', icon: 'chatbubble-ellipses-outline', route: 'Chatbot',     preview: true },
-      { label: 'Marketplace',  icon: 'storefront-outline',          route: 'Marketplace', preview: true },
-      { label: 'App & Serveur', icon: 'server-outline',             route: 'AppServSettings' },
+      { label: 'AI Assistant', icon: 'chatbubble-ellipses-outline', route: 'Chatbot', preview: true },
+      { label: 'Marketplace', icon: 'storefront-outline', route: 'Marketplace', preview: true },
+      { label: 'App & Serveur', icon: 'server-outline', route: 'AppServSettings' },
     ],
   },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
-  farmer: 'Farmer', owner: 'Owner', vet: 'Veterinarian', admin: 'Admin',
+  farmer: 'Farmer',
+  owner: 'Owner',
+  vet: 'Veterinarian',
+  admin: 'Admin',
 };
 const ROLE_COLORS: Record<string, string> = {
-  farmer: Colors.primary, owner: '#3498DB', vet: '#9B59B6', admin: '#E74C3C',
+  farmer: Colors.primary,
+  owner: '#3498DB',
+  vet: '#9B59B6',
+  admin: '#E74C3C',
 };
 
 // ─── Contenu drawer ───────────────────────────────────────────────────────────
@@ -120,14 +138,16 @@ function DrawerContent(props: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
   const { user, role, logout } = useAuthStore();
   const queryClient = useQueryClient();
-  const { farms, currentFarmId, selectFarm } = useFarmStore();
-  const currentFarm = farms.find((farm) => farm.id === currentFarmId) ?? null;
-  const currentRole = role === 'admin' ? 'admin' : currentFarm?.membership_role;
+  const farmState = useFarmStore();
+  const { farms, currentFarmId, selectFarm, loadFarms } = farmState;
+  const currentRole = selectedFarmRole(role, farmState);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const go = (route: string) => {
     props.navigation.closeDrawer();
     setTimeout(() => props.navigation.navigate('App', { screen: route } as any), 100);
   };
+
   const handleFarmChange = async (farmId: number) => {
     if (farmId === currentFarmId) return;
     if (await selectFarm(farmId)) {
@@ -135,6 +155,7 @@ function DrawerContent(props: DrawerContentComponentProps) {
       go('HomeTabs');
     }
   };
+
   const handleLogout = () => {
     Alert.alert('Logout', 'Do you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
@@ -163,7 +184,12 @@ function DrawerContent(props: DrawerContentComponentProps) {
             {user?.email}
           </Text>
           {currentRole && (
-            <View style={[styles.roleBadge, { backgroundColor: (ROLE_COLORS[currentRole] ?? Colors.primary) + '20' }]}>
+            <View
+              style={[
+                styles.roleBadge,
+                { backgroundColor: (ROLE_COLORS[currentRole] ?? Colors.primary) + '20' },
+              ]}
+            >
               <Text style={[styles.roleText, { color: ROLE_COLORS[currentRole] ?? Colors.primary }]}>
                 {ROLE_LABELS[currentRole] ?? currentRole}
               </Text>
@@ -174,10 +200,33 @@ function DrawerContent(props: DrawerContentComponentProps) {
 
       {/* Menu */}
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        {farms.length > 0 && (
-          <View style={styles.farmSection}>
-            <Text style={styles.sectionTitle}>Current Farm</Text>
-            {farms.map((farm) => {
+        {/* Farm Section with create action */}
+        <View style={styles.farmSection}>
+          <View style={styles.farmSectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {farms.length > 0 ? 'Current Farm' : 'Exploitation'}
+            </Text>
+            <TouchableOpacity
+              style={styles.addFarmSmallBtn}
+              onPress={() => setShowCreateModal(true)}
+              hitSlop={8}
+            >
+              <Ionicons name="add" size={16} color={Colors.primary} />
+              <Text style={styles.addFarmSmallText}>New</Text>
+            </TouchableOpacity>
+          </View>
+
+          {farms.length === 0 ? (
+            <TouchableOpacity
+              style={styles.noFarmCard}
+              onPress={() => setShowCreateModal(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add-circle-outline" size={20} color={Colors.primary} />
+              <Text style={styles.noFarmCardText}>+ Créer une exploitation</Text>
+            </TouchableOpacity>
+          ) : (
+            farms.map((farm) => {
               const active = farm.id === currentFarmId;
               return (
                 <TouchableOpacity
@@ -197,9 +246,10 @@ function DrawerContent(props: DrawerContentComponentProps) {
                   {active && <Ionicons name="checkmark" size={18} color={Colors.primary} />}
                 </TouchableOpacity>
               );
-            })}
-          </View>
-        )}
+            })
+          )}
+        </View>
+
         {SECTIONS.map((section) => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -234,6 +284,17 @@ function DrawerContent(props: DrawerContentComponentProps) {
           <Text style={[styles.footerText, { color: Colors.severity.critical }]}>Logout</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Farm Create Modal */}
+      <FarmCreateModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={async (newFarm) => {
+          await loadFarms();
+          await selectFarm(newFarm.id);
+          go('FarmOnboarding');
+        }}
+      />
     </View>
   );
 }
@@ -270,21 +331,33 @@ export default function DrawerNavigator() {
 const styles = StyleSheet.create({
   drawer: { flex: 1, backgroundColor: Colors.bg.card },
   profile: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    padding: Spacing.base, paddingBottom: Spacing.md,
-    borderBottomWidth: 1, borderBottomColor: Colors.border.default,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.base,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border.default,
   },
   avatar: {
-    width: 50, height: 50, borderRadius: 25,
-    backgroundColor: Colors.primary + '20', borderWidth: 2,
-    borderColor: Colors.primary + '40', alignItems: 'center', justifyContent: 'center',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.primary + '20',
+    borderWidth: 2,
+    borderColor: Colors.primary + '40',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  avatarText:   { fontSize: 20, fontWeight: '700', color: Colors.primary },
-  profileName:  { fontSize: Typography.base, fontWeight: '700', color: Colors.text.primary },
+  avatarText: { fontSize: 20, fontWeight: '700', color: Colors.primary },
+  profileName: { fontSize: Typography.base, fontWeight: '700', color: Colors.text.primary },
   profileEmail: { fontSize: Typography.xs, color: Colors.text.muted, marginTop: 2 },
   roleBadge: {
-    alignSelf: 'flex-start', marginTop: 4,
-    paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
   },
   roleText: { fontSize: Typography.xs, fontWeight: '700' },
 
@@ -293,6 +366,44 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border.default,
+  },
+  farmSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: Spacing.base,
+  },
+  addFarmSmallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primary + '18',
+  },
+  addFarmSmallText: {
+    fontSize: Typography.xs,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  noFarmCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.sm,
+    marginVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.primary + '10',
+    borderColor: Colors.primary + '30',
+    borderWidth: 1,
+    borderRadius: Radius.md,
+  },
+  noFarmCardText: {
+    fontSize: Typography.sm,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   farmItem: {
     minHeight: 42,
@@ -309,26 +420,40 @@ const styles = StyleSheet.create({
 
   section: { paddingTop: Spacing.md },
   sectionTitle: {
-    fontSize: Typography.xs, fontWeight: '700', color: Colors.text.muted,
-    textTransform: 'uppercase', letterSpacing: 0.8,
-    paddingHorizontal: Spacing.base, paddingBottom: Spacing.xs,
+    fontSize: Typography.xs,
+    fontWeight: '700',
+    color: Colors.text.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingHorizontal: Spacing.base,
+    paddingBottom: Spacing.xs,
   },
   item: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm + 2,
-    marginHorizontal: Spacing.sm, borderRadius: Radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.sm + 2,
+    marginHorizontal: Spacing.sm,
+    borderRadius: Radius.md,
   },
   itemLabel: { flex: 1, fontSize: Typography.base, color: Colors.text.secondary },
   soon: {
     backgroundColor: Colors.severity.warning + '20',
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
   },
   soonText: { fontSize: 10, color: Colors.severity.warning, fontWeight: '700' },
 
   footer: { borderTopWidth: 1, borderTopColor: Colors.border.default, padding: Spacing.sm, gap: 2 },
   footerItem: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
   },
   footerText: { fontSize: Typography.base, color: Colors.text.secondary },
 });

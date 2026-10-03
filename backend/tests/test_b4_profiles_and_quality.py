@@ -17,8 +17,7 @@ from app.models.membership import FarmMembership
 from app.core.timezone import TARGET_TZ
 from app.services.daily_summary import aggregate_daily_behavior
 from app.services.telemetry_quality import process_behavior_rebuilds
-from test_binary_protocol import REFERENCE
-from test_binary_telemetry_api import headers, json_equivalent, URL
+from test_binary_telemetry_api import headers, json_equivalent, URL, REFERENCE
 
 
 def packet(version=2, gps=True, stamp=None):
@@ -117,7 +116,7 @@ def test_revocation_blocks_both_transports_and_requires_new_secret(binary_case, 
 def test_retroactive_loss_invalidates_summary_and_preserves_raw_audit(binary_case, binary_client):
     case = binary_case
     stamp = (utc_now() - timedelta(hours=2)).replace(microsecond=0)
-    raw = packet(version=1, stamp=stamp)
+    raw = packet(stamp=stamp)
     assert binary_client.post(URL, content=raw, headers=headers(case)).status_code == 201
     day = stamp.astimezone(TARGET_TZ).date()
     assert aggregate_daily_behavior(case.db, case.animal.id, day).n_predictions == 1
@@ -147,7 +146,7 @@ def test_late_pre_loss_window_can_still_be_classified(binary_case, binary_client
     start = utc_now() - timedelta(minutes=10)
     assert binary_client.patch("/api/v1/devices/BINARY-TEST", json={
         "status": "lost", "loss_started_at": start.isoformat()}).status_code == 200
-    assert binary_client.post(URL, content=packet(version=1, stamp=start - timedelta(seconds=30)),
+    assert binary_client.post(URL, content=packet(stamp=start - timedelta(seconds=30)),
                               headers=headers(case)).status_code == 201
     case.prediction.assert_called_once()
     assert case.device.status == "lost"
@@ -195,7 +194,7 @@ def test_json_metadata_profiles_are_explicit(binary_case, binary_client, monkeyp
                               headers={"X-Device-Secret": case.secret}).status_code == 503
     data.pop("sample_rate")
     assert binary_client.post("/api/v1/telemetry/", json=data,
-                              headers={"X-Device-Secret": case.secret}).status_code == 201
+                              headers={"X-Device-Secret": case.secret}).status_code == 422
     case.prediction.assert_not_called()
 
 

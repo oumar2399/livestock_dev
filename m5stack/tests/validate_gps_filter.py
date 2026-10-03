@@ -1,5 +1,5 @@
 """
-validate_gps_filter_v2.py
+validate_gps_filter.py
 
 Diagnostic only. Does not modify production files and does not send telemetry.
 
@@ -15,6 +15,7 @@ Purpose:
 Important:
 This validates equivalence for the captured sample only. It does not prove that
 all future GPS modules/configurations will emit the same sentence mix.
+Both paths use the installed parser, not two historical parser versions.
 """
 
 import gc
@@ -286,6 +287,9 @@ def profile_useful_sentence_cost(lines):
 
 
 def main():
+    import b4_protocol
+    print("PROTOCOL_FILE:", getattr(b4_protocol, "__file__", "unknown"))
+    print("DIAGNOSTIC_ONLY: current parser vs external filtering, not old/new.")
     chunks, reference_tick = capture_like_production()
 
     if not chunks:
@@ -333,7 +337,9 @@ def main():
         print("TIME_SAVED_MS:", saved)
         print("TIME_SAVED_PERCENT:", int(saved * 100 / current["parse_ms"]))
 
-    if utc_equal and position_equal:
+    if current["utc_ms"] is None and current["position"] is None:
+        print("A_B_RESULT: NON CONCLUANT (no useful UTC or position observed)")
+    elif utc_equal and position_equal:
         print("A_B_RESULT: PASS")
     else:
         print("A_B_RESULT: DIFFERENT")

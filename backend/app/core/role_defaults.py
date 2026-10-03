@@ -11,6 +11,8 @@ ROLE_DEFAULT_PERMISSIONS: dict[str, list[str]] = {
         "invite_members",
         "manage_devices",
         "manage_farm",
+        "view_farm_reports",
+        "view_veterinary",
     ],
     "farmer": [
         "view_animals",
@@ -19,6 +21,8 @@ ROLE_DEFAULT_PERMISSIONS: dict[str, list[str]] = {
     "vet": [
         "view_animals",
         "give_feedback",
+        "manage_veterinary",
+        "view_veterinary",
     ],
 }
 

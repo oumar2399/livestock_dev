@@ -26,8 +26,9 @@ def quantize(features: np.ndarray) -> np.ndarray:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", type=int, choices=(1, 2), default=1)
-    parser.add_argument("--model-path", type=Path, help="Trusted local artifact; required for v2")
+    parser.add_argument("--version", type=int, choices=(1, 2), default=2,
+                        help="Nominal v2 by default; v1 is historical research only")
+    parser.add_argument("--model-path", type=Path, help="Trusted local artifact override")
     args = parser.parse_args()
     source = train
     samples = WINDOW_SAMPLES
@@ -35,9 +36,9 @@ def main() -> None:
         from ml import train_v2
         source = train_v2
         samples = 150
-        if args.model_path is None:
-            parser.error("v2 requires --model-path; this command never activates a model")
-    artifact = ml_inference._load_artifact(args.model_path or ml_inference._MODEL_PATH, (SAMPLE_RATE, samples))
+    filename = "behavior_classifier_v3_staged.pkl" if args.version == 2 else "behavior_classifier.pkl"
+    artifact_path = args.model_path or Path(__file__).resolve().parents[1] / "ml" / "models" / filename
+    artifact = ml_inference._load_artifact(artifact_path, (SAMPLE_RATE, samples))
     if artifact is None:
         raise RuntimeError("A compatible model artifact is required")
     if (source.TARGET_FREQ, source.WINDOW_SAMPLES) != (SAMPLE_RATE, samples):

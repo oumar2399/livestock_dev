@@ -3,6 +3,7 @@ validate_gps_filter_synthetic.py
 
 Synthetic equivalence test for current GPS parser vs filtered GGA/RMC/ZDA path.
 Does not use GPS hardware, does not modify production code, does not send telemetry.
+Both paths use the installed parser; expected values are checked independently.
 """
 
 import time
@@ -81,7 +82,7 @@ def same_position(a, b):
         and a[2] == b[2]
     )
 
-def run_case(name, bodies, expect_clock, expect_position):
+def run_case(name, bodies, expected_utc, expected_position):
     sentences = [nmea(body) for body in bodies]
     base = time.ticks_ms()
     ticks = []
@@ -95,8 +96,8 @@ def run_case(name, bodies, expect_clock, expect_position):
 
     utc_equal = current["utc"] == filtered["utc"]
     pos_equal = same_position(current["position"], filtered["position"])
-    clock_ok = (current["utc"] is not None) == expect_clock
-    pos_ok = (current["position"] is not None) == expect_position
+    clock_ok = current["utc"] == expected_utc
+    pos_ok = same_position(current["position"], expected_position)
 
     passed = utc_equal and pos_equal and clock_ok and pos_ok
 
@@ -118,6 +119,9 @@ def run_case(name, bodies, expect_clock, expect_position):
     return passed
 
 def main():
+    import b4_protocol
+    print("PROTOCOL_FILE:", getattr(b4_protocol, "__file__", "unknown"))
+    print("SYNTHETIC_ONLY: checks installed parser against fixed expected values.")
     results = []
 
     results.append(run_case(
@@ -129,7 +133,7 @@ def main():
             "GNRMC,123519.000,A,,,,,,,200926,,,A",
             "GLGSV,1,1,00",
         ],
-        True, False
+        1789907719100, None
     ))
 
     results.append(run_case(
@@ -140,7 +144,7 @@ def main():
             "GNVTG,,,,,,,,,N",
             "GPGSV,1,1,00",
         ],
-        False, False
+        None, None
     ))
 
     results.append(run_case(
@@ -151,7 +155,7 @@ def main():
             "GNZDA,123521.000,20,09,2026,00,00",
             "GNGLL,,,,,123521.000,V,N",
         ],
-        True, False
+        1789907721100, None
     ))
 
     results.append(run_case(
@@ -162,7 +166,7 @@ def main():
             "GNRMC,123522.000,A,3442.2674,N,13511.9820,E,0.0,0.0,200926,,,A",
             "GPGSV,1,1,04,01,40,100,30,02,35,120,25,03,20,200,20,04,10,300,15",
         ],
-        True, True
+        1789907722100, (34.70445666666667, 135.1997, 12)
     ))
 
     print("")

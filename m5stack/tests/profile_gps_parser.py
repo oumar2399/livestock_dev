@@ -7,6 +7,7 @@ Purpose:
 - Measure a simple useful-NMEA-only pre-filter without changing production code.
 
 This script does NOT send telemetry and does NOT modify b4_protocol.py.
+Both paths use the installed parser. This is not an old/new regression test.
 """
 
 import gc
@@ -153,6 +154,9 @@ def profile_filtered(lines):
     return filter_ms, parse_ms, len(useful), clock.invalid_sentences
 
 def main():
+    import b4_protocol
+    print("PROTOCOL_FILE:", getattr(b4_protocol, "__file__", "unknown"))
+    print("DIAGNOSTIC_ONLY: current parser vs external filtering, not old/new.")
     raw_chunks = capture()
     if not raw_chunks:
         print("")
@@ -201,4 +205,5 @@ def main():
     print("")
     print("Done. Send this complete output back for analysis.")
 
-main()
+if __name__ == "__main__":
+    main()

@@ -17,7 +17,7 @@ from app.core.timezone import utc_now
 from sqlalchemy.orm import Session
 
 # Import routes
-from app.api.v1 import telemetry, animals, alerts, auth, devices, activity, farms, admin, feedback, memberships, reports, history, geofences
+from app.api.v1 import telemetry, animals, alerts, auth, devices, activity, farms, admin, feedback, memberships, reports, history, geofences, farm_reports, locations, notifications, veterinary
 from app.core.scheduler import start_scheduler, stop_scheduler
 from app.core.config import settings
 
@@ -137,6 +137,10 @@ app.include_router(memberships.router, prefix=API_V1_PREFIX, tags=["memberships"
 app.include_router(reports.router, prefix=API_V1_PREFIX, tags=["reports"])
 app.include_router(history.router, prefix=API_V1_PREFIX, tags=["history"])
 app.include_router(geofences.router, prefix=API_V1_PREFIX, tags=["geofences"])
+app.include_router(farm_reports.router, prefix=API_V1_PREFIX, tags=["farm-reports"])
+app.include_router(locations.router, prefix=API_V1_PREFIX, tags=["locations"])
+app.include_router(notifications.router, prefix=API_V1_PREFIX, tags=["notifications"])
+app.include_router(veterinary.router, prefix=API_V1_PREFIX, tags=["veterinary"])
 app.include_router(predict_router)
 
 # ─── Gestion erreurs globales ─────────────────────────────────────────────────

@@ -165,6 +165,7 @@ export interface AlertsQueryParams {
 }
 
 export interface TelemetryLatestParams {
+  after_animal_id?: number;
   farm_id?: number;
   limit?: number;
   animal_id?: number;
@@ -184,6 +185,20 @@ export interface FarmAccess {
   membership_role: FarmMembershipRole;
   permissions: string[];
 }
+
+export interface FarmCreateInput {
+  name: string;
+  address?: string | null;
+  size_hectares?: number | null;
+  client_request_id?: string;
+}
+
+export interface FarmUpdateInput {
+  name: string;
+  address?: string | null;
+  size_hectares?: number | null;
+}
+
 
 export interface FarmMembership {
   id: number;
@@ -360,8 +375,6 @@ export interface GeofenceUpdate {
   points?: GeoPoint[];
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
 export interface LoginCredentials {
   username: string;
   password: string;
@@ -379,10 +392,10 @@ export type RootStackParamList = {
   Main: undefined;
 };
 
-// Onglets du bas (inchangés)
+// Onglets du bas
 export type MainTabParamList = {
   Dashboard: undefined;
-  Map: undefined;
+  Map: { focusAnimalId?: number; showTrack?: boolean } | undefined;
   Animals: undefined;
   Alerts: undefined;
   Profile: undefined;
@@ -403,12 +416,190 @@ export type AlertsStackParamList = {
 export type DrawerParamList = {
   HomeTabs: undefined;        // Wraps les bottom tabs
   Farm: undefined;
+  FarmOnboarding: undefined;
   Users: undefined;
   Devices: undefined;
   Geofence: undefined;
   Reports: undefined;
+  FarmReports: undefined;
   VetOptions: undefined;
   Settings: undefined;
   Chatbot: undefined;         // À venir
   Marketplace: undefined;     // À venir
 };
+
+// ─── Farm Reports & Data Quality (Lots G & H) ──────────────────────────────────
+
+export type FarmReportDataset = 'farm_summary' | 'animal_quality';
+
+export interface FarmCurrentState {
+  generated_at: string;
+  total_animals: number;
+  animals_by_status: Record<string, number>;
+  total_devices: number;
+  devices_by_status: Record<string, number>;
+  assigned_devices_count: number;
+  unassigned_devices_count: number;
+  last_reception?: {
+    last_seen_at: string;
+    age_seconds: number;
+    freshness_status: 'recent' | 'delayed' | 'silent';
+  } | null;
+  gps_freshness?: {
+    last_fix_at: string;
+    age_seconds: number;
+    satellites: number;
+    status: string;
+  } | null;
+  battery_summary?: {
+    min_pct?: number;
+    avg_pct?: number;
+    low_battery_count?: number;
+    monitored_devices_count?: number;
+  } | null;
+  active_alerts_count: number;
+}
+
+export interface FarmPeriodSummary {
+  date_from: string;
+  date_to: string;
+  effective_start: string;
+  effective_end: string;
+  provenance_available_from?: string | null;
+  scope_status: 'available' | 'no_data' | 'not_computable' | 'partial';
+  dated_windows_count: number;
+  proven_tracking_seconds: number;
+  dated_coverage_seconds: number;
+  dated_coverage_ratio?: number | null;
+  behavioral_coverage_seconds: number;
+  behavioral_coverage_ratio?: number | null;
+  behavior_breakdown: {
+    active_count: number;
+    resting_count: number;
+    active_ratio?: number | null;
+    label: string;
+  };
+  gps_presence_ratio?: number | null;
+  behavioral_exclusions: Record<string, number>;
+  reception_delay: {
+    median_seconds?: number | null;
+    p95_seconds?: number | null;
+    negative_anomalies_count: number;
+  };
+  unobserved_gaps: {
+    gap_count: number;
+    longest_gap_seconds: number;
+    total_unobserved_seconds: number;
+  };
+  alerts_triggered_in_period: number;
+  alerts_resolved_in_period: number;
+  limitations: string[];
+}
+
+export interface FarmUntimedSummary {
+  untimed_count: number;
+  breakdown_by_reason: Record<string, number>;
+  breakdown_by_attribution: Record<string, number>;
+  mandatory_label: string;
+}
+
+export interface FarmOverviewResponse {
+  farm_id: number;
+  farm_name: string;
+  generated_at: string;
+  target_timezone: string;
+  current_state: FarmCurrentState;
+  period_summary: FarmPeriodSummary;
+  untimed_summary: FarmUntimedSummary;
+}
+
+export interface FarmQualityItem {
+  animal_id: number;
+  animal_name: string;
+  date: string;
+  dated_windows_count: number;
+  covered_seconds: number;
+  coverage_ratio?: number | null;
+  active_count: number;
+  resting_count: number;
+  active_ratio?: number | null;
+  gps_presence_ratio?: number | null;
+  exclusions_count: number;
+  status: string;
+}
+
+export interface FarmQualityResponse {
+  farm_id: number;
+  farm_name: string;
+  generated_at: string;
+  target_timezone: string;
+  date_from: string;
+  date_to: string;
+  items: FarmQualityItem[];
+}
+
+export interface FarmReportPreview {
+  farm_id: number;
+  dataset: FarmReportDataset;
+  date_from: string;
+  date_to: string;
+  generated_at: string;
+  target_timezone: string;
+  columns: string[];
+  rows: string[][];
+  total_rows: number;
+  has_more: boolean;
+  limit: number;
+}
+
+// ─── Location & GPS Track (Lot B) ───────────────────────────────────────────
+
+export interface LocationPoint {
+  animal_id: number;
+  animal_name: string;
+  device_id: string | null;
+  latitude: number;
+  longitude: number;
+  position_time: string;
+  position_is_animal: boolean;
+  device_status: string | null;
+  freshness: 'recent' | 'stale' | 'old';
+  age_seconds: number;
+}
+
+export interface TrackPoint {
+  latitude: number;
+  longitude: number;
+  time: string;
+  speed: number | null;
+  satellites: number | null;
+  is_reliable: boolean;
+}
+
+export interface TrackSegment {
+  points: TrackPoint[];
+  start_time: string;
+  end_time: string;
+  is_proven: boolean;
+  quality: 'reliable' | 'degraded' | 'uncertain';
+}
+
+export interface GapInfo {
+  start_time: string;
+  end_time: string;
+  duration_seconds: number;
+  reason: 'no_data' | 'loss_period' | 'unproven';
+}
+
+export interface LocationHistoryResponse {
+  animal_id: number;
+  animal_name: string;
+  device_id: string | null;
+  position_is_animal: boolean;
+  segments: TrackSegment[];
+  gaps: GapInfo[];
+  period_start: string;
+  period_end: string;
+  total_points: number;
+  proven_coverage_ratio: number | null;
+}

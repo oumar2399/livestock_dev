@@ -14,8 +14,7 @@ import {
   TextInput,
   RefreshControl,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { DrawerActions } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -34,6 +33,7 @@ import {
   timeAgo,
   formatWeight,
   batteryColor,
+  evaluateFreshness,
 } from '../utils/helpers';
 import {
   ScreenHeader,
@@ -62,7 +62,15 @@ interface AnimalCardProps {
 
 function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
   const statusColor = animalStatusColor(animal.status);
-  const isOnline = !!telemetry;
+
+  const freshness = evaluateFreshness({
+    telemetryTime: telemetry?.last_update ?? animal.last_update,
+    positionTime: telemetry?.position_time,
+    latitude: telemetry?.latitude,
+    longitude: telemetry?.longitude,
+    deviceStatus: telemetry?.device_status,
+    battery: telemetry?.battery,
+  });
 
   // Use the ML-predicted state from the backend (or fallback to threshold)
   const activityState = telemetry && telemetry.behavior_eligible !== false
@@ -78,11 +86,11 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
         <Text style={[styles.avatarText, { color: statusColor }]}>
           {animal.name[0].toUpperCase()}
         </Text>
-        {/* Indicateur online/offline */}
+        {/* Indicateur de fraîcheur ou alerte matériel */}
         <View
           style={[
             styles.onlineDot,
-            { backgroundColor: isOnline ? Colors.status.healthy : Colors.status.offline },
+            { backgroundColor: freshness.deviceState === 'lost' ? '#E74C3C' : freshness.telemetryColor },
           ]}
         />
       </View>
@@ -104,7 +112,13 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
         </Text>
 
         <View style={styles.cardBottom}>
-          {isOnline && activityState ? (
+          {/* Statut matériel prioritaire si lost */}
+          {freshness.deviceState === 'lost' ? (
+            <View style={[styles.behaviorTag, { backgroundColor: '#E74C3C20' }]}>
+              <Ionicons name="warning-outline" size={12} color="#E74C3C" />
+              <Text style={[styles.behaviorText, { color: '#E74C3C' }]}>Collar Lost</Text>
+            </View>
+          ) : freshness.telemetryFreshness === 'recent' && activityState ? (
             <View style={[styles.behaviorTag, { backgroundColor: behaviorColor + '20' }]}>
               <View style={[styles.behaviorDot, { backgroundColor: behaviorColor }]} />
               <Text style={[styles.behaviorText, { color: behaviorColor }]}>
@@ -113,19 +127,32 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
             </View>
           ) : (
             <Text style={styles.offlineText}>
-              {animal.last_update ? `Seen ${timeAgo(animal.last_update)}` : 'Never seen'}
+              {freshness.telemetryLabel}
             </Text>
           )}
 
-          {isOnline && telemetry && (
+          {/* Indicateur GPS séparé */}
+          <View style={styles.gpsRow}>
+            <Ionicons
+              name={freshness.gpsStatus === 'fix' ? 'navigate-circle-outline' : 'navigate-outline'}
+              size={12}
+              color={freshness.gpsColor}
+            />
+            <Text style={[styles.gpsText, { color: freshness.gpsColor }]}>
+              {freshness.gpsStatus === 'fix' ? 'GPS Fix' : freshness.gpsStatus === 'stale_fix' ? 'Old GPS' : freshness.gpsStatus === 'weak_fix' ? 'Weak GPS' : 'No GPS'}
+            </Text>
+          </View>
+
+          {/* Batterie avec mention Unknown si non fiable */}
+          {telemetry && (
             <View style={styles.batteryRow}>
               <Ionicons
                 name="battery-half-outline"
                 size={13}
-                color={batteryColor(telemetry.battery)}
+                color={freshness.batteryColor}
               />
-              <Text style={[styles.batteryText, { color: batteryColor(telemetry.battery) }]}>
-                {telemetry.battery}%
+              <Text style={[styles.batteryText, { color: freshness.batteryColor }]}>
+                {freshness.batteryLabel}
               </Text>
             </View>
           )}
@@ -386,6 +413,8 @@ const styles = StyleSheet.create({
   behaviorDot: { width: 5, height: 5, borderRadius: 3 },
   behaviorText: { fontSize: Typography.xs, fontWeight: '600' },
   offlineText: { fontSize: Typography.xs, color: Colors.text.muted },
+  gpsRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  gpsText: { fontSize: Typography.xs, fontWeight: '600' },
   batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   batteryText: { fontSize: Typography.xs, fontWeight: '600' },
   addBtn: {

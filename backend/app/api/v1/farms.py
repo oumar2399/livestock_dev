@@ -5,11 +5,16 @@ POST /farms            → Create farm + auto-membership owner
 GET  /farms/{id}       → Farm details (membership required)
 PUT  /farms/{id}       → Update farm (manage_farm permission)
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from datetime import datetime
+import hashlib
+import json
+from typing import Optional, List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from app.models.farm_creation import FarmCreationRequest
 
 from app.db.database import get_db
 from app.models.farm import Farm
@@ -25,16 +30,16 @@ from app.core.access import (
 
 router = APIRouter(prefix="/farms", tags=["farms"])
 
-
 # ─── Schemas ──────────────────────────────────────────────────────────────────
 
 class FarmCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=255)
     address: Optional[str] = None
     size_hectares: Optional[float] = None
+    client_request_id: Optional[str] = Field(None, max_length=64, description="Client idempotency key (UUID)")
 
 class FarmUpdate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=255)
     address: Optional[str] = None
     size_hectares: Optional[float] = None
 
@@ -86,7 +91,7 @@ def list_farms(
             "size_hectares": farm.size_hectares,
             "owner_id": farm.owner_id,
             "created_at": farm.created_at,
-            "membership_role": "admin" if is_platform_admin(current_user) else membership.role,
+            "membership_role": "admin" if is_platform_admin(current_user) else (membership.role if membership else None),
             "permissions": effective_permissions(current_user, farm.id, db),
         })
     return result
@@ -103,7 +108,44 @@ def create_farm(
     """
     Create a new farm. The creating user automatically becomes
     an owner member with active status.
+    Guarantees client-side idempotency if client_request_id is provided.
     """
+    fingerprint = hashlib.sha256(json.dumps(
+        data.model_dump(exclude={"client_request_id"}), sort_keys=True,
+        separators=(",", ":"), ensure_ascii=True,
+    ).encode()).hexdigest()
+    if data.client_request_id:
+        # Serialize receipts across workers; creation and receipt commit together.
+        lock_key = int.from_bytes(hashlib.sha256(
+            f"farm-create:{current_user.id}:{data.client_request_id}".encode()
+        ).digest()[:8], "big", signed=True)
+        db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+        receipt = db.get(FarmCreationRequest, (current_user.id, data.client_request_id))
+        if receipt:
+            if receipt.fingerprint != fingerprint:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A farm creation with this idempotency key already exists with different parameters",
+                )
+            existing_farm = db.get(Farm, receipt.farm_id) if receipt.farm_id else None
+            if not existing_farm:
+                raise HTTPException(409, "The farm associated with this request no longer exists")
+            if existing_farm:
+                require_farm(current_user, existing_farm.id, permission=None, db=db)
+                membership = db.query(FarmMembership).filter_by(
+                    farm_id=existing_farm.id, user_id=current_user.id, status="active",
+                ).first()
+                return {
+                    "id": existing_farm.id,
+                    "name": existing_farm.name,
+                    "address": existing_farm.address,
+                    "size_hectares": existing_farm.size_hectares,
+                    "owner_id": existing_farm.owner_id,
+                    "created_at": existing_farm.created_at,
+                    "membership_role": "admin" if is_platform_admin(current_user) else membership.role,
+                    "permissions": effective_permissions(current_user, existing_farm.id, db),
+                }
+
     farm = Farm(
         owner_id=current_user.id,
         name=data.name,
@@ -121,9 +163,24 @@ def create_farm(
         status="active",
     )
     db.add(membership)
+    if data.client_request_id:
+        db.add(FarmCreationRequest(
+            user_id=current_user.id, request_id=data.client_request_id,
+            fingerprint=fingerprint, farm_id=farm.id,
+        ))
     db.commit()
     db.refresh(farm)
-    return farm
+
+    return {
+        "id": farm.id,
+        "name": farm.name,
+        "address": farm.address,
+        "size_hectares": farm.size_hectares,
+        "owner_id": farm.owner_id,
+        "created_at": farm.created_at,
+        "membership_role": "admin" if is_platform_admin(current_user) else "owner",
+        "permissions": effective_permissions(current_user, farm.id, db),
+    }
 
 
 # ─── GET /farms/{id} (membership required) ───────────────────────────────────
@@ -136,7 +193,24 @@ def get_farm(
 ):
     """Get farm details — requires active membership."""
     farm = require_farm(current_user, farm_id, None, db)
-    return farm
+    membership = None
+    if not is_platform_admin(current_user):
+        membership = db.query(FarmMembership).filter(
+            FarmMembership.user_id == current_user.id,
+            FarmMembership.farm_id == farm.id,
+            FarmMembership.status == "active",
+        ).first()
+
+    return {
+        "id": farm.id,
+        "name": farm.name,
+        "address": farm.address,
+        "size_hectares": farm.size_hectares,
+        "owner_id": farm.owner_id,
+        "created_at": farm.created_at,
+        "membership_role": "admin" if is_platform_admin(current_user) else (membership.role if membership else None),
+        "permissions": effective_permissions(current_user, farm.id, db),
+    }
 
 
 # ─── PUT /farms/{id} (manage_farm permission) ────────────────────────────────
@@ -159,4 +233,22 @@ def update_farm(
 
     db.commit()
     db.refresh(farm)
-    return farm
+
+    membership = None
+    if not is_platform_admin(current_user):
+        membership = db.query(FarmMembership).filter(
+            FarmMembership.user_id == current_user.id,
+            FarmMembership.farm_id == farm.id,
+            FarmMembership.status == "active",
+        ).first()
+
+    return {
+        "id": farm.id,
+        "name": farm.name,
+        "address": farm.address,
+        "size_hectares": farm.size_hectares,
+        "owner_id": farm.owner_id,
+        "created_at": farm.created_at,
+        "membership_role": "admin" if is_platform_admin(current_user) else (membership.role if membership else None),
+        "permissions": effective_permissions(current_user, farm.id, db),
+    }

@@ -35,12 +35,27 @@ export const telemetryKeys = {
 export function useTelemetryLatest(
   params?: TelemetryLatestParams,
   options?: Omit<UseQueryOptions<TelemetryLatest[]>, 'queryKey' | 'queryFn'>,
+  allPages = false,
 ) {
   const currentFarmId = useFarmStore((state) => state.currentFarmId);
   const scopedParams = currentFarmId ? { ...params, farm_id: currentFarmId } : params;
   return useQuery({
-    queryKey: telemetryKeys.latest(scopedParams),
-    queryFn: () => telemetryApi.getLatest(scopedParams),
+    queryKey: [...telemetryKeys.latest(scopedParams), { allPages }],
+    queryFn: async ({ signal }) => {
+      if (!allPages) return telemetryApi.getLatest(scopedParams, signal);
+      const rows: TelemetryLatest[] = [];
+      let after = 0;
+      for (let page = 0; page < 1000; page++) {
+        if (signal.aborted) throw new Error('Request cancelled');
+        const batch = await telemetryApi.getLatest({ ...scopedParams, limit: 100, after_animal_id: after }, signal);
+        rows.push(...batch);
+        if (batch.length < 100) return rows;
+        const next = batch[batch.length - 1].animal_id;
+        if (next <= after) break;
+        after = next;
+      }
+      throw new Error('Unable to load telemetry for the complete herd.');
+    },
     staleTime: Config.STALE_TIME_SHORT,
     refetchInterval: Config.MAP_REFRESH_INTERVAL,    // 10s
     refetchIntervalInBackground: false,               // Stop si app en arrière-plan

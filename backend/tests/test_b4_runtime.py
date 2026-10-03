@@ -1,12 +1,11 @@
 """Simulate the complete sequential firmware loop, never touching actual hardware."""
 
-import importlib.util
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from test_b4_firmware import fw, sentence
 from app.services.binary_telemetry import decode_binary_payload
+from firmware_helpers import load_firmware
 
 
 class FinishedCycle(BaseException):
@@ -15,11 +14,8 @@ class FinishedCycle(BaseException):
 
 @pytest.fixture
 def runtime(monkeypatch):
-    root = Path(__file__).resolve().parents[2] / "m5stack/tests/b4_runtime.py"
-    spec = importlib.util.spec_from_file_location("b4_runtime", root)
-    module = importlib.util.module_from_spec(spec)
     monkeypatch.setitem(sys.modules, "b4_protocol", fw)
-    spec.loader.exec_module(module)
+    module = load_firmware("b4_runtime")
     state = SimpleNamespace(tick=0, packets=[], codes=[201], outputs=[], clock=True, delay_sample=False)
     modulus = 1 << 30
     def sleep_ms(ms):
@@ -93,6 +89,27 @@ def test_sequential_window_and_retry_preserve_exact_bytes(runtime):
     assert fields["window_samples"] == 150 and fields["latitude"] is None
     assert fields["timestamp"].hour == 12 and fields["timestamp"].second == 15
     assert state.outputs[-1][-1]["sent"] == 1
+
+
+def test_deferred_gps_parsing_preserves_real_window_end(runtime, monkeypatch):
+    module, state, config = runtime
+    ticks = []
+
+    class SlowClock(fw.GPSClock):
+        def feed(self, data, tick):
+            assert state.tick >= 15000
+            ticks.append(tick)
+            state.tick += 250
+            super().feed(data, tick)
+
+    monkeypatch.setattr(module, "GPSClock", SlowClock)
+    with pytest.raises(FinishedCycle):
+        module.run(config)
+    assert len(ticks) == 12 and max(ticks) <= 15000
+    assert state.tick == 18000
+    fields = decode_binary_payload(state.packets[0])
+    assert fields["timestamp"].second == 15
+    assert state.outputs[-1][-1]["imu_invalid"] == 0
 
 
 def test_missing_clock_and_bad_sampling_are_counted_without_emission(runtime):
@@ -274,3 +291,29 @@ def test_wifi_reconnect_and_counters(runtime, monkeypatch):
     assert state.outputs[-1][-1]["sent"] == 1
     assert wifi_status["connected"] is True
 
+
+@pytest.mark.parametrize("timeout,attempts,delay,prepare", [
+    (24, 7, 1, 0), (10, 3, 30, 0), (10, 3, 1, 55),
+    (18, 1, 1, 0),
+])
+def test_autonomous_watchdog_rejects_full_gap_budget(runtime, timeout, attempts, delay, prepare):
+    module, _, config = runtime
+    config.PRODUCTION_MODE = True
+    config.HTTP_TIMEOUT_S = timeout
+    config.MAX_SEND_ATTEMPTS = attempts
+    config.POST_SEND_DELAY_S = delay
+    config.BENCH_PREPARE_DELAY_S = prepare
+    with pytest.raises(ValueError, match="watchdog"):
+        module.run(config)
+
+
+def test_nominal_autonomous_budget_still_accepted(runtime, monkeypatch):
+    module, state, config = runtime
+    config.PRODUCTION_MODE = True
+    config.HTTP_TIMEOUT_S = 10
+    config.POST_SEND_DELAY_S = 1
+    monkeypatch.setattr(module, "_http_post", lambda *a, **kw:
+        SimpleNamespace(status_code=201, close=lambda: None))
+    with pytest.raises(FinishedCycle):
+        module.run(config)
+    assert state.outputs[-1][-1]["sent"] == 1

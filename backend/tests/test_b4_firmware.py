@@ -1,16 +1,13 @@
 """Pure firmware tests run on PC; these are not a substitute for a device bench."""
 
-import importlib.util
-from pathlib import Path
 from datetime import datetime, timezone
 import math
 import pytest
 
 from app.services.binary_telemetry import decode_binary_payload
+from firmware_helpers import load_firmware
 
-spec = importlib.util.spec_from_file_location("b4_protocol", Path(__file__).resolve().parents[2] / "m5stack/tests/b4_protocol.py")
-fw = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fw)
+fw = load_firmware("b4_protocol")
 
 
 def sentence(body):

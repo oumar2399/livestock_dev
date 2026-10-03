@@ -18,8 +18,8 @@ export const animalsApi = {
    * GET /api/v1/animals/
    * Liste paginée avec filtres optionnels
    */
-  list: async (params?: AnimalsQueryParams): Promise<AnimalList> => {
-    const { data } = await apiClient.get<AnimalList>(BASE + '/', { params });
+  list: async (params?: AnimalsQueryParams, signal?: AbortSignal): Promise<AnimalList> => {
+    const { data } = await apiClient.get<AnimalList>(BASE + '/', { params, signal });
     return data;
   },
 

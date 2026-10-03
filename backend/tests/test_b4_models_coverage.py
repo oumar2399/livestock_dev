@@ -30,9 +30,9 @@ def test_model_selection_does_not_mutate_a_current_model(monkeypatch):
     def run(samples):
         return ml_inference.predict_with_confidence({**features, "sample_rate": 10, "window_samples": samples})[0]
     with ThreadPoolExecutor(max_workers=4) as executor:
-        assert list(executor.map(run, [50, 150] * 20)) == ["Active", "Resting"] * 20
+        assert list(executor.map(run, [50, 150] * 20)) == [None, "Resting"] * 20
     assert ml_inference._artifact is old and ml_inference._profiles[(10, 150)] is new
-    assert ml_inference.predict_with_confidence(features)[0] == "Active"
+    assert ml_inference.predict_with_confidence(features) == (None, None)
     assert ml_inference.predict_with_confidence({**features, "sample_rate": 10}) == (None, None)
 
 

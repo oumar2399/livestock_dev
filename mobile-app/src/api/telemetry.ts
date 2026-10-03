@@ -30,8 +30,8 @@ export const telemetryApi = {
    * Dernières positions de tous les animaux (ou d'un seul)
    * Utilisé pour la carte temps réel (polling toutes les 10s)
    */
-  getLatest: async (params?: TelemetryLatestParams): Promise<TelemetryLatest[]> => {
-    const { data } = await apiClient.get<TelemetryLatest[]>(BASE + '/latest', { params });
+  getLatest: async (params?: TelemetryLatestParams, signal?: AbortSignal): Promise<TelemetryLatest[]> => {
+    const { data } = await apiClient.get<TelemetryLatest[]>(BASE + '/latest', { params, signal });
     return data;
   },
 

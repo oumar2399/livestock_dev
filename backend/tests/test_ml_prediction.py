@@ -14,6 +14,8 @@ from app.api.v1.predict import PredictRequest
 
 
 VALID_FEATURES = {
+    "sample_rate": 10,
+    "window_samples": 150,
     "accel_x_mean": 0.012,
     "accel_x_std": 0.023,
     "accel_x_min": -0.050,

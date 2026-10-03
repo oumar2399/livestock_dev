@@ -51,13 +51,15 @@ class TelemetryCreate(TelemetryBase):
     """
     Payload envoyé par M5Stack v2.0
 
-    Exemple JSON minimal (rétrocompat v1.3) :
+    Exemple JSON minimal (profil 15 s explicite, sans features ML) :
     {
       "device_id": "M5-001",
       "latitude": 34.6901,
       "longitude": 135.1955,
       "activity": 0.12,
-      "battery": 78
+      "battery": 78,
+      "sample_rate": 10,
+      "window_samples": 150
     }
 
     Exemple JSON complet (v2.0 windowed) :
@@ -75,10 +77,12 @@ class TelemetryCreate(TelemetryBase):
       "accel_z_mean": 1.00,  "accel_z_std": 0.02,
       "accel_z_min":  0.95,  "accel_z_max": 1.05,
       "sample_rate": 10,
-      "window_samples": 50,
+      "window_samples": 150,
       "battery": 78
     }
     """
+    sample_rate: int = Field(..., description="Required by ingestion: 10 Hz")
+    window_samples: int = Field(..., description="Required by ingestion: 150 samples (15 s)")
     timestamp: Optional[datetime] = None  # allows simulated historical data
 
 

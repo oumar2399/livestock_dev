@@ -21,7 +21,16 @@ from app.models.farm import Farm
 from app.models.telemetry import Telemetry
 from app.models.user import User
 from app.services import binary_telemetry, ml_inference
-from test_binary_protocol import REFERENCE, changed
+from test_binary_protocol import REFERENCE as V1_REFERENCE
+import struct
+
+REFERENCE = bytes([2]) + V1_REFERENCE[1:]
+
+
+def changed(offset, fmt, value):
+    raw = bytearray(REFERENCE)
+    struct.pack_into("<" + fmt, raw, offset, value)
+    return bytes(raw)
 
 
 URL = "/api/v1/telemetry/binary"
@@ -148,23 +157,23 @@ def test_replay_reuses_row_and_does_not_rewind_battery(binary_case, binary_clien
 
 def test_model_profile_mismatch_and_unavailable_model(binary_case, binary_client, monkeypatch):
     case = binary_case
-    monkeypatch.setattr(ml_inference, "get_model_info", lambda: {"target_freq": 10, "window_samples": 150})
-    assert binary_client.post(URL, content=REFERENCE, headers=headers(case)).status_code == 409
+    assert binary_client.post(URL, content=V1_REFERENCE, headers=headers(case)).status_code == 422
     assert case.db.query(Telemetry).count() == 0
-    monkeypatch.setattr(ml_inference, "get_model_info", lambda: None)
+    monkeypatch.setattr(ml_inference, "_profiles", {})
     case.prediction.return_value = (None, None)
     result = binary_client.post(URL, content=REFERENCE, headers=headers(case))
-    assert result.status_code == 201 and result.json()["predicted_behavior"] is None
+    assert result.status_code == 503
 
 
 def test_equivalence_with_real_active_model(binary_case, binary_client, monkeypatch):
     ml_inference.load_model()
-    assert ml_inference.get_model_info()["window_samples"] == 50
+    assert ml_inference.get_model_info()["window_samples"] == 150
     monkeypatch.setattr(ml_inference, "predict_with_confidence", REAL_PREDICT)
     test_json_binary_have_identical_persisted_values(binary_case, binary_client)
 
 
 def test_concurrent_identical_packets_create_only_one_row(binary_engine, monkeypatch):
+    monkeypatch.setattr(ml_inference, "_profiles", {(10, 150): {}})
     monkeypatch.setattr(ml_inference, "predict_with_confidence", lambda _: ("Resting", 0.9))
     monkeypatch.setattr(ml_inference, "get_model_info", lambda: None)
     secret = generate_device_secret()

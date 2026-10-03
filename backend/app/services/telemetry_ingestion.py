@@ -1,4 +1,4 @@
-"""Shared telemetry ingestion, preserving the legacy JSON behavior."""
+"""Shared ingestion for explicit 15-second telemetry windows."""
 
 from datetime import datetime
 from dataclasses import dataclass
@@ -98,6 +98,8 @@ def ingest_telemetry(data: TelemetryCreate, db: Session, *, idempotent: bool = F
     received_at = received_at or utc_now()
     if idempotent and data.timestamp is None:
         raise ValueError("Idempotent ingestion requires a measurement timestamp")
+    if (data.sample_rate, data.window_samples) != (10, 150):
+        raise HTTPException(422, "Only 15-second windows are accepted: sample_rate=10, window_samples=150")
     device = db.query(Device).filter(Device.id == data.device_id).with_for_update().populate_existing().first()
     if device is not None and (device.ingestion_revoked_at is not None or device.status == "retired"):
         raise HTTPException(401, "Invalid device credentials")
@@ -129,10 +131,6 @@ def ingest_telemetry(data: TelemetryCreate, db: Session, *, idempotent: bool = F
         raise HTTPException(503, "Binary v2 is not enabled")
     if eligible and profile == (10, 150) and not ml_inference.profile_ready(profile):
         raise HTTPException(503, "The 15-second model is unavailable")
-    if eligible and idempotent and profile == (10, 50):
-        info = ml_inference.get_model_info()
-        if info is not None and (info["target_freq"], info["window_samples"]) != profile:
-            raise HTTPException(409, "Binary profile does not match the loaded model")
 
     # Auto-register or refresh the device without silently transferring farms.
     _sync_device(db, data.device_id, animal.farm_id, data.battery)
@@ -140,7 +138,7 @@ def ingest_telemetry(data: TelemetryCreate, db: Session, *, idempotent: bool = F
     # ── ML Prediction ──────────────────────────────────────────────────────────
     try:
         ml_prediction, confidence = (ml_inference.predict_with_confidence(data.model_dump())
-                                     if eligible and profile in ((None, None), (10, 50), (10, 150))
+                                     if eligible and profile == (10, 150)
                                      else (None, None))
     except (ValueError, TypeError) as e:
         logger.warning(f"⚠️ ML inference skipped for device {data.device_id} (invalid/malformed features): {e}")
@@ -215,9 +213,33 @@ def ingest_telemetry(data: TelemetryCreate, db: Session, *, idempotent: bool = F
     )
 
     db.add(telemetry)
+
     animal_id = animal.id
     try:
+        db.flush()
+        geofence_alerts = []
+        if telemetry.latitude is not None and telemetry.longitude is not None:
+            try:
+                from app.services.geofence_engine import evaluate_geofencing
+                with db.begin_nested():
+                    geofence_alerts = evaluate_geofencing(
+                        animal=animal, device=device,
+                        latitude=telemetry.latitude, longitude=telemetry.longitude,
+                        satellites=telemetry.satellites,
+                        speed=float(telemetry.speed) if telemetry.speed is not None else None,
+                        measurement_time=telemetry.time, db=db,
+                    )
+            except Exception:
+                logger.exception("Geofence evaluation failed for animal %s", animal_id)
         db.commit()
+        if geofence_alerts:
+            try:
+                from app.services.notification_service import enqueue_alert_notification
+                for ga in geofence_alerts:
+                    enqueue_alert_notification(db, ga)
+                db.commit()
+            except Exception:
+                logger.exception("Failed to enqueue notification for geofence alerts")
     except IntegrityError as exc:
         db.rollback()
         constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", "") or ""

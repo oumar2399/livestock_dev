@@ -1,7 +1,7 @@
 /**
  * ProfileScreen - User profile management
  * Displays user info, allows editing name/phone/password
- * Role display only — role changes are admin-only (via Users screen)
+ * Displays the selected farm role; membership changes belong to Users.
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/authStore';
+import { useFarmStore } from '../store/farmStore';
+import { selectedFarmRole } from '../utils/selectedFarmRole';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import apiClient from '../api/client';
 
@@ -90,6 +92,9 @@ function EditableField({
 
 export default function ProfileScreen() {
   const { role, logout } = useAuthStore();
+  const farmState = useFarmStore();
+  const currentRole = selectedFarmRole(role, farmState);
+  const currentFarm = farmState.farms.find(farm => farm.id === farmState.currentFarmId);
 
   const [editing, setEditing]   = useState(false);
   const [saving, setSaving]     = useState(false);
@@ -194,9 +199,13 @@ export default function ProfileScreen() {
     setEditing(false);
   };
 
-  const roleColor = ROLE_COLORS[role ?? ''] ?? Colors.primary;
-  const roleLabel = ROLE_LABELS[role ?? ''] ?? role ?? 'Unknown';
-  const roleIcon  = ROLE_ICONS[role ?? '']  ?? 'person-outline';
+  const roleColor = ROLE_COLORS[currentRole ?? ''] ?? Colors.text.muted;
+  const roleLabel = currentRole ? ROLE_LABELS[currentRole] : 'No farm role';
+  const roleIcon  = ROLE_ICONS[currentRole ?? ''] ?? 'person-outline';
+  const roleContext = currentRole === 'admin' ? 'Platform administrator'
+    : farmState.isLoading ? 'Loading farm access'
+    : farmState.error ? 'Farm access unavailable'
+    : currentRole ? currentFarm?.name : 'No farm selected';
 
   // Initials for avatar
   const initials = (profile?.name ?? profile?.email ?? '?')
@@ -241,7 +250,7 @@ export default function ProfileScreen() {
 
           {/* Role info note */}
           <Text style={styles.roleNote}>
-            Role changes can only be made by an administrator.
+            {roleContext}
           </Text>
         </View>
 
@@ -385,12 +394,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   roleBadge: {
+    maxWidth: '100%',
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: Spacing.md, paddingVertical: 6,
     borderRadius: Radius.full, borderWidth: 1,
     marginBottom: Spacing.sm,
   },
-  roleText:  { fontSize: Typography.sm, fontWeight: '700' },
+  roleText:  { fontSize: Typography.sm, fontWeight: '700', flexShrink: 1 },
   roleNote:  {
     fontSize: Typography.xs, color: Colors.text.muted,
     textAlign: 'center', paddingHorizontal: Spacing.xl,

@@ -139,6 +139,7 @@ def get_latest_telemetry(
     farm_id: Optional[int] = Query(None, description="Filter by farm"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    after_animal_id: int = Query(0, ge=0),
 ):
     """Latest position for each animal — scoped to user's farms."""
     accessible = resolve_farm_scope(current_user, db, farm_id)
@@ -164,6 +165,8 @@ def get_latest_telemetry(
 
     if animal_id:
         query = query.filter(Telemetry.animal_id == animal_id)
+    if isinstance(after_animal_id, int) and after_animal_id > 0:
+        query = query.filter(Telemetry.animal_id > after_animal_id)
 
     results = query.order_by(Telemetry.animal_id).limit(limit).all()
     ids = [t.animal_id for t, _, _ in results]

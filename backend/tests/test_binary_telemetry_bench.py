@@ -15,10 +15,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import pytest
+from firmware_helpers import FIRMWARE_DIR
 
 M5STACK_TESTS_DIR = Path(__file__).resolve().parent.parent.parent / "m5stack" / "tests"
 if str(M5STACK_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(M5STACK_TESTS_DIR))
+if str(FIRMWARE_DIR) not in sys.path:
+    sys.path.insert(0, str(FIRMWARE_DIR))
 
 import test_binary_telemetry as bench
 
@@ -180,7 +183,9 @@ def test_run_imu_capture_i2c_error_protection(mock_config, monkeypatch):
     monkeypatch.setattr(bench, "_safe_post", mock_post)
     monkeypatch.setattr(bench, "ensure_wifi", lambda cfg: True)
 
-    # 15 échantillons à 10Hz = 1.5s
-    res = bench.run_imu_capture(mock_config, seconds=2, sample_rate_hz=10, max_i2c_retries=10)
+    from test_gps_clock_bench import FakeTime
+    monkeypatch.setattr(bench, "time", FakeTime())
+    # Real v2 contract: 150 successful samples, with a simulated clock on PC.
+    res = bench.run_imu_capture(mock_config, seconds=15, sample_rate_hz=10, max_i2c_retries=10)
     assert res["verdict"] == "PASS"
     assert res["failed_reads"] == 5

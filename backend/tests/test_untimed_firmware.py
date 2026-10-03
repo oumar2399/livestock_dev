@@ -1,17 +1,13 @@
 """Host-only persistence fault injection; not a flash endurance or power-cut certification."""
 
-import importlib.util
-from pathlib import Path
-
 import pytest
+from types import SimpleNamespace
 
 from test_b4_firmware import fw, sentence
 from app.services.binary_telemetry import decode_untimed_payload
+from firmware_helpers import load_firmware
 
-spec = importlib.util.spec_from_file_location(
-    "untimed_store", Path(__file__).resolve().parents[2] / "m5stack/tests/untimed_store.py")
-store = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(store)
+store = load_firmware("untimed_store")
 
 
 class MemoryBanks:
@@ -156,3 +152,40 @@ def test_file_banks_round_trip_and_storage_reserve(tmp_path, monkeypatch):
     with pytest.raises(OSError, match='reserve'):
         journal.enqueue(packet(sequence=1))
     assert open_journal(banks).peek() == packet()
+
+
+def test_file_bank_reads_only_its_actual_size(tmp_path, monkeypatch):
+    import io
+    payload = b"small journal"
+    (tmp_path / "untimed.0").write_bytes(payload)
+    requested = []
+
+    class Reader(io.BytesIO):
+        def read(self, size=-1):
+            requested.append(size)
+            return super().read(size)
+
+    monkeypatch.setattr(store, "open", lambda *_: Reader(payload), raising=False)
+    banks = store.FileBanks(str(tmp_path), 2 * store.MAX_BYTES)
+    assert banks.read(0) == payload
+    assert requested == [len(payload)]
+
+
+def test_file_bank_missing_is_distinct_from_unreadable(tmp_path, monkeypatch):
+    banks = store.FileBanks(str(tmp_path), 2 * store.MAX_BYTES)
+    assert banks.read(0) is None
+
+    def denied(_):
+        raise OSError(13, "Permission denied")
+
+    monkeypatch.setattr(store, "os", SimpleNamespace(stat=denied))
+    with pytest.raises(OSError):
+        banks.read(0)
+
+
+def test_file_bank_rejects_oversize_before_opening(tmp_path, monkeypatch):
+    banks = store.FileBanks(str(tmp_path), 2 * store.MAX_BYTES)
+    monkeypatch.setattr(store, "os", SimpleNamespace(stat=lambda _: (0,) * 6 + (store.MAX_BYTES + 1,)))
+    monkeypatch.setattr(store, "open", lambda *_: pytest.fail("Oversized bank opened"), raising=False)
+    with pytest.raises(ValueError, match="Oversized"):
+        banks.read(0)

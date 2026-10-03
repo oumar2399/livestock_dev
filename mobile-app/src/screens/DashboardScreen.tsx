@@ -1,9 +1,12 @@
 /**
- * DashboardScreen - Vue d'ensemble troupeau
- * Stats globales + alertes actives + liste rapide animaux
- * Polling : toutes les 30s
+ * DashboardScreen - Vue d'ensemble troupeau & Centre d'attention opérationnel (Needs Attention)
+ * Intègre les règles de rigueur scientifique et de transparence terrain :
+ * - Section "Needs Attention" groupant franchissements geofence, anomalies, colliers silencieux (>30m) et batteries critiques (<15%)
+ * - Boutons d'action directs : Locate (centrage carte), Acknowledge (acquittement), View Animal
+ * - Bannissement du "All Good" aveugle : affiche le ratio de fraîcheur honnête "X/Y reporting recently"
+ * - Séparation stricte de la fraîcheur des données
  */
-import React from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +14,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Spacing, Radius, Typography } from '../constants/config';
 import { useAnimals } from '../hooks/useAnimals';
-import { useActiveAlerts } from '../hooks/useAlerts';
+import { useActiveAlerts, useAcknowledgeAlert } from '../hooks/useAlerts';
 import { useTelemetryLatest } from '../hooks/useTelemetry';
 import {
   StatCard,
@@ -27,45 +31,146 @@ import {
   LoadingState,
   ErrorState,
 } from '../components/ui';
-import { AnimalStatus, Alert, AlertSeverity, Animal, TelemetryLatest } from '../types';
+import { Alert, Animal, TelemetryLatest } from '../types';
 import {
   alertSeverityColor,
-  alertTypeIcon,
   activityStateLabel,
   activityStateColor,
   timeAgo,
-  formatWeight,
   animalStatusColor,
-  animalStatusLabel,
+  evaluateFreshness,
+  isRecentUpdate,
+  formatBattery,
 } from '../utils/helpers';
 
-// ─── Sous-composant : carte alerte récente ────────────────────────────────────
+// ─── Modèle unifié pour les éléments "Needs Attention" ────────────────────────
 
-function AlertCard({ alert }: { alert: Alert }) {
-  const severityColor = alertSeverityColor(alert.severity);
+interface AttentionItem {
+  id: string;
+  category: 'geofence' | 'health' | 'silent' | 'battery';
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  description: string;
+  animalId?: number;
+  animalName: string;
+  deviceId?: string;
+  alertId?: number;
+  hasGpsLocation: boolean;
+  timeLabel?: string;
+}
+
+// ─── Sous-composant : Carte "Needs Attention" ─────────────────────────────────
+
+function AttentionCard({
+  item,
+  onLocate,
+  onAcknowledge,
+  onViewAnimal,
+  isAcknowledging,
+}: {
+  item: AttentionItem;
+  onLocate: () => void;
+  onAcknowledge?: () => void;
+  onViewAnimal: () => void;
+  isAcknowledging?: boolean;
+}) {
+  const sevColor = item.severity === 'critical'
+    ? Colors.severity.critical
+    : item.severity === 'warning'
+      ? Colors.severity.warning
+      : Colors.severity.info;
+
+  const iconName = item.category === 'geofence'
+    ? 'navigate-circle-outline'
+    : item.category === 'silent'
+      ? 'cloud-offline-outline'
+      : item.category === 'battery'
+        ? 'battery-dead-outline'
+        : 'fitness-outline';
+
   return (
-    <View style={[styles.alertCard, { borderLeftColor: severityColor }]}>
-      <View style={[styles.alertIconBg, { backgroundColor: severityColor + '20' }]}>
-        <Ionicons name={alertTypeIcon(alert.type) as any} size={18} color={severityColor} />
+    <View style={[styles.attentionCard, { borderLeftColor: sevColor }]}>
+      <View style={styles.attentionHeader}>
+        <View style={[styles.attentionIconWrap, { backgroundColor: sevColor + '18' }]}>
+          <Ionicons name={iconName as any} size={20} color={sevColor} />
+        </View>
+
+        <View style={styles.attentionTitleBox}>
+          <View style={styles.attentionBadgeRow}>
+            <View style={[styles.categoryBadge, { backgroundColor: sevColor + '20' }]}>
+              <Text style={[styles.categoryBadgeText, { color: sevColor }]}>
+                {item.category.toUpperCase()}
+              </Text>
+            </View>
+            {item.timeLabel ? (
+              <Text style={styles.attentionTime}>{item.timeLabel}</Text>
+            ) : null}
+          </View>
+          <Text style={styles.attentionTitle} numberOfLines={1}>{item.title}</Text>
+        </View>
       </View>
-      <View style={styles.alertContent}>
-        <Text style={styles.alertTitle} numberOfLines={1}>{alert.title}</Text>
-        <Text style={styles.alertMeta}>
-          {alert.animal_name ?? 'Unknown'} · {timeAgo(alert.triggered_at)}
-        </Text>
+
+      <Text style={styles.attentionDesc}>{item.description}</Text>
+
+      {/* Barre d'actions rapides directes */}
+      <View style={styles.actionRow}>
+        {item.hasGpsLocation && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.locateBtn]}
+            onPress={onLocate}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="map-outline" size={14} color="#fff" />
+            <Text style={styles.locateBtnText}>Locate</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.actionBtnSecondary}
+          onPress={onViewAnimal}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="paw-outline" size={14} color={Colors.text.primary} />
+          <Text style={styles.actionBtnSecondaryText}>View Animal</Text>
+        </TouchableOpacity>
+
+        {item.alertId && onAcknowledge && (
+          <TouchableOpacity
+            style={styles.actionBtnOutline}
+            onPress={onAcknowledge}
+            disabled={isAcknowledging}
+            activeOpacity={0.7}
+          >
+            {isAcknowledging ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <>
+                <Ionicons name="checkmark-done-outline" size={14} color={Colors.primary} />
+                <Text style={styles.actionBtnOutlineText}>Acknowledge</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
-      <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
     </View>
   );
 }
 
-// ─── Sous-composant : ligne animal dans la liste rapide ───────────────────────
+// ─── Sous-composant : Ligne animal dans la liste rapide ───────────────────────
 
 function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: TelemetryLatest }) {
   const navigation = useNavigation<any>();
   const statusColor = animalStatusColor(animal.status);
 
-  // Use the ML-predicted state from the backend (or fallback to threshold)
+  const freshness = evaluateFreshness({
+    telemetryTime: telemetry?.last_update,
+    positionTime: telemetry?.position_time,
+    latitude: telemetry?.latitude,
+    longitude: telemetry?.longitude,
+    deviceStatus: telemetry?.device_status,
+    battery: telemetry?.battery,
+  });
+
   const activityState = telemetry && telemetry.behavior_eligible !== false
     ? (telemetry.activity_state ?? (telemetry.activity < 0.5 ? 'Resting' : 'Active'))
     : null;
@@ -80,7 +185,6 @@ function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: Telemetr
       })}
       activeOpacity={0.7}
     >
-      {/* Avatar initial */}
       <View style={[styles.animalAvatar, { backgroundColor: statusColor + '20' }]}>
         <Text style={[styles.animalAvatarText, { color: statusColor }]}>
           {animal.name[0].toUpperCase()}
@@ -95,18 +199,17 @@ function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: Telemetr
       </View>
 
       <View style={styles.animalRight}>
-        {telemetry && activityState ? (
-          <View style={[styles.behaviorTag, { backgroundColor: behaviorColor + '20' }]}>
-            <Text style={[styles.behaviorText, { color: behaviorColor }]}>
-              {activityStateLabel(activityState as any)}
-            </Text>
-          </View>
-        ) : (
-          <Text style={styles.noSignal}>Offline</Text>
+        <View style={[styles.freshnessTag, { backgroundColor: freshness.telemetryFreshness === 'recent' ? '#27AE6018' : '#7F8C8D18' }]}>
+          <Text style={[styles.freshnessText, { color: freshness.telemetryFreshness === 'recent' ? '#27AE60' : Colors.text.muted }]}>
+            {freshness.telemetryLabel}
+          </Text>
+        </View>
+
+        {activityState && (
+          <Text style={[styles.behaviorMini, { color: behaviorColor }]}>
+            {activityStateLabel(activityState as any)}
+          </Text>
         )}
-        <Text style={[styles.statusText, { color: statusColor }]}>
-          {animalStatusLabel(animal.status)}
-        </Text>
       </View>
 
       <Ionicons name="chevron-forward" size={16} color={Colors.text.muted} />
@@ -119,10 +222,16 @@ function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: Telemetr
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const [clockTick, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick((value) => value + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const animalsQuery = useAnimals({ page_size: 10 });
+  const animalsQuery = useAnimals({ page_size: 100 }, undefined, true);
   const alertsQuery = useActiveAlerts();
-  const telemetryQuery = useTelemetryLatest({ limit: 50 });
+  const telemetryQuery = useTelemetryLatest({ limit: 100 }, undefined, true);
+  const acknowledgeMutation = useAcknowledgeAlert();
 
   const isRefreshing =
     animalsQuery.isRefetching || alertsQuery.isRefetching || telemetryQuery.isRefetching;
@@ -135,24 +244,134 @@ export default function DashboardScreen() {
 
   const animals = animalsQuery.data?.animals ?? [];
   const alerts = alertsQuery.data?.alerts ?? [];
-  const telemetryMap = new Map(
-    (telemetryQuery.data ?? []).map((t) => [t.animal_id, t])
+  const telemetryList = telemetryQuery.data ?? [];
+  const telemetryMap = useMemo(
+    () => new Map(telemetryList.map((t) => [t.animal_id, t])),
+    [telemetryList],
   );
 
-  // Stats calculées
-  const totalAnimals = animalsQuery.data?.total ?? 0;
-  const activeAnimals = animals.filter((a) => a.status === 'active').length;
-  const sickAnimals = animals.filter((a) => a.status === 'sick').length;
-  const criticalAlerts = alerts.filter((a) => a.severity === 'critical').length;
-  const devicesOnline = telemetryQuery.data?.length ?? 0;
-  const unresolvedCount = alertsQuery.data?.unresolved_count ?? 0;
+  // ── Fraîcheur globale du troupeau ──────────────────────────────────────────
+  const totalAnimals = animalsQuery.data?.total ?? animals.length;
+  const reportingRecentlyCount = useMemo(() => {
+    let count = 0;
+    for (const t of telemetryList) {
+      if (isRecentUpdate(t.last_update, 5)) {
+        count++;
+      }
+    }
+    return count;
+  }, [telemetryList, clockTick]);
 
-  if (animalsQuery.isLoading && !animalsQuery.data) {
-    return <LoadingState message="Loading herd..." />;
+  // ── Construction du Centre d'Attention ("Needs Attention") ─────────────────
+  const attentionItems = useMemo(() => {
+    const items: AttentionItem[] = [];
+
+    // 1. Alertes actives serveur (Geofence, Santé, Batterie)
+    for (const alert of alerts) {
+      const animalTelem = telemetryMap.get(alert.animal_id);
+      const hasGps = animalTelem?.latitude != null && animalTelem?.longitude != null;
+
+      let cat: AttentionItem['category'] = 'health';
+      if (alert.type === 'geofence') cat = 'geofence';
+      else if (alert.type === 'battery') cat = 'battery';
+
+      items.push({
+        id: `alert-${alert.id}`,
+        category: cat,
+        severity: alert.severity,
+        title: alert.title ?? 'Alert',
+        description: alert.message ?? `${alert.animal_name ?? 'Animal'} requires attention.`,
+        animalId: alert.animal_id,
+        animalName: alert.animal_name ?? 'Animal',
+        alertId: alert.id,
+        hasGpsLocation: hasGps,
+        timeLabel: timeAgo(alert.triggered_at),
+      });
+    }
+
+    // 2. Colliers silencieux (> 30 min) pour animaux actifs avec collier assigné
+    for (const animal of animals) {
+      if (animal.status === 'active' && animal.assigned_device) {
+        const telem = telemetryMap.get(animal.id);
+        const freshness = evaluateFreshness({
+          telemetryTime: telem?.last_update,
+          positionTime: telem?.position_time,
+          latitude: telem?.latitude,
+          longitude: telem?.longitude,
+          deviceStatus: telem?.device_status,
+          battery: telem?.battery,
+        });
+
+        if (freshness.telemetryFreshness === 'silent') {
+          const hasExistingSilentAlert = items.some(
+            (it) => it.animalId === animal.id && it.category === 'silent'
+          );
+          if (!hasExistingSilentAlert) {
+            const hasGps = telem?.latitude != null && telem?.longitude != null;
+            items.push({
+              id: `silent-${animal.id}`,
+              category: 'silent',
+              severity: 'warning',
+              title: `Silent Collar (${animal.assigned_device})`,
+              description: telem?.last_update
+                ? `No telemetry received for ${timeAgo(telem.last_update)}.`
+                : 'Collar has not transmitted any telemetry yet.',
+              animalId: animal.id,
+              animalName: animal.name,
+              deviceId: animal.assigned_device,
+              hasGpsLocation: hasGps,
+              timeLabel: telem?.last_update ? timeAgo(telem.last_update) : 'No signal',
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Batteries critiques (< 15%) non encore alertées
+    for (const animal of animals) {
+      const telem = telemetryMap.get(animal.id);
+      if (telem && typeof telem.battery === 'number' && telem.battery >= 0 && telem.battery < 15) {
+        const alreadyCovered = items.some(
+          (it) => it.animalId === animal.id && it.category === 'battery'
+        );
+        if (!alreadyCovered) {
+          const hasGps = telem?.latitude != null && telem?.longitude != null;
+          items.push({
+            id: `bat-${animal.id}`,
+            category: 'battery',
+            severity: 'warning',
+            title: `Critical Battery (${formatBattery(telem.battery)})`,
+            description: `${animal.name}'s collar (${animal.assigned_device ?? 'unknown'}) needs recharging.`,
+            animalId: animal.id,
+            animalName: animal.name,
+            deviceId: animal.assigned_device ?? undefined,
+            hasGpsLocation: hasGps,
+            timeLabel: formatBattery(telem.battery),
+          });
+        }
+      }
+    }
+
+    // Trier : critical en premier, puis warning
+    return items.sort((a, b) => {
+      const order = { critical: 0, warning: 1, info: 2 };
+      return order[a.severity] - order[b.severity];
+    });
+  }, [alerts, animals, telemetryMap, clockTick]);
+
+  const activeBreachesCount = useMemo(
+    () => alerts.filter((a) => a.type === 'geofence').length,
+    [alerts],
+  );
+
+  const unresolvedCount = alertsQuery.data?.unresolved_count ?? alerts.length;
+
+  if ((animalsQuery.isLoading && !animalsQuery.data) || (telemetryQuery.isLoading && !telemetryQuery.data)) {
+    return <LoadingState message="Loading operational dashboard..." />;
   }
 
-  if (animalsQuery.isError) {
-    return <ErrorState message="Failed to load data" onRetry={onRefresh} />;
+  if (animalsQuery.isError || telemetryQuery.isError || alertsQuery.isError) {
+    return <ErrorState message="Failed to load dashboard data" onRetry={onRefresh} />;
   }
 
   return (
@@ -160,12 +379,13 @@ export default function DashboardScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <View>
-          <Text style={styles.headerGreeting}>Hello 👋</Text>
+          <Text style={styles.headerGreeting}>Pastoral Overview 👋</Text>
           <Text style={styles.headerTitle}>Dashboard</Text>
         </View>
         <TouchableOpacity
           style={styles.alertsBtn}
           onPress={() => navigation.navigate('Alerts')}
+          activeOpacity={0.7}
         >
           <Ionicons name="notifications-outline" size={22} color={Colors.text.primary} />
           {unresolvedCount > 0 && (
@@ -187,11 +407,31 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* ── Stats Grid ────────────────────────────── */}
+        {/* ── Bannière de configuration initiale si cheptel vide ───────── */}
+        {totalAnimals === 0 && (
+          <TouchableOpacity
+            style={styles.onboardingCtaCard}
+            onPress={() => navigation.navigate('FarmOnboarding')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.onboardingCtaIcon}>
+              <Ionicons name="sparkles" size={24} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.onboardingCtaTitle}>Guide de mise en route</Text>
+              <Text style={styles.onboardingCtaSub}>
+                Configurez votre exploitation : enregistrez vos premiers animaux, associez vos colliers et délimitez vos zones.
+              </Text>
+            </View>
+            <Ionicons name="arrow-forward-circle" size={26} color={Colors.primary} />
+          </TouchableOpacity>
+        )}
+
+        {/* ── Stats Grid Honnête ────────────────────── */}
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>
             <StatCard
-              label="All Animals"
+              label="Total Herd"
               value={totalAnimals}
               icon="paw-outline"
               color={Colors.primary}
@@ -199,61 +439,93 @@ export default function DashboardScreen() {
             />
             <View style={styles.statGap} />
             <StatCard
-              label="Devices Online"
-              value={devicesOnline}
-              icon="wifi-outline"
-              color={Colors.status.healthy}
+              label="Reporting Recently"
+              value={`${reportingRecentlyCount}/${totalAnimals}`}
+              icon="radio-outline"
+              color={reportingRecentlyCount === totalAnimals && totalAnimals > 0 ? '#27AE60' : '#F39C12'}
               style={styles.statFlex}
             />
           </View>
           <View style={[styles.statsRow, { marginTop: Spacing.sm }]}>
             <StatCard
-              label="Sick Animals"
-              value={sickAnimals}
-              icon="medical-outline"
-              color={sickAnimals > 0 ? Colors.severity.warning : Colors.text.muted}
+              label="Needs Attention"
+              value={attentionItems.length}
+              icon="alert-circle-outline"
+              color={attentionItems.length > 0 ? Colors.severity.critical : Colors.text.muted}
               style={styles.statFlex}
             />
             <View style={styles.statGap} />
             <StatCard
-              label="Critical Alerts"
-              value={criticalAlerts}
-              icon="warning-outline"
-              color={criticalAlerts > 0 ? Colors.severity.critical : Colors.text.muted}
+              label="Geofence Breaches"
+              value={activeBreachesCount}
+              icon="navigate-outline"
+              color={activeBreachesCount > 0 ? Colors.severity.critical : Colors.text.muted}
               style={styles.statFlex}
             />
           </View>
         </View>
 
-        {/* ── Alertes actives ───────────────────────── */}
+        {/* ── Centre d'Attention ("Needs Attention") ───────── */}
         <View style={styles.section}>
           <SectionTitle
-            title={`Active Alerts ${unresolvedCount > 0 ? `(${unresolvedCount})` : ''}`}
-            action={{ label: 'View All', onPress: () => navigation.navigate('Alerts') }}
+            title={`Needs Attention ${attentionItems.length > 0 ? `(${attentionItems.length})` : ''}`}
+            action={attentionItems.length > 0 ? { label: 'View Alerts', onPress: () => navigation.navigate('Alerts') } : undefined}
           />
-          {alerts.length === 0 ? (
-            <View style={styles.allGoodCard}>
-              <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-              <Text style={styles.allGoodText}>No active alerts — everything is good!</Text>
+
+          {attentionItems.length === 0 ? (
+            /* État transparent et vérifiable "All Clear" */
+            <View style={styles.allClearCard}>
+              <View style={styles.allClearIconCircle}>
+                <Ionicons name="checkmark-sharp" size={24} color="#27AE60" />
+              </View>
+              <View style={styles.allClearContent}>
+                <Text style={styles.allClearTitle}>No active issues detected</Text>
+                <Text style={styles.allClearSubtitle}>
+                  {reportingRecentlyCount} of {totalAnimals} animals reporting recently (under 5 min)
+                </Text>
+                {totalAnimals > reportingRecentlyCount && (
+                  <Text style={styles.allClearNotice}>
+                    {totalAnimals - reportingRecentlyCount} collar(s) currently silent or unassigned
+                  </Text>
+                )}
+              </View>
             </View>
           ) : (
-            alerts.slice(0, 3).map((alert) => (
-              <AlertCard key={alert.id} alert={alert} />
+            attentionItems.map((item) => (
+              <AttentionCard
+                key={item.id}
+                item={item}
+                onLocate={() => {
+                  if (item.animalId) {
+                    navigation.navigate('Map', { focusAnimalId: item.animalId, showTrack: true });
+                  }
+                }}
+                onViewAnimal={() => {
+                  if (item.animalId) {
+                    navigation.navigate('Animals', {
+                      screen: 'AnimalDetail',
+                      params: { animalId: item.animalId },
+                    });
+                  }
+                }}
+                onAcknowledge={item.alertId ? () => acknowledgeMutation.mutate(item.alertId!) : undefined}
+                isAcknowledging={acknowledgeMutation.isPending && acknowledgeMutation.variables === item.alertId}
+              />
             ))
           )}
         </View>
 
-        {/* ── Troupeau ─────────────────────────────── */}
+        {/* ── Troupeau Récent ──────────────────────── */}
         <View style={styles.section}>
           <SectionTitle
-            title="Recent Herd"
+            title="Recent Herd Activity"
             action={{ label: 'View All', onPress: () => navigation.navigate('Animals') }}
           />
           {animals.length === 0 ? (
             <EmptyState
               icon="paw-outline"
               title="No Animals"
-              message="Add your first animals"
+              message="Add your first animals to monitor the herd."
             />
           ) : (
             <View style={styles.animalsList}>
@@ -284,9 +556,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingBottom: Spacing.md,
     height: 90,
-      //backgroundColor: "#FF0000" // red,
   },
-  headerGreeting: { fontSize: Typography.xl, color: Colors.text.secondary },
+  headerGreeting: { fontSize: Typography.sm, color: Colors.text.secondary, fontWeight: '500' },
   headerTitle: {
     fontSize: Typography['2xl'],
     fontWeight: '800',
@@ -300,70 +571,183 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg.elevated,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border.default,
   },
   notifBadge: {
     position: 'absolute',
     top: 6,
     right: 6,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: Colors.severity.critical,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  notifBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 
   scrollContent: { paddingBottom: Spacing['3xl'] },
 
-  statsGrid: { paddingHorizontal: Spacing.base, marginBottom: Spacing.base },
+  statsGrid: { paddingHorizontal: Spacing.base, marginBottom: Spacing.xs },
   statsRow: { flexDirection: 'row' },
   statFlex: { flex: 1 },
   statGap: { width: Spacing.sm },
 
-  section: { paddingHorizontal: Spacing.base, marginTop: Spacing.xl },
+  section: { paddingHorizontal: Spacing.base, marginTop: Spacing.lg },
 
-  // Alerts
-  allGoodCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primaryMuted,
-    borderRadius: Radius.lg,
-    padding: Spacing.base,
-    gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.primary + '30',
-  },
-  allGoodText: { color: Colors.primary, fontWeight: '600', fontSize: Typography.sm },
-  alertCard: {
+  // ── "All Clear" transparent card ──
+  allClearCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.bg.card,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderLeftWidth: 3,
-    gap: Spacing.sm,
+    borderRadius: Radius.lg,
+    padding: Spacing.base,
+    gap: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border.default,
+    borderColor: '#27AE6030',
   },
-  alertIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.sm,
+  allClearIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#27AE6018',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  alertContent: { flex: 1 },
-  alertTitle: {
+  allClearContent: { flex: 1 },
+  allClearTitle: {
+    color: '#27AE60',
+    fontWeight: '700',
+    fontSize: Typography.base,
+  },
+  allClearSubtitle: {
+    color: Colors.text.primary,
+    fontWeight: '500',
+    fontSize: Typography.xs,
+    marginTop: 2,
+  },
+  allClearNotice: {
+    color: Colors.text.muted,
+    fontSize: Typography.xs,
+    marginTop: 2,
+  },
+
+  // ── "Needs Attention" card ──
+  attentionCard: {
+    backgroundColor: Colors.bg.card,
+    borderRadius: Radius.lg,
+    padding: Spacing.base,
+    marginBottom: Spacing.sm,
+    borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+  },
+  attentionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+  },
+  attentionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attentionTitleBox: { flex: 1 },
+  attentionBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  categoryBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+  },
+  categoryBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  attentionTime: {
+    fontSize: Typography.xs,
+    color: Colors.text.muted,
+  },
+  attentionTitle: {
     fontSize: Typography.sm,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.text.primary,
   },
-  alertMeta: { fontSize: Typography.xs, color: Colors.text.muted, marginTop: 2 },
-  severityDot: { width: 8, height: 8, borderRadius: 4 },
+  attentionDesc: {
+    fontSize: Typography.xs,
+    color: Colors.text.secondary,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.sm,
+    lineHeight: 18,
+  },
 
-  // Animaux
+  // Actions
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flexWrap: 'wrap',
+    marginTop: 2,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    gap: 4,
+  },
+  locateBtn: {
+    backgroundColor: Colors.primary,
+  },
+  locateBtnText: {
+    color: '#fff',
+    fontSize: Typography.xs,
+    fontWeight: '700',
+  },
+  actionBtnSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bg.elevated,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
+  },
+  actionBtnSecondaryText: {
+    color: Colors.text.primary,
+    fontSize: Typography.xs,
+    fontWeight: '600',
+  },
+  actionBtnOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.primary + '10',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: Colors.primary + '40',
+  },
+  actionBtnOutlineText: {
+    color: Colors.primary,
+    fontSize: Typography.xs,
+    fontWeight: '600',
+  },
+
+  // Troupeau
   animalsList: {
     backgroundColor: Colors.bg.card,
     borderRadius: Radius.lg,
@@ -395,12 +779,42 @@ const styles = StyleSheet.create({
   },
   animalMeta: { fontSize: Typography.xs, color: Colors.text.muted, marginTop: 1 },
   animalRight: { alignItems: 'flex-end', gap: 2 },
-  behaviorTag: {
+  freshnessTag: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Radius.sm,
   },
-  behaviorText: { fontSize: Typography.xs, fontWeight: '600' },
-  noSignal: { fontSize: Typography.xs, color: Colors.text.muted },
-  statusText: { fontSize: Typography.xs, fontWeight: '500' },
+  freshnessText: { fontSize: 10, fontWeight: '600' },
+  behaviorMini: { fontSize: 10, fontWeight: '600' },
+
+  onboardingCtaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: Colors.primary + '12',
+    borderColor: Colors.primary + '40',
+    borderWidth: 1.5,
+    borderRadius: Radius.lg,
+    padding: Spacing.base,
+    marginBottom: Spacing.base,
+  },
+  onboardingCtaIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: Colors.primary + '22',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onboardingCtaTitle: {
+    fontSize: Typography.base,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 3,
+  },
+  onboardingCtaSub: {
+    fontSize: Typography.xs,
+    color: Colors.text.secondary,
+    lineHeight: 16,
+  },
 });

@@ -30,7 +30,7 @@ GPS_TIME_COHERENCE_MS = 2000  # 2s de coherence GPS/heure
 CLOCK_MAX_JUMP_MS = 5000      # 5s max de saut d'horloge avant rejet
 MAX_SAMPLE_JITTER_MS = 20     # Jitter max IMU (ms) pour fenetre 15s Welford
 MAX_SEND_ATTEMPTS = 3         # Retries reseau bornes (backoff 1s, 2s)
-HTTP_TIMEOUT_S = 10           # Timeout usocket physique (s)
+HTTP_TIMEOUT_S = 10           # Budget TCP/HTTP par tentative, hors getaddrinfo ; Wi-Fi a un budget separe identique
 POST_SEND_DELAY_S = 1         # Delai de repos post-envoi (s)
 BENCH_PREPARE_DELAY_S = 0     # Aucun delai artificiel de banc
 
