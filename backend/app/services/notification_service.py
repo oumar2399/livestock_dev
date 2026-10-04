@@ -1,6 +1,7 @@
 """
 Service de gestion des notifications :
-- Enqueue post-commit idempotent
+- Enqueue idempotent, dans la transaction de l'alerte (savepoint)
+- Réconciliation des intentions manquantes au début de chaque dispatch
 - Résolution des destinataires autorisés (RBAC + préférences)
 - Dispatcher périodique / à la demande avec verrouillage et backoff
 """
@@ -8,12 +9,12 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session
 
 from app.core.access import is_platform_admin, get_active_membership
 from app.core.role_defaults import role_has_permission
 from app.models.alert import Alert
-from app.models.farm import Farm
 from app.models.membership import FarmMembership
 from app.models.notification import PushDevice, NotificationPreference, NotificationDelivery
 from app.models.user import User
@@ -99,8 +100,8 @@ def enqueue_alert_notification(db: Session, alert: Alert) -> List[NotificationDe
         logger.warning(f"Cannot enqueue notification for alert #{alert.id} without farm_id")
         return []
 
-    # 1. Identifier les utilisateurs éligibles ayant accès à la ferme
-    # - Membres actifs avec permission "view_animals"
+    # 1. Eligible users: active memberships with "view_animals" only.
+    # farms.owner_id grants nothing on its own (membership is the access source).
     active_memberships = (
         db.query(FarmMembership)
         .filter(
@@ -114,11 +115,6 @@ def enqueue_alert_notification(db: Session, alert: Alert) -> List[NotificationDe
     for m in active_memberships:
         if role_has_permission(m.role, "view_animals"):
             eligible_user_ids.add(m.user_id)
-
-    # - Propriétaire de la ferme
-    farm = db.query(Farm).filter(Farm.id == farm_id).first()
-    if farm and farm.owner_id:
-        eligible_user_ids.add(farm.owner_id)
 
     if not eligible_user_ids:
         return []
@@ -171,6 +167,51 @@ def enqueue_alert_notification(db: Session, alert: Alert) -> List[NotificationDe
     return enqueued
 
 
+# Alerts this recent without any delivery row get their intent recreated by dispatch.
+MISSING_INTENT_WINDOW = timedelta(hours=24)
+# alert_metadata key: the alert is kept but deliberately not notified (e.g. covered by a danger alert).
+NOTIFICATION_SUPPRESSED = "notification_suppressed"
+
+
+def enqueue_in_savepoint(db: Session, alerts: List[Alert]) -> bool:
+    """Queue intents inside the caller's transaction; a failure only rolls back the savepoint."""
+    try:
+        with db.begin_nested():
+            for alert in alerts:
+                enqueue_alert_notification(db, alert)
+        return True
+    except Exception:
+        logger.exception("Notification intent not saved for alerts %s; dispatch will reconcile",
+                         [alert.id for alert in alerts])
+        return False
+
+
+def reconcile_missing_intents(db: Session, now: Optional[datetime] = None) -> int:
+    """Recreate intents for recent unresolved alerts that have no delivery row at all."""
+    now = now or datetime.utcnow()
+    metadata = Alert.alert_metadata
+    candidates = (
+        db.query(Alert)
+        .filter(
+            Alert.resolved_at.is_(None),
+            Alert.triggered_at >= now - MISSING_INTENT_WINDOW,
+            ~exists().where(NotificationDelivery.alert_id == Alert.id),
+            or_(metadata.is_(None),
+                and_(~metadata.has_key("quality_invalidated_at"), ~metadata.has_key(NOTIFICATION_SUPPRESSED))),
+        )
+        .order_by(Alert.id)
+        .all()
+    )
+    created = 0
+    for alert in candidates:
+        try:
+            with db.begin_nested():
+                created += len(enqueue_alert_notification(db, alert))
+        except Exception:
+            logger.exception("Could not reconcile notification intent for alert %s", alert.id)
+    return created
+
+
 def dispatch_pending_notifications(
     db: Session,
     provider: Optional[NotificationProvider] = None,
@@ -182,6 +223,10 @@ def dispatch_pending_notifications(
     """
     if provider is None:
         provider = ExpoPushProvider()
+
+    # Intents lost before commit (or never created) are recreated first, durably.
+    if reconcile_missing_intents(db):
+        db.commit()
 
     now = datetime.utcnow()
 
@@ -220,13 +265,10 @@ def dispatch_pending_notifications(
 
         farm_id = delivery.farm_id or alert.farm_id
 
-        # SÉCURITÉ 1 : Revalidation des droits d'accès
+        # SÉCURITÉ 1 : Revalidation des droits d'accès (membership only)
         if not is_platform_admin(user):
             membership = get_active_membership(user, farm_id, db)
-            farm = db.query(Farm).filter(Farm.id == farm_id).first()
-            is_owner = (farm is not None and farm.owner_id == user.id)
-
-            if not is_owner and (not membership or not role_has_permission(membership.role, "view_animals")):
+            if not membership or not role_has_permission(membership.role, "view_animals"):
                 delivery.status = "cancelled"
                 delivery.last_error_code = "PERMISSION_REVOKED"
                 logger.info(f"Delivery #{delivery.id} cancelled: user {user.id} has no permission on farm {farm_id}")

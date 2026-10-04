@@ -1,9 +1,17 @@
 # scripts/simulate_telemetry.py
+"""Send 24 h of synthetic JSON telemetry for one provisioned device.
+
+JSON ingestion accepts only provisioned devices with a valid X-Device-Secret:
+
+    python scripts/simulate_telemetry.py --device-id M5-001 --device-secret <64 hex>
+"""
+import argparse
 import requests, random, time
 from datetime import datetime, timedelta
 
 API    = "http://localhost:8000/api/v1/telemetry"
 DEVICE = "M5-001"
+SECRET = None
 
 HOURLY_PATTERN = {
     0:  "lying",    1:  "lying",    2:  "lying",    3:  "lying",
@@ -45,10 +53,17 @@ def send(state, timestamp):
         "temperature":    round(random.uniform(38.0, 39.5), 2),
     }
 
-    r = requests.post(API, json=payload)
+    r = requests.post(API, json=payload, headers={"X-Device-Secret": SECRET})
     print(f"[{timestamp.strftime('%H:%M')}] {state:10s} activity={activity:.3f} → {r.status_code}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--api", default=API, help="Telemetry endpoint URL")
+    parser.add_argument("--device-id", default=DEVICE)
+    parser.add_argument("--device-secret", required=True, help="Provisioned device secret (64 hex)")
+    args = parser.parse_args()
+    API, DEVICE, SECRET = args.api, args.device_id, args.device_secret
+
     base = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
     for hour in range(24):

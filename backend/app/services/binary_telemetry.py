@@ -76,8 +76,10 @@ def _decode_measurements(latitude, longitude, satellites, battery, measurements,
         raise BinaryMeasurementError("Longitude is outside [-180, 180]")
     if not absent and not 1 <= satellites <= 50:
         raise BinaryMeasurementError("A present GPS position requires 1..50 satellites")
-    if battery > 100:
-        raise BinaryMeasurementError("Battery must be between 0 and 100")
+    if battery == protocol.BATTERY_UNKNOWN:
+        battery = None
+    elif battery > 100:
+        raise BinaryMeasurementError("Battery must be between 0 and 100, or 255 when unknown")
     features = dict(zip(protocol.FEATURE_NAMES, (value / protocol.ACCEL_SCALE for value in measurements[:12])))
     for name, value in features.items():
         if not -protocol.FEATURE_LIMIT_G <= value <= protocol.FEATURE_LIMIT_G:

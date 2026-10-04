@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.access import require_animal_access
+from app.core.access import has_permission, require_animal_access
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.user import User
@@ -28,13 +28,15 @@ def get_animal_timeline(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_animal_access(current_user, animal_id, "view_animals", db)
+    animal = require_animal_access(current_user, animal_id, "view_animals", db)
     if date_from and date_to and date_to < date_from:
         raise HTTPException(status_code=400, detail="date_to must be on or after date_from")
     try:
         return build_timeline(
             db=db,
             animal_id=animal_id,
+            farm_id=animal.farm_id,
+            include_veterinary=has_permission(current_user, animal.farm_id, "view_veterinary", db),
             event_types=event_type,
             date_from=date_from,
             date_to=date_to,

@@ -13,7 +13,12 @@ Exemple d'utilisation dans Thonny :
     bench.test_ram_stability(20)       # Palier 4.4
 """
 
+import sys
 import time
+
+if "/flash/tests" not in sys.path:  # bench configs and helpers live in /flash/tests
+    sys.path.append("/flash/tests")
+
 import b4_runtime
 
 try:

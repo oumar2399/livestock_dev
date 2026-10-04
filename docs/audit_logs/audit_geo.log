@@ -1,0 +1,255 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> fbc3952585f9, baseline_existing_schema
+INFO  [alembic.runtime.migration] Running upgrade fbc3952585f9 -> 9c312871348b, add_accel_3axes_windowing
+INFO  [alembic.runtime.migration] Running upgrade 9c312871348b -> 2082c4e4b0dc, add_predicted_behavior_to_telemetry
+INFO  [alembic.runtime.migration] Running upgrade 2082c4e4b0dc -> 187d38a14511, add_daily_behavior_summary_table
+INFO  [alembic.runtime.migration] Running upgrade 187d38a14511 -> 0a6e1e7a1828, update_alerts_type_check_constraint
+INFO  [alembic.runtime.migration] Running upgrade 0a6e1e7a1828 -> 093cf2d65539, add_gin_index_alert_metadata
+INFO  [alembic.runtime.migration] Running upgrade 093cf2d65539 -> 29135abe6072, add_alert_feedback_and_unique_constraints
+INFO  [alembic.runtime.migration] Running upgrade 29135abe6072 -> b4e8f1a2c3d4, add_farm_memberships_table
+INFO  [alembic.runtime.migration] Running upgrade b4e8f1a2c3d4 -> c7b2a4d9e1f0, add unique daily anomaly alert index
+INFO  [alembic.runtime.migration] Running upgrade c7b2a4d9e1f0 -> d8e4f6a1b2c3, reconcile required farm-scoped columns
+INFO  [alembic.runtime.migration] Running upgrade d8e4f6a1b2c3 -> e9f5a7b2c3d4, add daily job execution history
+INFO  [alembic.runtime.migration] Running upgrade e9f5a7b2c3d4 -> f0a6b8c3d4e5, ensure geofence polygon GiST index
+INFO  [alembic.runtime.migration] Running upgrade f0a6b8c3d4e5 -> 1b7d9e4c5a6f, Enforce one assigned animal per physical device.
+INFO  [alembic.runtime.migration] Running upgrade 1b7d9e4c5a6f -> 2c8e0f6a7b9d, Backfill device rows for existing animal assignments.
+INFO  [alembic.runtime.migration] Running upgrade 2c8e0f6a7b9d -> 3d9f1b2c4a6e, Add optional device binary identifiers and secret fingerprints.
+INFO  [alembic.runtime.migration] Running upgrade 3d9f1b2c4a6e -> 4e0a2c3d5b7f, Add persistent revocation, loss history and telemetry provenance (no backfill).
+INFO  [alembic.runtime.migration] Running upgrade 4e0a2c3d5b7f -> 5f1b3d4e6c8a, Add isolated untimed telemetry archive; no historical backfill.
+INFO  [alembic.runtime.migration] Running upgrade 5f1b3d4e6c8a -> 6a2c4e5f7b8d, Add animal_tracking_periods and alerts.farm_id for historical provenance.
+INFO  [alembic.runtime.migration] Running upgrade 6a2c4e5f7b8d -> 7b3d5f6a8c9e, Bootstrap prospective tracking and durable farm creation receipts.
+INFO  [alembic.runtime.migration] Running upgrade 7b3d5f6a8c9e -> 8c4e6a1b2d3f, Add notifications tables: push_devices, notification_preferences, notification_deliveries
+INFO  [alembic.runtime.migration] Running upgrade 8c4e6a1b2d3f -> 9d5f7b2c3e4a, Add veterinary tables: veterinary_cases, veterinary_entries
+WARNI [app.services.telemetry_ingestion] 📡 Orphan device JSON-UNKNOWN-f6c84d detected — telemetry discarded.
+Traceback (most recent call last):
+  File "C:\Users\oumba\AppData\Local\Temp\audit_geo.py", line 31, in case
+    fn()
+  File "C:\Users\oumba\AppData\Local\Temp\audit_geo.py", line 253, in untimed_v3
+    row = s.query(UntimedTelemetry).filter_by(device_id=c["device"]).one()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\orm\query.py", line 2798, in one
+    return self._iter().one()  # type: ignore
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\result.py", line 1827, in one
+    return self._only_one_row(
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\result.py", line 760, in _only_one_row
+    raise exc.NoResultFound(
+sqlalchemy.exc.NoResultFound: No row was found when one was required
+WARNI [app.services.geofence_engine] 🚨 CRITICAL GEOFENCE ALERT: Animal 7 breached danger zone danger
+WARNI [app.services.geofence_engine] 🚨 CRITICAL GEOFENCE ALERT: Animal 8 breached danger zone danger
+WARNI [app.services.geofence_engine] ⚠️ WARNING GEOFENCE ALERT: Animal 11 confirmed outside pasture.
+WARNI [app.services.geofence_engine] ⚠️ WARNING GEOFENCE ALERT: Animal 12 confirmed outside pasture.
+WARNI [app.services.geofence_engine] 🚨 CRITICAL GEOFENCE ALERT: Animal 18 breached danger zone danger
+WARNI [app.services.geofence_engine] ⚠️ WARNING GEOFENCE ALERT: Animal 18 confirmed outside pasture.
+WARNI [app.services.geofence_engine] ⚠️ WARNING GEOFENCE ALERT: Animal 19 confirmed outside pasture.
+WARNI [app.services.geofence_engine] ⚠️ WARNING GEOFENCE ALERT: Animal 20 confirmed outside pasture.
+WARNI [app.services.geofence_engine] ⚠️ WARNING GEOFENCE ALERT: Animal 20 confirmed outside pasture.
+ERROR [app.services.telemetry_ingestion] Geofence evaluation failed for animal 24
+Traceback (most recent call last):
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\app\services\telemetry_ingestion.py", line 225, in ingest_telemetry
+    geofence_alerts = evaluate_geofencing(
+                      ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\app\services\geofence_engine.py", line 204, in evaluate_geofencing
+    covering_ids = get_covering_geofence_ids(db, animal.farm_id, latitude, longitude, geofences)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\AppData\Local\Temp\audit_geo.py", line 372, in py_fail
+    raise RuntimeError("PostGIS geofence evaluation unavailable")
+RuntimeError: PostGIS geofence evaluation unavailable
+ERROR [app.services.telemetry_ingestion] Geofence evaluation failed for animal 25
+Traceback (most recent call last):
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.InternalError_: parse error - invalid geometry
+LINE 1: SELECT ST_Covers('NOT A GEOMETRY'::geometry, NULL::geometry)
+                         ^
+HINT:  "NO" <-- parse error at position 2 within geometry
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\app\services\telemetry_ingestion.py", line 225, in ingest_telemetry
+    geofence_alerts = evaluate_geofencing(
+                      ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\app\services\geofence_engine.py", line 204, in evaluate_geofencing
+    covering_ids = get_covering_geofence_ids(db, animal.farm_id, latitude, longitude, geofences)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\AppData\Local\Temp\audit_geo.py", line 379, in sql_fail
+    db.execute(text("SELECT ST_Covers('NOT A GEOMETRY'::geometry, NULL::geometry)"))
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2308, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2199, in _execute_internal
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1416, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 516, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2343, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.InternalError: (psycopg2.errors.InternalError_) parse error - invalid geometry
+LINE 1: SELECT ST_Covers('NOT A GEOMETRY'::geometry, NULL::geometry)
+                         ^
+HINT:  "NO" <-- parse error at position 2 within geometry
+
+[SQL: SELECT ST_Covers('NOT A GEOMETRY'::geometry, NULL::geometry)]
+(Background on this error at: https://sqlalche.me/e/20/2j85)
+WARNI [app.services.geofence_engine] 🚨 CRITICAL GEOFENCE ALERT: Animal 26 breached danger zone danger
+ERROR [app.services.telemetry_ingestion] Failed to enqueue notification for geofence alerts
+Traceback (most recent call last):
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\app\services\telemetry_ingestion.py", line 239, in ingest_telemetry
+    enqueue_alert_notification(db, ga)
+  File "C:\Users\oumba\AppData\Local\Temp\audit_geo.py", line 389, in enqueue_py
+    raise RuntimeError("push outbox down")
+RuntimeError: push outbox down
+WARNI [app.services.geofence_engine] 🚨 CRITICAL GEOFENCE ALERT: Animal 27 breached danger zone danger
+ERROR [app.services.telemetry_ingestion] Failed to enqueue notification for geofence alerts
+Traceback (most recent call last):
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.DivisionByZero: division by zero
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\app\services\telemetry_ingestion.py", line 239, in ingest_telemetry
+    enqueue_alert_notification(db, ga)
+  File "C:\Users\oumba\AppData\Local\Temp\audit_geo.py", line 398, in enqueue_sql
+    db.execute(text("SELECT 1/0"))
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2308, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2199, in _execute_internal
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1416, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 516, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2343, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\oumba\Documents\livestock-monitoring\backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.DataError: (psycopg2.errors.DivisionByZero) division by zero
+
+[SQL: SELECT 1/0]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+disposable database: livestock_audit_4d803364e3e34611b392514d2988b0b3
+PASS  A1 unknown transport_id -> 401                                                              401
+PASS  A2 wrong secret -> 401                                                                      401
+PASS  A3 missing X-Device-Secret -> 401                                                           401
+PASS  A4 malformed secret -> 401                                                                  401
+PASS  A1-4 nothing persisted before auth                                                          
+PASS  A5 46-byte v2 body -> 413                                                                   413
+PASS  A6 wrong content-type -> 415                                                                415
+PASS  A7 valid packet -> 201                                                                      201
+PASS  A8 identical replay -> 200                                                                  200
+PASS  A9 same timestamp, different content -> 409                                                 409
+PASS  A7-9 exactly one telemetry row                                                              1
+PASS  D1 binary, provisioned device without animal: rejected, no row                              409 Device AUD-102 belongs to farm 1, not farm None
+PASS  D2 JSON unknown device without animal -> 404 (no telemetry)                                 404
+PASS  D3 JSON unknown device auto-registered as orphan Device row (unauthenticated)               created=True farm=None
+PASS  D4 JSON for animal whose device row is missing: accepted with no secret                     201
+PASS  D5 JSON for provisioned device without secret -> 401                                        401
+PASS  D6 JSON with secret -> 201                                                                  201
+FAIL  D7 JSON identical replay status (binary gives 200)                                          500
+PASS  R0 revoked: baseline 201                                                                    
+PASS  R1 revoked: new binary -> 401                                                               401
+PASS  R2 revoked: replay of accepted packet -> 401                                                401
+PASS  R3 revoked: JSON -> 401                                                                     401
+PASS  R4 revoked: v3 -> 401                                                                       401
+PASS  R0 retired: baseline 201                                                                    
+PASS  R1 retired: new binary -> 401                                                               401
+PASS  R2 retired: replay of accepted packet -> 401                                                401
+PASS  R3 retired: JSON -> 401                                                                     401
+PASS  R4 retired: v3 -> 401                                                                       401
+PASS  V0 v3 new window with BINARY_V3_ENABLED=False -> 503                                        503
+FAIL  V1 v3 new window -> 201                                                                     500 Internal Server Error
+FAIL  V2 v3 identical replay -> 200                                                               500
+FAIL  V3 v3 same session/sequence, different bytes -> 409                                         500
+FAIL  V4 v3 replay with flag off -> 200 (replay checked before the gate)                          503
+FAIL  untimed_v3 crashed                                                                          NoResultFound: No row was found when one was required
+PASS  G1 danger fix aged  299 s -> alert=True                                                     201 alert=True
+PASS  G1 danger fix aged  300 s -> alert=True                                                     201 alert=True
+PASS  G1 danger fix aged  301 s -> alert=False                                                    201 alert=False
+PASS  G1 danger fix aged   -1 s -> alert=False                                                    201 alert=False
+PASS  G2 two outside fixes 119 s apart -> exit alert=True                                         alert=True first=[]
+PASS  G2 two outside fixes 120 s apart -> exit alert=True                                         alert=True first=[]
+PASS  G2 two outside fixes 121 s apart -> exit alert=False                                        alert=False first=[]
+PASS  G3 prior outside fix from a different collar does not confirm exit                          []
+PASS  G4 two fixes exactly on pasture border -> no exit alert (ST_Covers)                         []
+PASS  G5 first fix with 3 satellites does not count toward confirmation                           []
+PASS  G6 danger fix with 3 satellites ignored                                                     
+PASS  G7 single danger fix -> critical alert                                                      [(5, 'critical', 'danger_zone_entry', None, '2026-10-03T11:59:36+00:00')]
+PASS  G8 danger alert -> notification intent (delivery row)                                       1
+FAIL  G9 repeated danger fix -> no duplicate alert or delivery                                    alerts=[(5, 'critical', 'danger_zone_entry', None, '2026-10-03T11:59:56+00:00'), (6, 'warning', 'pasture_exit', None, '2026-10-03T11:59:56+00:00')] deliveries=1
+PASS  G10 back in pasture: danger alert NOT auto-resolved                                         [(5, 'critical', 'danger_zone_entry', None, '2026-10-03T11:59:56+00:00'), (6, 'warning', 'pasture_exit', datetime.datetime(2026, 10, 3, 21, 0, 16), '2026-10-03T
+PASS  G11 confirmed exit -> warning pasture_exit                                                  [(7, 'warning', 'pasture_exit', None, '2026-10-03T12:00:46+00:00')]
+PASS  G12 return to pasture -> exit alert auto-resolved                                           [(7, 'warning', 'pasture_exit', datetime.datetime(2026, 10, 3, 21, 1, 16), '2026-10-03T12:00:46+00:00')]
+PASS  G13 replay of first outside fix (200) does not create an alert                              
+PASS  G14 replay of confirming fix (200) leaves alert/delivery untouched                          [(8, 'warning', 'pasture_exit', None, '2026-10-03T11:58:46+00:00')] vs [(8, 'warning', 'pasture_exit', None, '2026-10-03T11:58:46+00:00')]
+PASS  G15 replay of an inside fix (200) does not resolve the reopened alert                       before=[(8, 'warning', 'pasture_exit', datetime.datetime(2026, 10, 3, 20, 59, 16), '2026-10-03T11:58:46+00:00'), (9, 'warning', 'pasture_exit', None, '2026-10-0
+PASS  G16 replay after resolution does not reopen/duplicate                                       
+PASS  G17 older fix arriving after a newer one -> stored (201), no alert                          201 []
+PASS  G18 lost collar: telemetry stored, no geofence alert                                        201 eligible=False
+PASS  G18 maintenance collar: telemetry stored, no geofence alert                                 201 eligible=True
+PASS  G19 spatial error (Python) -> 201, telemetry kept, no alert                                 201
+PASS  G20 spatial error (SQL, aborts txn) -> savepoint keeps telemetry (201), no alert            201
+PASS  N1 enqueue fails (Python): HTTP status / alert committed / deliveries                       http=201 alerts=1 deliveries=0
+PASS  N1b alert exists with zero notification intents (no retry path)                             
+FAIL  N2 enqueue fails (SQL error): response code                                                 http=500 telemetry=1 alerts=1 deliveries=0
+PASS  N3 device retry after N2 (replay) -> 200, still no notification intent                      http=200 deliveries=0
+PASS  L1 Δ = 1800 s stays in one segment; Δ = 1801 s splits                                       [(2, 'reliable'), (1, 'degraded')] gaps=['no_data']
+PASS  L2 gap reason 'no_data' (no loss period)                                                    ['no_data']
+PASS  L3 history window clamped to 168 h                                                          168.00 h
+PASS  L4 point with satellites=NULL counted as reliable                                           {'latitude': 34.005, 'longitude': 135.005, 'time': '2026-10-03T20:02:56+09:00', 'speed': None, 'satellites': None, 'is_reliable': True}
+PASS  L5 no path simplification (all points returned)                                             [2, 2]
+PASS  L6 lost collar: current location flagged position_is_animal=False                           {'animal_id': 29, 'animal_name': 'Cow 129', 'device_id': 'AUD-129', 'latitude': 34.005, 'longitude': 135.005, 'position_time': '2026-10-03T20:11:16+09:00', 'pos
+PASS  L7 lost collar: history quality 'uncertain' for ALL segments (incl. pre-loss)               ['uncertain']
+PASS  L8 /telemetry/latest: lost collar position_is_animal=False                                  [{'animal_id': 29, 'animal_name': 'Cow 129', 'device_id': 'AUD-129', 'latitude': 34.005, 'longitude': 135.005, 'position_time': '2026-10-03T20:11:16+09:00', 'po
+PASS  L9 closed loss period (collar remounted): loss-window point still drawn as animal track     points=3 qualities=['reliable']
+PASS  P1 new farm: current location -> 404 (no proven position)                                   404
+PASS  P2 new farm: /locations history has 0 points from old farm                                  0
+PASS  P3 new farm: /locations/latest excludes the transferred animal                              
+FAIL  P4 new farm: legacy /telemetry/history exposes old-farm rows                                http=200 rows=2
+FAIL  P5 new farm: legacy /telemetry/latest exposes old-farm position                             http=200 latitude=34.005
+PASS  P6 old farm loses access to the animal (403)                                                403
+PASS  P7 device transfer: new packet attributed to new animal; old readings stay with old animal  http=201 rows=1 pts=0
+PASS  G21 GiST index on geofences.polygon                                                         ['idx_geofences_polygon']
+
+71/81 expectations met
+dropped: livestock_audit_4d803364e3e34611b392514d2988b0b3

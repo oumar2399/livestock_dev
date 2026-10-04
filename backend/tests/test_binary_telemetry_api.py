@@ -93,8 +93,11 @@ def test_unknown_and_unprovisioned_have_same_error(binary_case, binary_client):
     unprovisioned = binary_client.post(URL, content=REFERENCE, headers=headers(case))
     assert unknown.status_code == unprovisioned.status_code == 401
     assert unknown.json() == unprovisioned.json()
+    # JSON follows the same rule: an unprovisioned device is rejected, nothing stored.
     legacy = json_equivalent(case)
-    assert binary_client.post("/api/v1/telemetry/", json=legacy).status_code == 201
+    json_response = binary_client.post("/api/v1/telemetry/", json=legacy)
+    assert json_response.status_code == 401 and json_response.json() == unprovisioned.json()
+    assert case.db.query(Telemetry).count() == 0
 
 
 def test_rotation_closes_old_secret_on_both_transports(binary_case, binary_client):

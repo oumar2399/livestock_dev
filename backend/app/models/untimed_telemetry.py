@@ -26,7 +26,7 @@ class UntimedTelemetry(Base):
     latitude = sa.Column(sa.Float(), nullable=True)
     longitude = sa.Column(sa.Float(), nullable=True)
     satellites = sa.Column(sa.Integer(), nullable=False)
-    battery_level = sa.Column(sa.Integer(), nullable=False)
+    battery_level = sa.Column(sa.Integer(), nullable=True)  # NULL = unknown (firmware sent 255)
     accel_x_mean = sa.Column(sa.Numeric(7, 4), nullable=False)
     accel_x_std = sa.Column(sa.Numeric(7, 4), nullable=False)
     accel_x_min = sa.Column(sa.Numeric(7, 4), nullable=False)

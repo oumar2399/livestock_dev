@@ -1,7 +1,7 @@
 """Focused integration checks for the low-risk operational features."""
 
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from alembic.script import ScriptDirectory
 
@@ -15,6 +15,7 @@ from app.models.daily_summary import DailyBehaviorSummary
 from app.models.farm import Farm
 from app.models.geofence import Geofence
 from app.models.job_run import DailyJobRun
+from app.models.provenance import AnimalTrackingPeriod
 from app.schemas.geofence import GeoPoint
 from app.services.csv_export import _csv_line
 from app.services.geofence_service import build_polygon, geofence_query, serialize_geofence
@@ -71,6 +72,10 @@ def test_transactional_features() -> None:
         assert payload["points"][0] == payload["points"][-1]
 
         occurred_at = datetime(2026, 8, 31, 12, 0, 0)
+        # The timeline only shows events proven for the animal's farm.
+        db.add(AnimalTrackingPeriod(animal_id=animal.id, farm_id=farm.id,
+                                    valid_from=datetime(2026, 8, 1, tzinfo=timezone.utc),
+                                    source="registration"))
         db.add_all([
             Alert(
                 animal_id=animal.id,
@@ -98,11 +103,11 @@ def test_transactional_features() -> None:
         ])
         db.flush()
 
-        first_page = build_timeline(db, animal.id, None, None, None, 2, None)
+        first_page = build_timeline(db, animal.id, farm.id, None, None, None, 2, None)
         assert len(first_page.items) == 2
         assert first_page.next_cursor is not None
         second_page = build_timeline(
-            db, animal.id, None, None, None, 2, first_page.next_cursor
+            db, animal.id, farm.id, None, None, None, 2, first_page.next_cursor
         )
         all_ids = [item.id for item in first_page.items + second_page.items]
         assert len(all_ids) == 3

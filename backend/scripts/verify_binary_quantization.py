@@ -11,7 +11,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 import numpy as np
 
-from app.core.binary_protocol import ACCEL_SCALE, FEATURE_NAMES, SAMPLE_RATE, WINDOW_SAMPLES
+from app.core.binary_protocol import ACCEL_SCALE, FEATURE_NAMES, SAMPLE_RATE, LEGACY_V1_WINDOW_SAMPLES as WINDOW_SAMPLES
 from app.services import ml_inference
 from ml import train
 

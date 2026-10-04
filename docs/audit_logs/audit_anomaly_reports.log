@@ -1,0 +1,72 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> fbc3952585f9, baseline_existing_schema
+INFO  [alembic.runtime.migration] Running upgrade fbc3952585f9 -> 9c312871348b, add_accel_3axes_windowing
+INFO  [alembic.runtime.migration] Running upgrade 9c312871348b -> 2082c4e4b0dc, add_predicted_behavior_to_telemetry
+INFO  [alembic.runtime.migration] Running upgrade 2082c4e4b0dc -> 187d38a14511, add_daily_behavior_summary_table
+INFO  [alembic.runtime.migration] Running upgrade 187d38a14511 -> 0a6e1e7a1828, update_alerts_type_check_constraint
+INFO  [alembic.runtime.migration] Running upgrade 0a6e1e7a1828 -> 093cf2d65539, add_gin_index_alert_metadata
+INFO  [alembic.runtime.migration] Running upgrade 093cf2d65539 -> 29135abe6072, add_alert_feedback_and_unique_constraints
+INFO  [alembic.runtime.migration] Running upgrade 29135abe6072 -> b4e8f1a2c3d4, add_farm_memberships_table
+INFO  [alembic.runtime.migration] Running upgrade b4e8f1a2c3d4 -> c7b2a4d9e1f0, add unique daily anomaly alert index
+INFO  [alembic.runtime.migration] Running upgrade c7b2a4d9e1f0 -> d8e4f6a1b2c3, reconcile required farm-scoped columns
+INFO  [alembic.runtime.migration] Running upgrade d8e4f6a1b2c3 -> e9f5a7b2c3d4, add daily job execution history
+INFO  [alembic.runtime.migration] Running upgrade e9f5a7b2c3d4 -> f0a6b8c3d4e5, ensure geofence polygon GiST index
+INFO  [alembic.runtime.migration] Running upgrade f0a6b8c3d4e5 -> 1b7d9e4c5a6f, Enforce one assigned animal per physical device.
+INFO  [alembic.runtime.migration] Running upgrade 1b7d9e4c5a6f -> 2c8e0f6a7b9d, Backfill device rows for existing animal assignments.
+INFO  [alembic.runtime.migration] Running upgrade 2c8e0f6a7b9d -> 3d9f1b2c4a6e, Add optional device binary identifiers and secret fingerprints.
+INFO  [alembic.runtime.migration] Running upgrade 3d9f1b2c4a6e -> 4e0a2c3d5b7f, Add persistent revocation, loss history and telemetry provenance (no backfill).
+INFO  [alembic.runtime.migration] Running upgrade 4e0a2c3d5b7f -> 5f1b3d4e6c8a, Add isolated untimed telemetry archive; no historical backfill.
+INFO  [alembic.runtime.migration] Running upgrade 5f1b3d4e6c8a -> 6a2c4e5f7b8d, Add animal_tracking_periods and alerts.farm_id for historical provenance.
+INFO  [alembic.runtime.migration] Running upgrade 6a2c4e5f7b8d -> 7b3d5f6a8c9e, Bootstrap prospective tracking and durable farm creation receipts.
+INFO  [alembic.runtime.migration] Running upgrade 7b3d5f6a8c9e -> 8c4e6a1b2d3f, Add notifications tables: push_devices, notification_preferences, notification_deliveries
+INFO  [alembic.runtime.migration] Running upgrade 8c4e6a1b2d3f -> 9d5f7b2c3e4a, Add veterinary tables: veterinary_cases, veterinary_entries
+WARNI [app.services.anomaly_detection] ANOMALY ALERT CREATED: [CRITICAL] Activité inhabituellement élevée (Cow) - Activité inhabituellement élevée (+5.0 pts vs habitude) (Z=5000000.00)
+WARNI [app.services.anomaly_detection] ANOMALY ALERT CREATED: [CRITICAL] Activité inhabituellement élevée (Cow) - Activité inhabituellement élevée (+5.0 pts vs habitude) (Z=5000000.00)
+WARNI [app.services.anomaly_detection] ANOMALY ALERT CREATED: [CRITICAL] Activité inhabituellement élevée (Cow) - Activité inhabituellement élevée (+400.0% vs habitude) (Z=10.79)
+WARNI [app.services.anomaly_detection] ANOMALY ALERT CREATED: [CRITICAL] Activité inhabituellement élevée (Cow) - Activité inhabituellement élevée (+471.4% vs habitude) (Z=7.42)
+WARNI [app.services.anomaly_detection] ANOMALY ALERT CREATED: [CRITICAL] Activité inhabituellement élevée (Cow) - Activité inhabituellement élevée (+471.4% vs habitude) (Z=7.42)
+WARNI [app.services.anomaly_detection] ANOMALY ALERT CREATED: [CRITICAL] Activité inhabituellement élevée (Cow) - Activité inhabituellement élevée (+471.4% vs habitude) (Z=7.42)
+WARNI [app.services.anomaly_detection] ANOMALY ALERT CREATED: [CRITICAL] Activité inhabituellement élevée (Cow) - Activité inhabituellement élevée (+471.4% vs habitude) (Z=7.42)
+disposable database: livestock_audit_f05de16ce0864019991f1fa02efa1826
+FAIL  A4a MAD=0 (12 identical days at 0 % Active), target 5 % (1 Active window of 20) -> alert?                      result=(1, 'activity_deviation_high', 'critical', 5000000.0, 0.0, 'Activité inhabituellement élevée (Cow)', 'Activité inhabituellement élevée (+5.0 pts vs habitude)')
+PASS  A4b MAD=0, target identical (0 %) -> no alert                                                                  
+FAIL  A4c MAD=0 with only a majority of identical days (7/12 at 0 %), target 5 % -> alert?                           result=(2, 'activity_deviation_high', 'critical', 5000000.0, 0.0, 'Activité inhabituellement élevée (Cow)', 'Activité inhabituellement élevée (+5.0 pts vs habitude)')
+PASS  A4d same target with a spread baseline (MAD>0) -> no alert                                                     result=None
+PASS  A2 modified Z = |x - median| / (1.4826*MAD + 1e-6)                                                             
+PASS  A2b MAD=0 -> denominator 1e-6, Z for a 0.01-point deviation                                                    Z=10000
+PASS  A3 9 baseline days + target -> evaluated=False                                                                 result=None
+PASS  A3 10 baseline days + target -> evaluated=True                                                                 result=(3, 'activity_deviation_high', 'critical', 10.79, 5.0, 'Activité inhabituellement élevée (Cow)', 'Activité inhabituellement élevée (+400.0% vs habitude)')
+FAIL  A3b back-dated target (40 days ago) with 12 baseline days before it -> evaluated                               result=None (warm-up counts telemetry days in now-20d)
+PASS  A7a ANOMALY_MIN_COVERAGE_SECONDS unset, new data (received_at set) -> no anomaly                               result=None
+PASS  A7b unset, legacy rows (received_at NULL) -> still evaluated                                                   result=(4, 'activity_deviation_high', 'critical', 7.42, 7.5, 'Activité inhabituellement élevée (Cow)', 'Activité inhabituellement élevée (+471.4% vs habitude)')
+PASS  A7c min coverage 301 s, days with 300 s observed (20x15 s) -> excluded, no anomaly                             result=None
+PASS  A7d coverage is the union of windows (overlap counted once)                                                    25.0
+PASS  A5a rerun same day -> same alert, no duplicate                                                                 [('activity_deviation_high', '2026-10-02')]
+PASS  A6 neutral wording (no diagnosis)                                                                              Activité inhabituellement élevée (Cow) | Activité inhabituellement élevée (+471.4% vs habitude)
+PASS  A5b same day re-evaluated after the summary changes direction -> second alert of the other type                [('activity_deviation_high', '2026-10-02')]
+PASS  A8 day partly inside a loss period: loss windows excluded, the day itself is still summarised (not excluded)   summary=(20, 0.0)
+PASS  A9 windows at 23:59:50 and 00:00:05 Asia/Tokyo land on their local days (window END time)                      {datetime.date(2026, 9, 27): (1, 100.0), datetime.date(2026, 9, 28): (1, 0.0)}
+PASS  A11a DailyJobRun records success then failed (with error message)                                              [('success', None), ('failed', 'boom')]
+PASS  A11b no uniqueness on (job_name, target_date): concurrent/duplicate runs allowed                               columns=['id', 'job_name', 'trigger_source', 'target_date', 'timezone_name', 'status', 'started_at', 'finished_at', 'initiated_by', 'summaries_created', 'alerts_created', 'error_me
+PASS  Q4 farm overview as owner -> 200                                                                               200
+PASS  Q4 farm overview as farmer -> 403                                                                              403
+PASS  Q4 farm overview as vet -> 403                                                                                 403
+PASS  Q4 farm overview as other farm's owner -> 403                                                                  403
+PASS  Q4 farm overview as admin -> 200                                                                               200
+PASS  Q5 research export 'telemetry' as farm owner -> 403                                                            403
+PASS  Q5 research export 'untimed_telemetry' as farm owner -> 403                                                    403
+PASS  Q5 research export 'alerts' as farm owner -> 403                                                               403
+PASS  Q5b untimed export as admin -> 200                                                                             200
+PASS  Q6a research export starts with UTF-8 BOM                                                                      '\ufeffal'
+PASS  Q6b research export neutralizes =,+,-,@ prefixes                                                               {'=HYPERLINK("x")': (False, True), ' =cmd': (True, False), '\t=cmd': (True, False), '+1+1': (False, True), '-2': (False, True), '@SUM(1)': (False, True), 'Normal': (True, False)}
+PASS  Q6c research export: leading space / tab before '=' NOT neutralized                                            {' =cmd': (True, False), '\t=cmd': (True, False)}
+FAIL  Q6d farm export: BOM + leading space/tab formulas neutralized                                                  http=200 rows=60 sample=['-2', "'\t=cmd", "' =cmd"]
+PASS  Q7 research preview: 20 rows, has_more, identical to first 20 export rows                                      rows=20 has_more=True export_rows=25
+PASS  Q8a farm quality over budget -> 413 refusal (no partial result)                                                413
+PASS  Q8b farm report period > 31 days -> 400                                                                        400
+FAIL  Q9a research telemetry export filtered on new farm B includes rows measured while in farm A (labelled farm B)  rows_for_animal=3 farm_id_column=['4', '4', '4']
+PASS  Q9b farm B owner overview counts no farm-A windows (provenance respected)                                      0
+
+33/38 expectations met
+dropped: livestock_audit_f05de16ce0864019991f1fa02efa1826

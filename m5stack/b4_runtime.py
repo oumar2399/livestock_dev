@@ -2,7 +2,7 @@
 
 import gc
 import time
-from b4_protocol import GPSClock, Window
+from b4_protocol import BATTERY_UNKNOWN, GPSClock, Window
 
 
 def required(config, name):
@@ -329,8 +329,9 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None, on_transport=
     elapsed_ms, sequence, last_tick = 0, 0, time.ticks_ms()
 
     def _safe_battery():
+        """Battery percentage, or BATTERY_UNKNOWN (255) when it cannot be read."""
         if power is None:
-            return 100
+            return BATTERY_UNKNOWN
         try:
             lvl = power.getBatteryLevel()
             if isinstance(lvl, (int, float)):
@@ -339,7 +340,7 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None, on_transport=
                     return lvl
         except Exception:
             pass
-        return 100
+        return BATTERY_UNKNOWN
 
     def relative_time():
         nonlocal elapsed_ms, last_tick

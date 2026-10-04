@@ -11,6 +11,10 @@ Utilisation dans Thonny REPL :
 """
 
 import sys
+
+if "/flash/tests" not in sys.path:  # bench configs and helpers live in /flash/tests
+    sys.path.append("/flash/tests")
+
 try:
     import utime as time
 except ImportError:

@@ -7,6 +7,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Iterable, Iterator, Optional, Sequence
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import TARGET_TIMEZONE
@@ -21,10 +22,13 @@ from app.models.untimed_telemetry import UntimedTelemetry
 from app.core.binary_protocol import FEATURE_NAMES
 from app.models.user import User
 from app.schemas.report import ReportDataset, ReportPreview
+from app.services.csv_safety import neutralize_formula
+from app.services.provenance_service import period_at_time, period_covering_day
 from app.services.telemetry_quality import eligible_clause, feedback_eligible_clause
 
-
-FORMULA_PREFIXES = ("=", "+", "-", "@")
+# Farm columns come from the tracking period at measurement time, not from the
+# animal's current farm. Rows with no period at that time keep an empty farm
+# label and are excluded when a farm_id filter is given.
 
 
 def _target_bounds(
@@ -56,8 +60,8 @@ def _format_value(value):
         return format(value, "f")
     if isinstance(value, (dict, list)):
         value = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    if isinstance(value, str) and value.startswith(FORMULA_PREFIXES):
-        return f"'{value}"
+    if isinstance(value, str):
+        return neutralize_formula(value)
     return value
 
 
@@ -77,6 +81,11 @@ def _apply_naive_datetime_filters(query, column, start, end):
     return query
 
 
+def _alert_farm(period):
+    """Alerts store their farm; legacy alerts without it use the period at trigger time."""
+    return func.coalesce(Alert.farm_id, period.farm_id)
+
+
 def _bounded_rows(query, limit, batch_size):
     if limit is not None:
         query = query.limit(limit)
@@ -84,13 +93,15 @@ def _bounded_rows(query, limit, batch_size):
 
 
 def _telemetry_rows(db, farm_id, animal_id, start, end, limit=None):
+    period, covers = period_at_time(Telemetry.animal_id, Telemetry.time)
     query = (
-        db.query(Telemetry, Animal.name, Animal.farm_id, Farm.name, eligible_clause())
+        db.query(Telemetry, Animal.name, period.farm_id, Farm.name, eligible_clause())
         .join(Animal, Animal.id == Telemetry.animal_id)
-        .join(Farm, Farm.id == Animal.farm_id)
+        .outerjoin(period, covers)
+        .outerjoin(Farm, Farm.id == period.farm_id)
     )
     if farm_id is not None:
-        query = query.filter(Animal.farm_id == farm_id)
+        query = query.filter(period.farm_id == farm_id)
     if animal_id is not None:
         query = query.filter(Telemetry.animal_id == animal_id)
     if start:
@@ -120,13 +131,16 @@ def _telemetry_rows(db, farm_id, animal_id, start, end, limit=None):
 
 
 def _daily_summary_rows(db, farm_id, animal_id, date_from, date_to, limit=None):
+    # A transfer day is covered by no single period: empty farm label.
+    period, covers = period_covering_day(DailyBehaviorSummary.animal_id, DailyBehaviorSummary.date)
     query = (
-        db.query(DailyBehaviorSummary, Animal.name, Animal.farm_id, Farm.name)
+        db.query(DailyBehaviorSummary, Animal.name, period.farm_id, Farm.name)
         .join(Animal, Animal.id == DailyBehaviorSummary.animal_id)
-        .join(Farm, Farm.id == Animal.farm_id)
+        .outerjoin(period, covers)
+        .outerjoin(Farm, Farm.id == period.farm_id)
     )
     if farm_id is not None:
-        query = query.filter(Animal.farm_id == farm_id)
+        query = query.filter(period.farm_id == farm_id)
     if animal_id is not None:
         query = query.filter(DailyBehaviorSummary.animal_id == animal_id)
     if date_from:
@@ -145,13 +159,16 @@ def _daily_summary_rows(db, farm_id, animal_id, date_from, date_to, limit=None):
 
 
 def _alert_rows(db, farm_id, animal_id, start, end, resolved, limit=None):
+    period, covers = period_at_time(Alert.animal_id, Alert.triggered_at, naive_utc=True)
+    alert_farm = _alert_farm(period)
     query = (
-        db.query(Alert, Animal.name, Animal.farm_id, Farm.name)
+        db.query(Alert, Animal.name, alert_farm, Farm.name)
         .join(Animal, Animal.id == Alert.animal_id)
-        .join(Farm, Farm.id == Animal.farm_id)
+        .outerjoin(period, covers)
+        .outerjoin(Farm, Farm.id == alert_farm)
     )
     if farm_id is not None:
-        query = query.filter(Animal.farm_id == farm_id)
+        query = query.filter(alert_farm == farm_id)
     if animal_id is not None:
         query = query.filter(Alert.animal_id == animal_id)
     query = _apply_naive_datetime_filters(query, Alert.triggered_at, start, end)
@@ -172,15 +189,18 @@ def _alert_rows(db, farm_id, animal_id, start, end, resolved, limit=None):
 
 
 def _prediction_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
+    period, covers = period_at_time(PredictionFeedback.animal_id, PredictionFeedback.telemetry_time,
+                                    naive_utc=True)
     query = (
-        db.query(PredictionFeedback, Animal.name, Animal.farm_id, Farm.name, User.email,
+        db.query(PredictionFeedback, Animal.name, period.farm_id, Farm.name, User.email,
                  feedback_eligible_clause())
         .join(Animal, Animal.id == PredictionFeedback.animal_id)
-        .join(Farm, Farm.id == Animal.farm_id)
+        .outerjoin(period, covers)
+        .outerjoin(Farm, Farm.id == period.farm_id)
         .join(User, User.id == PredictionFeedback.user_id)
     )
     if farm_id is not None:
-        query = query.filter(Animal.farm_id == farm_id)
+        query = query.filter(period.farm_id == farm_id)
     if animal_id is not None:
         query = query.filter(PredictionFeedback.animal_id == animal_id)
     query = _apply_naive_datetime_filters(
@@ -200,16 +220,19 @@ def _prediction_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
 
 
 def _alert_feedback_rows(db, farm_id, animal_id, start, end, limit=None):
+    period, covers = period_at_time(Alert.animal_id, Alert.triggered_at, naive_utc=True)
+    alert_farm = _alert_farm(period)
     query = (
-        db.query(AlertFeedback, Animal.name, Animal.farm_id, Farm.name, User.email,
+        db.query(AlertFeedback, Animal.name, alert_farm, Farm.name, User.email,
                  Alert.alert_metadata["quality_invalidated_at"].astext.is_(None))
         .join(Animal, Animal.id == AlertFeedback.animal_id)
         .join(Alert, Alert.id == AlertFeedback.alert_id)
-        .join(Farm, Farm.id == Animal.farm_id)
+        .outerjoin(period, covers)
+        .outerjoin(Farm, Farm.id == alert_farm)
         .join(User, User.id == AlertFeedback.user_id)
     )
     if farm_id is not None:
-        query = query.filter(Animal.farm_id == farm_id)
+        query = query.filter(alert_farm == farm_id)
     if animal_id is not None:
         query = query.filter(AlertFeedback.animal_id == animal_id)
     query = _apply_naive_datetime_filters(query, AlertFeedback.created_at, start, end)

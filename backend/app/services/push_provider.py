@@ -13,6 +13,9 @@ from app.models.notification import PushDevice
 
 logger = logging.getLogger(__name__)
 
+# Expo ticket errors that mean the phone token itself is no longer valid.
+TOKEN_SPECIFIC_ERRORS = frozenset({"DeviceNotRegistered"})
+
 
 @dataclass
 class ProviderResponse:
@@ -107,8 +110,13 @@ class ExpoPushProvider(NotificationProvider):
 
                 # Statut d'erreur au niveau du ticket
                 error_type = ticket.get("details", {}).get("error") or ticket.get("message")
-                deactivate = error_type in ("DeviceNotRegistered", "InvalidCredentials")
+                # Only a token-specific error deactivates the phone token. InvalidCredentials
+                # is a server-side credential problem: the token stays active.
+                deactivate = error_type in TOKEN_SPECIFIC_ERRORS
                 retryable = error_type in ("MessageRateExceeded", "InternalServerError")
+                if error_type == "InvalidCredentials":
+                    logger.error("Expo rejected the server push credentials (InvalidCredentials); "
+                                 "phone tokens are left active")
                 return ProviderResponse(
                     success=False,
                     error_code=error_type or "ExpoTicketError",

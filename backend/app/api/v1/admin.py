@@ -19,7 +19,7 @@ from app.schemas.health import SystemStatusResponse
 from app.services.system_health import build_system_status
 from app.models.job_run import DailyJobRun
 from app.schemas.job_run import DailyJobRunList, DailyJobRunResponse
-from app.services.job_tracking import run_daily_pipeline_tracked
+from app.services.job_tracking import JobAlreadyRunning, run_daily_pipeline_tracked
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +60,14 @@ def trigger_daily_pipeline(
     Protected by JWT authentication (Admin role required).
     """
     logger.info(f"👨‍💼 Admin #{current_user.id} ({current_user.email}) triggered daily pipeline for {target_date or 'yesterday'}")
-    return run_daily_pipeline_tracked(
-        target_date=target_date,
-        trigger_source="manual",
-        initiated_by=current_user.id,
-    )
+    try:
+        return run_daily_pipeline_tracked(
+            target_date=target_date,
+            trigger_source="manual",
+            initiated_by=current_user.id,
+        )
+    except JobAlreadyRunning as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
 
 
 @router.get("/daily-job-runs", response_model=DailyJobRunList)

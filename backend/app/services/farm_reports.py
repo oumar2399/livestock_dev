@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import csv
 import io
-import re
 from datetime import date, datetime, time, timedelta
 from typing import Iterator, Optional, Sequence, Any
 from sqlalchemy.orm import Session
@@ -32,6 +31,7 @@ from app.schemas.farm_report import (
     FarmQualityResponse,
     FarmReportPreview,
 )
+from app.services.csv_safety import neutralize_formula
 from app.services.provenance_service import get_proven_tracking_periods, is_window_proven
 from app.services.telemetry_quality import eligible_clause
 from app.services.data_quality import (
@@ -43,8 +43,6 @@ from app.services.data_quality import (
     MetricState,
 )
 
-FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
-NUMERIC_RE = re.compile(r"^[-+]?\d+(\.\d+)?$")
 MAX_REPORT_WINDOWS = 200_000
 MAX_QUALITY_ITEMS = 10_000
 
@@ -107,16 +105,7 @@ def _sanitize_csv_cell(value: Any) -> str:
     if isinstance(value, (int, float)):
         return f"{value:.4f}".rstrip("0").rstrip(".") if isinstance(value, float) and "." in f"{value:.4f}" else str(value)
     
-    val_str = str(value)
-    if val_str.startswith(("\t", "\r")):
-        return f"'{val_str}"
-
-    stripped = val_str.lstrip(" \t\r\n")
-    if stripped.startswith(("=", "+", "-", "@")):
-        if NUMERIC_RE.match(val_str.strip()) and val_str == val_str.strip():
-            return val_str
-        return f"'{val_str}"
-    return val_str
+    return neutralize_formula(str(value))
 
 
 def _csv_line(values: Sequence[Any], include_bom: bool = False) -> str:

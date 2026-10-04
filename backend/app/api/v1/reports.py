@@ -44,12 +44,10 @@ def _validate_filters(
     if farm_id is not None and not db.query(Farm.id).filter(Farm.id == farm_id).first():
         raise HTTPException(status_code=404, detail="Farm not found")
 
-    if animal_id is not None:
-        animal = db.query(Animal).filter(Animal.id == animal_id).first()
-        if not animal:
-            raise HTTPException(status_code=404, detail="Animal not found")
-        if farm_id is not None and animal.farm_id != farm_id:
-            raise HTTPException(status_code=400, detail="Animal does not belong to farm")
+    # farm_id filters on the farm at measurement time, so a transferred animal
+    # can legitimately be combined with a farm it no longer belongs to.
+    if animal_id is not None and not db.query(Animal.id).filter(Animal.id == animal_id).first():
+        raise HTTPException(status_code=404, detail="Animal not found")
 
 
 @router.get("/preview/{dataset}", response_model=ReportPreview)

@@ -29,18 +29,14 @@ class RegisterRequest(BaseModel):
         "email": "fermier@example.com",
         "password": "motdepasse123",
         "name": "Tanaka Hiroshi",
-        "role": "farmer",
         "phone": "+81-90-1234-5678"
     }
     """
     email: EmailStr
     password: str = Field(..., min_length=6, description="Min 6 caractères")
     name: Optional[str] = Field(None, max_length=255)
-    role: str = Field(
-        default="farmer",
-        pattern="^(farmer|owner|vet|admin)$",
-        description="farmer | owner | vet | admin"
-    )
+    # No role field: a client-sent "role" is ignored and the account gets the
+    # default role. Farm roles come from memberships.
     phone: Optional[str] = Field(None, max_length=50)
 
 # ─── Token ────────────────────────────────────────────────────────────────────

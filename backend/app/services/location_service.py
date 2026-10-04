@@ -5,7 +5,10 @@ Règles invariantes :
 - Un identifiant d'animal ne constitue jamais une autorisation.
 - Ne jamais exposer le nom d'une ancienne ferme.
 - Coordonnée valide : deux nombres finis, latitude [-90,90], longitude [-180,180].
-- Un collier perdu est du matériel, pas la position certaine de l'ancien porteur.
+- Un collier perdu est du matériel, pas la position certaine de l'ancien porteur :
+  les points situés dans une période de perte (dates DeviceLossPeriod) ne sont
+  jamais tracés comme position de l'animal ; le statut courant du collier ne
+  change pas la qualité des points d'avant la perte.
 - Ne jamais afficher une position sans horodatage ni indication de fraîcheur.
 """
 from __future__ import annotations
@@ -23,6 +26,7 @@ from app.models.device import Device
 from app.models.provenance import AnimalTrackingPeriod
 from app.models.telemetry import Telemetry
 from app.models.telemetry_quality import DeviceLossPeriod
+from app.services.telemetry_quality import animal_position_clause
 from app.schemas.location import (
     GapInfo,
     LocationHistoryResponse,
@@ -87,13 +91,12 @@ def get_current_location(
         .first()
     )
 
-    # Dernière position avec coordonnées valides, dans la période prouvée
+    # Dernière position de l'animal (hors périodes de perte), dans la période prouvée
     query = (
         db.query(Telemetry)
         .filter(
             Telemetry.animal_id == animal.id,
-            Telemetry.latitude.is_not(None),
-            Telemetry.longitude.is_not(None),
+            animal_position_clause(),
         )
     )
 
@@ -126,9 +129,8 @@ def get_current_location(
     if row is None or not _is_valid_coord(row.latitude, row.longitude):
         return None
 
-    # Statut du collier
+    # Statut du collier (information matériel seulement : le point est hors période de perte)
     device = db.query(Device).filter(Device.id == row.device_id).first() if row.device_id else None
-    is_lost = device is not None and device.status == "lost"
 
     age = int((now - ensure_utc(row.time)).total_seconds())
     if age < 0:
@@ -141,7 +143,7 @@ def get_current_location(
         latitude=float(row.latitude),
         longitude=float(row.longitude),
         position_time=row.time,
-        position_is_animal=not is_lost,
+        position_is_animal=True,
         device_status=device.status if device else None,
         freshness=_freshness_label(age),
         age_seconds=age,
@@ -256,25 +258,27 @@ def get_location_history(
         )
 
     # 3. Requête des points GPS dans les intervalles prouvés
+    # Points inside a loss period are equipment positions, not the animal's track.
     rows = (
         db.query(Telemetry)
         .filter(
             Telemetry.animal_id == animal.id,
-            Telemetry.latitude.is_not(None),
-            Telemetry.longitude.is_not(None),
+            animal_position_clause(),
             or_(*time_filters),
         )
         .order_by(Telemetry.time.asc())
         .all()
     )
 
-    # 4. Récupérer les périodes de perte pour classifier les trous
+    # 4. Périodes de perte des colliers de l'animal, pour classifier les trous
+    device_ids = {p.device_id for p in proven_periods if p.device_id}
+    device_ids |= {r.device_id for r in rows if r.device_id}
+    if animal.assigned_device:
+        device_ids.add(animal.assigned_device)
     loss_periods = (
         db.query(DeviceLossPeriod)
         .filter(
-            DeviceLossPeriod.device_id.in_(
-                [r.device_id for r in rows if r.device_id]
-            ) if rows else DeviceLossPeriod.id < 0,  # no-match fallback
+            DeviceLossPeriod.device_id.in_(device_ids),
             DeviceLossPeriod.started_at < end_utc,
             or_(
                 DeviceLossPeriod.ended_at.is_(None),
@@ -282,13 +286,7 @@ def get_location_history(
             ),
         )
         .all()
-    ) if rows else []
-
-    # 5. Statut du collier actuel
-    device_ids = {r.device_id for r in rows if r.device_id}
-    devices = {d.id: d for d in db.query(Device).filter(Device.id.in_(device_ids)).all()} if device_ids else {}
-    current_device = devices.get(animal.assigned_device) if animal.assigned_device else None
-    is_lost = current_device is not None and current_device.status == "lost"
+    ) if device_ids else []
 
     # 6. Convertir en TrackPoints et segmenter
     track_points = []
@@ -305,7 +303,7 @@ def get_location_history(
             is_reliable=sats is None or sats >= MIN_RELIABLE_SATELLITES,
         ))
 
-    segments, gaps = _segment_track(track_points, loss_periods, start_utc, end_utc, is_lost)
+    segments, gaps = _segment_track(track_points, loss_periods, start_utc, end_utc)
 
     total_period = max(int((end_utc - start_utc).total_seconds()), 1)
     coverage = proven_seconds / total_period if total_period > 0 else None
@@ -314,7 +312,7 @@ def get_location_history(
         animal_id=animal.id,
         animal_name=animal.name,
         device_id=animal.assigned_device,
-        position_is_animal=not is_lost,
+        position_is_animal=True,
         segments=segments,
         gaps=gaps,
         period_start=start_utc,
@@ -329,7 +327,6 @@ def _segment_track(
     loss_periods: Sequence[DeviceLossPeriod],
     period_start: datetime,
     period_end: datetime,
-    is_lost: bool,
 ) -> tuple[list[TrackSegment], list[GapInfo]]:
     """
     Coupe la liste de points en segments continus.
@@ -354,7 +351,7 @@ def _segment_track(
 
         if delta > GAP_THRESHOLD_SECONDS:
             # Fermer le segment courant
-            segments.append(_build_segment(current_segment, is_lost))
+            segments.append(_build_segment(current_segment))
             # Enregistrer le trou
             gaps.append(_classify_gap(prev_time, curr_time, loss_periods))
             # Nouveau segment
@@ -364,22 +361,14 @@ def _segment_track(
 
     # Dernier segment
     if current_segment:
-        segments.append(_build_segment(current_segment, is_lost))
+        segments.append(_build_segment(current_segment))
 
     return segments, gaps
 
 
-def _build_segment(points: list[TrackPoint], is_lost: bool) -> TrackSegment:
-    """Construit un TrackSegment à partir d'une liste de points continus."""
-    reliable_count = sum(1 for p in points if p.is_reliable)
-    total = len(points)
-
-    if is_lost:
-        quality = "uncertain"
-    elif reliable_count == total:
-        quality = "reliable"
-    else:
-        quality = "degraded"
+def _build_segment(points: list[TrackPoint]) -> TrackSegment:
+    """Construit un TrackSegment : reliable si tous les points ont >= 4 satellites, sinon degraded."""
+    quality = "reliable" if all(p.is_reliable for p in points) else "degraded"
 
     return TrackSegment(
         points=points,
