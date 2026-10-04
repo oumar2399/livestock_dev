@@ -441,7 +441,7 @@ function ClusterSheet({
             {isIsolated && (
               <Ionicons name="warning" size={16} color={Colors.severity.critical} />
             )}
-            <Text style={styles.clusterItemBattery}>{point.battery}%</Text>
+            <Text style={styles.clusterItemBattery}>{formatBattery(point.battery)}</Text>
             <Ionicons name="chevron-forward" size={16} color={Colors.text.muted} />
           </TouchableOpacity>
         );
@@ -494,7 +494,8 @@ export default function MapScreen() {
     latitude:  parseFloat(String(p.latitude)),
     longitude: parseFloat(String(p.longitude)),
     activity:  parseFloat(String(p.activity)),
-    battery:   parseInt(String(p.battery), 10),
+    // Unknown battery (firmware 255, stored NULL) stays null; never a guessed value.
+    battery:   p.battery == null ? null : parseInt(String(p.battery), 10),
     })).filter(p => !isNaN(p.latitude) && !isNaN(p.longitude));
   }, [data]);
 
@@ -760,20 +761,14 @@ export default function MapScreen() {
             latitude: pt.latitude,
             longitude: pt.longitude,
           }));
-          const strokeColor =
-            segment.quality === 'reliable'
-              ? '#2E86DE'
-              : segment.quality === 'degraded'
-              ? '#E67E22'
-              : '#7F8C8D';
+          const strokeColor = segment.quality === 'reliable' ? '#2E86DE' : '#E67E22';
 
           return (
             <Polyline
               key={`segment-${sIdx}`}
               coordinates={coords}
               strokeColor={strokeColor}
-              strokeWidth={segment.quality === 'uncertain' ? 2 : 3.5}
-              lineDashPattern={segment.quality === 'uncertain' ? [6, 4] : undefined}
+              strokeWidth={3.5}
             />
           );
         })}
@@ -966,7 +961,7 @@ export default function MapScreen() {
                   {p._distanceKm} km from herd
                 </Text>
               </View>
-              <Text style={styles.clusterItemBattery}>{p.battery}%</Text>
+              <Text style={styles.clusterItemBattery}>{formatBattery(p.battery)}</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.text.muted} />
             </TouchableOpacity>
           ))}

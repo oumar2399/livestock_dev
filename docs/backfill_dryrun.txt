@@ -1,0 +1,18 @@
+backfill_tracking_periods: DRY RUN: transaction rolled back, nothing written (times in UTC)
+source set to 'history_backfill' (no CHECK constraint on the column)
+animal_id | name | outcome | old_valid_from | new_valid_from | telemetry_rows | telemetry_devices | period_device | device_mismatch | note
+1 | Marguerite-edit | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-02-21T18:12:31.787664+00:00 | 803 | M5-001 | M5-001 | no | first window duration unknown: window end used
+2 | Bella | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-02-21T18:12:31.787664+00:00 | 144 | M5-002 | M5-002 | no | first window duration unknown: window end used
+3 | Daisy | skipped | 2026-09-22T07:54:55.178611+00:00 | - | 0 | - | M5-003 | no | no telemetry
+4 | Hanako | skipped | 2026-09-22T07:54:55.178611+00:00 | - | 0 | - | M5-012 | no | no telemetry
+5 | Kitako | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-03-01T06:44:58.293431+00:00 | 433 | M5-001 | M5-008 | YES | first window duration unknown: window end used
+6 | Pam | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-03-01T06:44:58.293431+00:00 | 433 | M5-002 | M5-009 | YES | first window duration unknown: window end used
+7 | Hina | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-03-01T06:44:58.293431+00:00 | 433 | M5-003 | M5-010 | YES | first window duration unknown: window end used
+8 | Usagi | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-03-01T06:44:58.293431+00:00 | 433 | M5-004 | M5-004 | no | first window duration unknown: window end used
+9 | Hatake | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-03-01T06:44:58.293431+00:00 | 433 | M5-005 | M5-005 | no | first window duration unknown: window end used
+10 | Kanojo | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-03-01T06:44:58.293431+00:00 | 433 | M5-006 | M5-006 | no | first window duration unknown: window end used
+11 | Ameyu | updated | 2026-09-22T07:54:55.178611+00:00 | 2026-03-01T06:44:58.293431+00:00 | 433 | M5-007 | M5-007 | no | first window duration unknown: window end used
+12 | Toriko | skipped | 2026-09-22T07:54:55.178611+00:00 | - | 0 | - | M5-011 | no | no telemetry
+266 | Vache-Banc-T3 | updated | 2026-09-22T07:54:55.178611+00:00 | 2024-09-17T15:59:45+00:00 | 446 | M5-TEST3-BENCH | M5-TEST3-BENCH | no | -
+totals: skipped=3, updated=10
+note: 3 updated animal(s) have telemetry from another device than the period's; those rows appear in history but stay excluded from farm reports.

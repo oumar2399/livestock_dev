@@ -354,6 +354,23 @@ export function formatDateTime(isoDate: string | null): string {
   }
 }
 
+/**
+ * Presence lines for an open danger-zone alert. These alerts are resolved by a human
+ * only, so the card says where the animal was last seen instead of closing itself.
+ */
+export function dangerZonePresence(alert: Pick<Alert, 'type' | 'alert_metadata'>): string[] {
+  const meta = alert.alert_metadata;
+  if (alert.type !== 'geofence' || !meta || meta.sub_type !== 'danger_zone_entry') return [];
+  const lines: string[] = [];
+  if (typeof meta.last_detected_inside_at === 'string') {
+    lines.push(`Last detected inside: ${formatDateTime(meta.last_detected_inside_at)}`);
+  }
+  if (typeof meta.left_zone_at === 'string') {
+    lines.push(`No longer detected inside (since ${formatDateTime(meta.left_zone_at)})`);
+  }
+  return lines;
+}
+
 /** Formate une date ISO en "14/03/2024" */
 export function formatDate(isoDate: string | null): string {
   if (!isoDate) return '–';

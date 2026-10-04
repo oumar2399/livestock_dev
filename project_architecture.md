@@ -47,8 +47,8 @@ En cas de contradiction entre deux descriptions datées, **la plus récente est 
 # 0.2 État de validation courant
 
 - **624 tests backend réussis, 0 échec, 0 ignoré** — commit `bc03c42` + modifications B2–B4 non commitées ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-04 11:39 +0900 ;
-- **85 tests mobile réussis** [to verify : commit et date] ;
-- TypeScript sans erreur ;
+- **98 tests mobile réussis, 0 échec** — commit `62badba` + modifications B5 non commitées ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-04 13:06 +0900 ;
+- TypeScript sans erreur (`tsc --noEmit`, même commit, 2026-10-04 13:06 +0900) ;
 - Alembic / schéma réconcilié depuis B1 (`bc03c42`), `alembic check` propre.
 
 ---
@@ -1330,7 +1330,7 @@ Le choix dépendra de :
 - **Geofence engine** : implémenté.
 - **Création de ferme** : idempotence durable PostgreSQL ; les anciens caches mémoire sont historiques.
 - **Alembic / schéma** : réconcilié depuis B1 (`bc03c42`).
-- **Tests mobile courants** : **85** [to verify : commit et date].
+- **Tests mobile courants** : **98** (commit `62badba` + B5 non commité, `node --test tests/*.test.cjs`, 2026-10-04 13:06 +0900).
 - **Lots B, C, D, E** : réalisés ; les anciennes mentions “prochain”, “futur” ou “pas encore codé” sont obsolètes.
 - **LoRaWAN Côte d’Ivoire** : bande 868–870 MHz / profil EU868 documentés ; les anciennes mentions “plan à confirmer” sont historiques.
 

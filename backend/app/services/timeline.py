@@ -264,7 +264,7 @@ def _veterinary_entry_items(db, animal_id, farm_id, start, end, cursor, fetch_li
             source_id=row.id,
             event_type=TimelineEventType.VETERINARY_ENTRY,
             occurred_at=ensure_utc(row.occurred_at),
-            title=f"Note vétérinaire : {row.entry_type}",
+            title="Status change" if row.entry_type == "status_change" else f"Veterinary note: {row.entry_type}",
             summary=row.content[:100] + ("..." if len(row.content) > 100 else ""),
             data={
                 "entry_id": row.id,

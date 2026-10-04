@@ -32,6 +32,7 @@ import {
   isAlertAcknowledged,
   timeAgo,
   formatDateTime,
+  dangerZonePresence,
 } from '../utils/helpers';
 import {
   ScreenHeader,
@@ -125,6 +126,12 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
                 Triggered : {formatDateTime(alert.triggered_at)}
               </Text>
             </View>
+            {dangerZonePresence(alert).map((line) => (
+              <View key={line} style={styles.alertTimeRow}>
+                <Ionicons name="location-outline" size={13} color={Colors.severity.critical} />
+                <Text style={[styles.alertTimeText, { color: Colors.severity.critical }]}>{line}</Text>
+              </View>
+            ))}
             {alert.acknowledged_at && (
               <View style={styles.alertTimeRow}>
                 <Ionicons name="eye-outline" size={13} color={Colors.primary} />
