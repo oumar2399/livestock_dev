@@ -105,6 +105,12 @@ def binary_case(binary_db, monkeypatch):
                     device_secret=hash_device_secret(secret))
     animal = Animal(farm_id=farm.id, name="Binary test animal", status="active", assigned_device=device.id)
     db.add_all([device, animal])
+    db.flush()
+    # Provenance: farm-scoped reads only show data inside a tracking period.
+    from datetime import datetime, timezone
+    from app.models.provenance import AnimalTrackingPeriod
+    db.add(AnimalTrackingPeriod(animal_id=animal.id, farm_id=farm.id, device_id=device.id,
+                                valid_from=datetime(2020, 1, 1, tzinfo=timezone.utc), source="registration"))
     db.commit()
     monkeypatch.setattr(ml_inference, "_artifact", None)
     monkeypatch.setattr(ml_inference, "_profiles", {(10, 150): {}})

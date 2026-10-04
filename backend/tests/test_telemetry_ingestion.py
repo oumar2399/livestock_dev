@@ -1,4 +1,4 @@
-"""HTTP characterization of the legacy JSON ingestion contract."""
+"""HTTP characterization of the JSON ingestion contract (provisioned devices only)."""
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
 from app.api.v1 import telemetry as telemetry_api
+from app.core.security import generate_device_secret, hash_device_secret
 from app.db.database import get_db
 from app.models.animal import Animal
 from app.models.device import Device
@@ -20,11 +21,14 @@ from app.services import telemetry_ingestion
 from app.schemas.telemetry import TelemetryCreate
 
 
+SECRET = generate_device_secret()
+
+
 @pytest.fixture
 def ingestion_client(monkeypatch):
     state = SimpleNamespace(
         animal=Animal(id=7, farm_id=3, name="Test", status="active"),
-        device=Device(id="M5-test", farm_id=3, status="active"),
+        device=Device(id="M5-test", farm_id=3, status="active", device_secret=hash_device_secret(SECRET)),
         saved=[],
     )
     db = MagicMock()
@@ -35,7 +39,9 @@ def ingestion_client(monkeypatch):
         result.with_for_update.return_value = result
         result.populate_existing.return_value = result
         result.all.return_value = []
-        result.first.side_effect = lambda: state.animal if model is Animal else state.device
+        result.first.side_effect = lambda: (
+            state.animal if model is Animal else None if model is Telemetry else state.device
+        )
         return result
 
     db.query.side_effect = query
@@ -46,7 +52,7 @@ def ingestion_client(monkeypatch):
     app = FastAPI()
     app.include_router(telemetry_api.router, prefix="/api/v1")
     app.dependency_overrides[get_db] = lambda: db
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-Device-Secret": SECRET}) as client:
         yield client, state, db, prediction
 
 
@@ -122,31 +128,56 @@ def test_prediction_errors_do_not_discard_telemetry(ingestion_client, error):
     assert inserted(state).predicted_behavior is None
 
 
-def test_unknown_orphan_is_registered_but_measure_discarded(ingestion_client):
+def test_unknown_device_is_rejected_and_never_created(ingestion_client):
     client, state, db, prediction = ingestion_client
     state.animal = state.device = None
     response = client.post("/api/v1/telemetry/", json=payload())
-    assert response.status_code == 404
-    assert len(state.saved) == 1 and isinstance(state.saved[0], Device)
-    assert state.saved[0].farm_id is None
-    db.commit.assert_called_once()
+    assert response.status_code == 401
+    assert state.saved == []
+    db.commit.assert_not_called()
     prediction.assert_not_called()
 
 
-def test_known_farm_device_without_active_animal_retains_conflict(ingestion_client):
+@pytest.mark.parametrize("stored,sent", [(None, SECRET), ("provisioned", None), ("provisioned", "0" * 64)])
+def test_unprovisioned_device_or_bad_secret_is_rejected(ingestion_client, stored, sent):
+    client, state, db, _ = ingestion_client
+    if stored is None:
+        state.device.device_secret = None
+    headers = {} if sent is None else {"X-Device-Secret": sent}
+    client.headers.pop("X-Device-Secret", None)
+    assert client.post("/api/v1/telemetry/", json=payload(), headers=headers).status_code == 401
+    assert state.saved == []
+    db.commit.assert_not_called()
+
+
+def test_device_without_active_animal_gets_a_clear_404(ingestion_client):
     client, state, db, prediction = ingestion_client
     state.animal = None
-    assert client.post("/api/v1/telemetry/", json=payload()).status_code == 409
+    response = client.post("/api/v1/telemetry/", json=payload())
+    assert response.status_code == 404
+    assert "farm" not in response.json()["detail"].lower()
+    assert state.saved == []
     db.commit.assert_not_called()
     prediction.assert_not_called()
 
 
-def test_cross_farm_device_is_rejected(ingestion_client):
+def test_cross_farm_device_is_rejected_without_exposing_farm_ids(ingestion_client):
     client, state, db, prediction = ingestion_client
     state.device.farm_id = 4
-    assert client.post("/api/v1/telemetry/", json=payload()).status_code == 409
+    response = client.post("/api/v1/telemetry/", json=payload())
+    assert response.status_code == 409
+    assert not any(char.isdigit() for char in response.json()["detail"])
     db.commit.assert_not_called()
     prediction.assert_not_called()
+
+
+def test_server_stamped_collision_is_409_not_500(ingestion_client):
+    client, _, db, _ = ingestion_client
+    original = Exception("database conflict")
+    original.pgcode = "23505"
+    original.diag = SimpleNamespace(constraint_name="telemetry_pkey")
+    db.flush.side_effect = IntegrityError("INSERT", {}, original)
+    assert client.post("/api/v1/telemetry/", json=payload()).status_code == 409
 
 
 @pytest.mark.parametrize("status", ["lost", "retired"])

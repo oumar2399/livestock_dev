@@ -2,7 +2,7 @@
 Telemetry API - Sensor data reception and consultation
 
 Auth:
-  POST /telemetry         → Device secret when provisioned; legacy JSON otherwise
+  POST /telemetry         → Provisioned device secret required (same rule as binary)
   POST /telemetry/binary  → Provisioned device secret required
   GET  /telemetry/latest  → JWT mandatory (farm-scoped)
   GET  /telemetry/history → JWT mandatory (farm-scoped)
@@ -36,21 +36,20 @@ from app.core import binary_protocol
 from app.core.security import DEVICE_SECRET_HEADER, verify_device_secret
 from app.core.timezone import to_utc_naive, utc_now
 from app.services.telemetry_quality import eligible_clause
+from app.services.provenance_service import proven_in_farm
 from app.api.v1.feedback import submit_prediction_feedback as upsert_prediction_feedback
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 
 
 def _authenticated_device(db: Session, secret: Optional[str], *, device_id=None, transport_id=None):
+    """JSON and binary share one rule: a provisioned, active device with a valid secret."""
     key = Device.transport_id == transport_id if transport_id is not None else Device.id == device_id
     device = db.query(Device).filter(key).with_for_update().populate_existing().first()
-    if device is not None and (device.ingestion_revoked_at is not None or device.status == "retired"):
+    if (device is None or device.device_secret is None
+            or device.ingestion_revoked_at is not None or device.status == "retired"
+            or not verify_device_secret(secret, device.device_secret)):
         raise HTTPException(status_code=401, detail="Invalid device credentials")
-    if transport_id is not None and (device is None or device.device_secret is None):
-        raise HTTPException(status_code=401, detail="Invalid device credentials")
-    if device is not None and device.device_secret is not None:
-        if not verify_device_secret(secret, device.device_secret):
-            raise HTTPException(status_code=401, detail="Invalid device credentials")
     return device
 
 
@@ -74,15 +73,26 @@ async def read_binary_body(request: Request) -> bytes:
     return bytes(body)
 
 
-@router.post("/", response_model=TelemetryResponse, status_code=201)
+@router.post("/", response_model=TelemetryResponse, status_code=201,
+             responses={200: {"model": TelemetryResponse}, 401: {"description": "Invalid device credentials"},
+                        404: {"description": "No active animal assigned"},
+                        409: {"description": "Measurement conflict"}})
 def receive_telemetry(
     data: TelemetryCreate,
+    response: Response,
     db: Session = Depends(get_db),
     device_secret: Optional[str] = Header(None, alias=DEVICE_SECRET_HEADER),
 ):
-    """Receive sensor data through the shared ingestion service."""
+    """Receive sensor data through the shared ingestion service.
+
+    With a device timestamp, replays follow the binary rules (201 new, 200 identical,
+    409 conflicting). Without one, the server reception time is used and no replay
+    detection is possible.
+    """
     _authenticated_device(db, device_secret, device_id=data.device_id)
-    return ingest_telemetry(data, db).telemetry
+    result = ingest_telemetry(data, db, idempotent=data.timestamp is not None)
+    response.status_code = 201 if result.created else 200
+    return result.telemetry
 
 
 @router.post(
@@ -143,10 +153,14 @@ def get_latest_telemetry(
 ):
     """Latest position for each animal — scoped to user's farms."""
     accessible = resolve_farm_scope(current_user, db, farm_id)
+    # Only rows proven for the animal's current farm (no data from a previous farm).
+    proven = proven_in_farm(Telemetry.animal_id, Telemetry.time, Animal.farm_id)
 
     subquery = db.query(
         Telemetry.animal_id,
         func.max(Telemetry.time).label("last_time"),
+    ).join(Animal, Animal.id == Telemetry.animal_id).filter(
+        Animal.farm_id.in_(accessible), proven,
     ).group_by(Telemetry.animal_id).subquery()
 
     query = db.query(
@@ -173,8 +187,9 @@ def get_latest_telemetry(
     positions = {
         t.animal_id: (t, eligible)
         for t, eligible in db.query(Telemetry, eligible_clause())
+        .join(Animal, Animal.id == Telemetry.animal_id)
         .outerjoin(Device, Device.id == Telemetry.device_id)
-        .filter(Telemetry.animal_id.in_(ids), Telemetry.latitude.is_not(None),
+        .filter(Telemetry.animal_id.in_(ids), proven, Telemetry.latitude.is_not(None),
                 Telemetry.longitude.is_not(None), or_(eligible_clause(), Device.status == "lost"))
         .distinct(Telemetry.animal_id).order_by(Telemetry.animal_id, Telemetry.time.desc()).all()
     }
@@ -215,13 +230,14 @@ def get_telemetry_history(
 ):
     """Telemetry history for one animal — requires farm membership."""
     # Farm access check
-    require_animal_access(current_user, animal_id, "view_animals", db)
+    animal = require_animal_access(current_user, animal_id, "view_animals", db)
 
     since = utc_now() - timedelta(hours=hours)
 
     results = db.query(Telemetry, eligible_clause()).filter(
         Telemetry.animal_id == animal_id,
         Telemetry.time >= since,
+        proven_in_farm(Telemetry.animal_id, Telemetry.time, animal.farm_id),
     ).order_by(Telemetry.time.asc()).all()
 
     # Map legacy states and attach existing prediction feedback

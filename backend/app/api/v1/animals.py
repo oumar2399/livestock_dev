@@ -8,9 +8,13 @@ from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 
 from app.db.database import get_db
+from app.models.alert import Alert
 from app.models.animal import Animal
+from app.models.daily_summary import DailyBehaviorSummary
+from app.models.feedback import AlertFeedback, PredictionFeedback
 from app.models.telemetry import Telemetry
 from app.models.user import User
+from app.models.veterinary import VeterinaryCase
 from app.schemas.animal import (
     AnimalCreate,
     AnimalUpdate,
@@ -29,7 +33,7 @@ from app.core.access import (
 )
 from app.services.device_assignment import validate_device_assignment
 from app.services.telemetry_quality import animal_position_clause
-from app.services.provenance_service import record_tracking_period, close_tracking_period
+from app.services.provenance_service import record_tracking_period
 
 router = APIRouter(
     prefix="/animals",
@@ -281,12 +285,19 @@ def delete_animal(
 ):
     """
     Delete animal — requires edit_animals permission on the animal's farm.
-    Deletes related summaries, alerts and feedback. Raw telemetry is retained.
+    Only empty records are deleted: an animal with any telemetry, alert, daily
+    summary, feedback or veterinary case gets 409 "animal_has_history".
+    Tracking periods alone do not count as history (one exists from registration).
     """
     animal = require_animal_access(current_user, animal_id, "edit_animals", db)
 
-    close_tracking_period(db, animal_id, source="deletion")
-    db.delete(animal)
+    history_tables = (Telemetry, Alert, DailyBehaviorSummary, PredictionFeedback,
+                      AlertFeedback, VeterinaryCase)
+    if any(db.query(model.animal_id).filter(model.animal_id == animal_id).first() is not None
+           for model in history_tables):
+        raise HTTPException(status_code=409, detail="animal_has_history")
+
+    db.delete(animal)  # its tracking periods are removed by ON DELETE CASCADE
     db.commit()
 
     return None  # 204 No Content

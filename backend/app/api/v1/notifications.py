@@ -185,12 +185,12 @@ def trigger_dispatch(
 ):
     """
     Déclenche manuellement un lot de dispatch des notifications en attente.
-    Autorisé aux administrateurs ou pour des déclencheurs internes.
+    Platform administrators only: the dispatch covers every farm.
     """
-    if not is_platform_admin(current_user) and current_user.role != "owner":
+    if not is_platform_admin(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Seuls les administrateurs et gestionnaires peuvent déclencher le dispatch global",
+            detail="Only platform administrators can trigger the global dispatch",
         )
 
     return dispatch_pending_notifications(db=db, batch_size=batch_size)

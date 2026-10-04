@@ -3,7 +3,6 @@
 from datetime import datetime
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
 import logging
 
 from fastapi import HTTPException, status
@@ -50,37 +49,20 @@ def _reuse_measurement(existing: Telemetry, data: TelemetryCreate) -> IngestionR
 
 # ─── Helper: auto-register or update device ───────────────────────────────────
 
-def _sync_device(db: Session, device_id: str, farm_id: Optional[int], battery: int):
+def _sync_device(device: Device, farm_id: int, battery):
     """
-    Auto-register a device on first telemetry, or update last_seen.
-    Farm transfers are deliberately handled only by the authenticated device API.
+    Update last_seen and battery of a provisioned device. Devices are never
+    created by ingestion; farm transfers go through the authenticated device API.
+    An unknown battery (None) keeps the last known value.
     """
-    device = db.query(Device).filter(Device.id == device_id).first()
-
-    if not device:
-        # First contact — create device entry
-        device = Device(
-            id=device_id,
-            farm_id=farm_id,
-            model="M5Stack M5GO",
-            firmware_version=None,
-            last_seen=datetime.utcnow(),
-            battery_capacity=battery,
-            status="active",
+    if device.farm_id != farm_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Device and assigned animal are registered on different farms; telemetry was not stored.",
         )
-        db.add(device)
-    else:
-        # Known device — update tracking info
-        device.last_seen        = datetime.utcnow()
+    device.last_seen        = datetime.utcnow()
+    if battery is not None:
         device.battery_capacity = battery
-        if device.farm_id != farm_id:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Device {device_id} belongs to farm {device.farm_id}, "
-                    f"not farm {farm_id}"
-                ),
-            )
 
 
 
@@ -101,7 +83,8 @@ def ingest_telemetry(data: TelemetryCreate, db: Session, *, idempotent: bool = F
     if (data.sample_rate, data.window_samples) != (10, 150):
         raise HTTPException(422, "Only 15-second windows are accepted: sample_rate=10, window_samples=150")
     device = db.query(Device).filter(Device.id == data.device_id).with_for_update().populate_existing().first()
-    if device is not None and (device.ingestion_revoked_at is not None or device.status == "retired"):
+    # Only provisioned devices reach this point through the API; never create one here.
+    if device is None or device.ingestion_revoked_at is not None or device.status == "retired":
         raise HTTPException(401, "Invalid device credentials")
     # Find animal assigned to this device
     animal = db.query(Animal).filter(
@@ -110,13 +93,10 @@ def ingest_telemetry(data: TelemetryCreate, db: Session, *, idempotent: bool = F
     ).first()
 
     if not animal:
-        # Auto-register orphan device so admins can see it in the devices list
-        _sync_device(db, data.device_id, farm_id=None, battery=data.battery)
-        db.commit()
-        logger.warning(f"📡 Orphan device {data.device_id} detected — telemetry discarded.")
+        logger.warning("Device %s has no active animal; telemetry discarded.", data.device_id)
         raise HTTPException(
             status_code=404,
-            detail=f"No active animal assigned to device {data.device_id}. Device registered as orphan."
+            detail="No active animal is assigned to this device; telemetry was not stored.",
         )
 
     if idempotent:
@@ -132,8 +112,8 @@ def ingest_telemetry(data: TelemetryCreate, db: Session, *, idempotent: bool = F
     if eligible and profile == (10, 150) and not ml_inference.profile_ready(profile):
         raise HTTPException(503, "The 15-second model is unavailable")
 
-    # Auto-register or refresh the device without silently transferring farms.
-    _sync_device(db, data.device_id, animal.farm_id, data.battery)
+    # Refresh the device without silently transferring farms.
+    _sync_device(device, animal.farm_id, data.battery)
 
     # ── ML Prediction ──────────────────────────────────────────────────────────
     try:
@@ -231,21 +211,21 @@ def ingest_telemetry(data: TelemetryCreate, db: Session, *, idempotent: bool = F
                     )
             except Exception:
                 logger.exception("Geofence evaluation failed for animal %s", animal_id)
-        db.commit()
         if geofence_alerts:
-            try:
-                from app.services.notification_service import enqueue_alert_notification
-                for ga in geofence_alerts:
-                    enqueue_alert_notification(db, ga)
-                db.commit()
-            except Exception:
-                logger.exception("Failed to enqueue notification for geofence alerts")
+            # Same transaction as the alerts, isolated in a savepoint: a failure here
+            # never loses telemetry or alerts (dispatch reconciles missing intents).
+            from app.services.notification_service import enqueue_in_savepoint
+            enqueue_in_savepoint(db, geofence_alerts)
+        db.commit()
     except IntegrityError as exc:
         db.rollback()
         constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", "") or ""
-        if not (idempotent and getattr(exc.orig, "pgcode", None) == "23505"
+        if not (getattr(exc.orig, "pgcode", None) == "23505"
                 and (constraint == "telemetry_pkey" or constraint.endswith("_telemetry_pkey"))):
             raise
+        if not idempotent:
+            # Server-stamped measurement colliding with an existing row at the same instant.
+            raise HTTPException(status_code=409, detail="A measurement already exists at this timestamp") from None
         existing = _existing_measurement(db, animal_id, data)
         if existing is None:
             raise

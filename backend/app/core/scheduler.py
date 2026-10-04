@@ -9,7 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.core.config import settings, TARGET_TIMEZONE
 from app.core.timezone import TARGET_TZ
-from app.services.job_tracking import run_daily_pipeline_tracked
+from app.services.job_tracking import JobAlreadyRunning, run_daily_pipeline_tracked
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,8 @@ def run_daily_pipeline_job():
     logger.info("⏰ Scheduler trigger: Starting daily behavior pipeline job...")
     try:
         run_daily_pipeline_tracked(trigger_source="scheduled")
+    except JobAlreadyRunning as e:
+        logger.warning("Scheduled daily pipeline skipped: %s", e)
     except Exception as e:
         logger.error(f"❌ Scheduled daily pipeline job failed with error: {e}", exc_info=True)
 

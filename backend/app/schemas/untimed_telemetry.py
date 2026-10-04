@@ -1,7 +1,7 @@
 """Validated binary v3 input and lossless archive acknowledgement."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -14,7 +14,7 @@ class UntimedTelemetryCreate(BaseModel):
     latitude: float | None = Field(ge=-90, le=90)
     longitude: float | None = Field(ge=-180, le=180)
     satellites: int = Field(ge=0, le=50)
-    battery: int = Field(ge=0, le=100)
+    battery: Optional[int] = Field(ge=0, le=100)  # None = unknown (firmware sent 255)
     sample_rate: Literal[10] = 10
     window_samples: Literal[150] = 150
     activity: float = Field(ge=0, le=20)

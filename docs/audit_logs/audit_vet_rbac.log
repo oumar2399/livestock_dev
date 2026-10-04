@@ -1,0 +1,57 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> fbc3952585f9, baseline_existing_schema
+INFO  [alembic.runtime.migration] Running upgrade fbc3952585f9 -> 9c312871348b, add_accel_3axes_windowing
+INFO  [alembic.runtime.migration] Running upgrade 9c312871348b -> 2082c4e4b0dc, add_predicted_behavior_to_telemetry
+INFO  [alembic.runtime.migration] Running upgrade 2082c4e4b0dc -> 187d38a14511, add_daily_behavior_summary_table
+INFO  [alembic.runtime.migration] Running upgrade 187d38a14511 -> 0a6e1e7a1828, update_alerts_type_check_constraint
+INFO  [alembic.runtime.migration] Running upgrade 0a6e1e7a1828 -> 093cf2d65539, add_gin_index_alert_metadata
+INFO  [alembic.runtime.migration] Running upgrade 093cf2d65539 -> 29135abe6072, add_alert_feedback_and_unique_constraints
+INFO  [alembic.runtime.migration] Running upgrade 29135abe6072 -> b4e8f1a2c3d4, add_farm_memberships_table
+INFO  [alembic.runtime.migration] Running upgrade b4e8f1a2c3d4 -> c7b2a4d9e1f0, add unique daily anomaly alert index
+INFO  [alembic.runtime.migration] Running upgrade c7b2a4d9e1f0 -> d8e4f6a1b2c3, reconcile required farm-scoped columns
+INFO  [alembic.runtime.migration] Running upgrade d8e4f6a1b2c3 -> e9f5a7b2c3d4, add daily job execution history
+INFO  [alembic.runtime.migration] Running upgrade e9f5a7b2c3d4 -> f0a6b8c3d4e5, ensure geofence polygon GiST index
+INFO  [alembic.runtime.migration] Running upgrade f0a6b8c3d4e5 -> 1b7d9e4c5a6f, Enforce one assigned animal per physical device.
+INFO  [alembic.runtime.migration] Running upgrade 1b7d9e4c5a6f -> 2c8e0f6a7b9d, Backfill device rows for existing animal assignments.
+INFO  [alembic.runtime.migration] Running upgrade 2c8e0f6a7b9d -> 3d9f1b2c4a6e, Add optional device binary identifiers and secret fingerprints.
+INFO  [alembic.runtime.migration] Running upgrade 3d9f1b2c4a6e -> 4e0a2c3d5b7f, Add persistent revocation, loss history and telemetry provenance (no backfill).
+INFO  [alembic.runtime.migration] Running upgrade 4e0a2c3d5b7f -> 5f1b3d4e6c8a, Add isolated untimed telemetry archive; no historical backfill.
+INFO  [alembic.runtime.migration] Running upgrade 5f1b3d4e6c8a -> 6a2c4e5f7b8d, Add animal_tracking_periods and alerts.farm_id for historical provenance.
+INFO  [alembic.runtime.migration] Running upgrade 6a2c4e5f7b8d -> 7b3d5f6a8c9e, Bootstrap prospective tracking and durable farm creation receipts.
+INFO  [alembic.runtime.migration] Running upgrade 7b3d5f6a8c9e -> 8c4e6a1b2d3f, Add notifications tables: push_devices, notification_preferences, notification_deliveries
+INFO  [alembic.runtime.migration] Running upgrade 8c4e6a1b2d3f -> 9d5f7b2c3e4a, Add veterinary tables: veterinary_cases, veterinary_entries
+disposable database: livestock_audit_0c432814938c4ce49a2c88d78bd8cbec
+PASS  V8a dual user (vet in A) opens a case in A -> 201                                            201
+PASS  V8b dual user adds entry in A -> 201                                                         201
+PASS  V8c dual user (farmer in B) opens a case in B -> 403                                         403
+PASS  V3a owner cannot open a case (manage_veterinary is vet/admin only) -> 403                    403
+PASS  V8d dual user (farmer in B) cannot list B cases -> 403                                       403
+PASS  R7a GET /farms/ returns the per-farm role the app needs (A=vet, B=farmer)                    {2: 'farmer', 1: 'vet'}
+PASS  V3b farmer cannot list vet cases -> 403                                                      403
+PASS  R1 platform admin without membership can write a vet entry -> 201                            201
+PASS  V4a case in farm A for an animal of farm B -> 400                                            400
+PASS  V4b case linking an alert of another animal/farm -> 400                                      400
+PASS  V4c unknown case id in farm scope -> 404                                                     404
+PASS  V2a no PUT/PATCH/DELETE route on veterinary entries                                          [('GET', '/api/v1/animals/{animal_id}/veterinary-cases'), ('GET', '/api/v1/farms/{farm_id}/veterinary-cases'), ('GET', '/api/v1/farms/{farm_id}/veterinary-cases/{case_id}
+PASS  V2b PUT on an entry -> 404/405                                                               404
+PASS  V2b PATCH on an entry -> 404/405                                                             404
+PASS  V2b DELETE on an entry -> 404/405                                                            404
+PASS  V7 case closed then reopened: closed_at erased, no journal entry recorded for either change  close=200 reopen=200 closed_at=None entries=1
+PASS  V2c owner deletes the animal -> all its vet cases and entries are deleted (FK cascade)       delete=204 entries 4->0 (total left 0)
+FAIL  V6a farmer (no view_veterinary) reads full vet entry content through /timeline               http=200 vet_items=1 content=Limping on left hind leg
+FAIL  V6b after transfer, new farm sees old farm's vet entries in /timeline                        http=200 vet_items=1
+PASS  V6c new farm's /veterinary-cases list does not include the old farm case                     {'total': 0, 'cases': []}
+PASS  R3 JWT claims carry no farm list                                                             ['email', 'exp', 'name', 'role', 'sub', 'type']
+PASS  R5 membership revoked, same JWT: vet list blocked immediately                                before=200 after=403
+PASS  R5b same JWT: animal timeline blocked                                                        403
+PASS  R5c same JWT: revoked farm no longer listed in GET /farms/                                   [3, 2, 1]
+PASS  R6a account role 'vet' with no membership grants nothing (403)                               403
+PASS  R6b farms.owner_id without membership: no access (membership is the only source)             403
+PASS  R9a refresh re-reads the user and returns new tokens                                         200
+PASS  R9b refreshed token reflects the current DB role                                             admin
+PASS  R9c deleted user: refresh -> 401                                                             401
+PASS  R9d access token rejected as refresh token -> 401                                            401
+
+28/30 expectations met
+dropped: livestock_audit_0c432814938c4ce49a2c88d78bd8cbec

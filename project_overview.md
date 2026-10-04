@@ -1,10 +1,11 @@
 # Livestock Monitoring IoT — Project Overview
+Last updated: 2026-10-04
 
 Short version of the two reference documents, meant to be browsed day to day.
 For full detail, open the reference files:
 
-- `project_master_handoff_revised_2026-09-23.md`: state, science, limits, proposals
-- `project_architecture_revised_2026-09-23.md`: components, flows, contracts
+- `project_master_handoff.md`: state, science, limits, proposals
+- `project_architecture.md`: components, flows, contracts
 
 If this file and a reference file disagree, the reference file wins. Fix this file.
 
@@ -49,22 +50,22 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 
 | Area | Status | Key facts | Ref |
 |---|---|---|---|
-| Firmware | ✅ | `m5stack/main.py`; cycle ≈ 19.4 s; WDT; v3 archive off (`UNTIMED_ARCHIVE_ENABLED=False`) | handoff §3.2 |
+| Firmware | ✅ | `m5stack/main.py`; cycle ≈ 19.4 s; WDT; v3 archive off by default (`UNTIMED_ARCHIVE_ENABLED=False`); unreadable battery sent as 255 = unknown (stored NULL, LCD `BAT ?`) | handoff §3.2 |
 | Telemetry v2 | ✅ | 45 B, reliable UTC required, GPS may be absent | handoff §4.1 |
-| Telemetry v3 | 🟡 | 58 B, no reliable UTC → separate `untimed_telemetry`; power-loss persistence not validated | handoff §4.2 |
+| Telemetry v3 | 🟡 | 58 B, no reliable UTC → separate `untimed_telemetry`; off by default (backend `BINARY_V3_ENABLED=false`); power-loss persistence not validated | handoff §4.2 |
 | ML model | ✅ | RF, Active/Resting, 15 s only loaded; 5 s rejected (422) | handoff §5.2 |
 | Multi-farm RBAC | ✅ | `admin` platform role; `owner/farmer/vet` per farm; JWT carries no farms | arch §11 |
-| Geofencing | ✅ | `ST_Covers`; danger = immediate; pasture exit = 2 fixes ≤120 s apart; GPS ≤300 s old; auto-resolve | handoff §8.2 |
-| Location / history | ✅ | gaps > 30 min segmented; quality `reliable/degraded/uncertain`; lost equipment ≠ animal | handoff §8.3 |
-| Notifications | 🟡 | outbox, idempotent, `SKIP LOCKED`, retry; real phone reception not validated | handoff §8.4 |
-| Offline | ✅ | read-only, allowlist, cache purged on logout / farm change | handoff §8.5 |
+| Geofencing | ✅ | `ST_Covers`; fix ≥ 4 satellites, ≤ 25 km/h, ≤ 300 s old; danger = immediate, resolved by humans only; pasture exit = 2 fixes ≤ 120 s apart, auto-resolved on return; one notification per fix (danger wins over pasture exit) | handoff §8.2 |
+| Location / history | ✅ | gaps > 30 min segmented; quality `reliable/degraded`; loss-period points removed from the track; telemetry attributed to the animal holding the collar at reception time | handoff §8.3 |
+| Notifications | 🟡 | backend outbox only (intent in the alert transaction, 24 h reconciliation, `SKIP LOCKED`, retry); no mobile token registration, no automatic dispatch (admin-only endpoint), no quiet hours; real phone reception not validated | handoff §8.4 |
+| Offline | 🟡 | module exists, not integrated (cache and banner not used by any screen) | handoff §8.5 |
 | Veterinary | ✅ | `VeterinaryCase` + append-only entries; no automatic diagnosis | handoff §8.6 |
 | Reports / data quality | ✅ | provenance periods; `available/no_data/not_computable/partial` | handoff §8.7 |
-| Anomaly detection | ✅ | daily median/MAD modified Z; min 10 days history in 20-day window; Z ≥ 3.0 | arch §17 |
+| Anomaly detection | 🟡 | daily modified Z (Iglewicz & Hoaglin), Z ≥ 3.5, MeanAD fallback, change ≥ 5 pts; min 10 days history in 20-day window; inactive on new data while `ANOMALY_MIN_COVERAGE_SECONDS` is unset; scheduler off by default | arch §17 |
 | Previews only | — | video, AI assistant, marketplace (no real backend) | arch §12.2 |
 | LoRaWAN | 💡 | documented, not implemented | handoff §13–15 |
 
-**Software checks:** 507 backend tests passed (1 skipped) · 85 mobile tests · TypeScript clean · Alembic reconciled.
+**Software checks:** 624 backend tests passed, 0 failed, 0 skipped (commit `bc03c42` + uncommitted B2–B4 changes; `scripts/run_isolated_tests.py tests` on a disposable database; 2026-10-04 11:39 +0900) · 85 mobile tests [to verify: commit and date] · TypeScript clean · Alembic reconciled since B1 (`bc03c42`), `alembic check` clean.
 
 ---
 
@@ -105,11 +106,14 @@ Evidence files (check they exist in `docs/`): `validation_m5stack_avant_lora.md`
 5. Long-term autonomy not established.
 6. v3 persistence under power loss not validated.
 7. HTTP prototype not encrypted.
-8. `TARGET_TIMEZONE` still `Asia/Tokyo` (→ `Africa/Abidjan` before field).
+8. `TARGET_TIMEZONE` still `Asia/Tokyo` (→ `Africa/Abidjan` before field); it is a code constant, not an env variable.
 9. Anomaly thresholds not calibrated on real veterinary data.
-10. `ANOMALY_MIN_COVERAGE_SECONDS` not set.
+10. `ANOMALY_MIN_COVERAGE_SECONDS` not set: every day with a reception time is excluded (target and baseline), so new data never raises anomalies.
 11. No evidence the model generalizes to West African breeds.
 12. No willingness-to-pay or validated business model.
+13. No collar-side buffering of v2 windows.
+14. Application tables (alerts, notifications, vet, users…) store naive UTC timestamps; telemetry and provenance tables use timestamptz.
+15. Last known battery may be outdated (no timestamp on the device row).
 
 ---
 
@@ -132,6 +136,7 @@ Safe gap wording: *"No public IMU dataset matching the targeted West African cat
 | Topic | Decision needed |
 |---|---|
 | `ANOMALY_MIN_COVERAGE_SECONDS` | set a value, with justification |
+| Scheduler | enable it or not (`SCHEDULER_ENABLED=false` by default) |
 | Timezone | switch to `Africa/Abidjan` before field |
 | v3 flash archive | validate under power loss before enabling |
 | LoRaWAN payload | design compact radio profile (≤51 B at DR0–DR2) |
@@ -172,8 +177,8 @@ Feature freeze: no new large features.
 
 | Need | File |
 |---|---|
-| Full state, science, proposals, sources | `project_master_handoff_revised_2026-09-23.md` |
-| Data flows, contracts, components | `project_architecture_revised_2026-09-23.md` |
+| Full state, science, proposals, sources | `project_master_handoff.md` |
+| Data flows, contracts, components | `project_architecture.md` |
 | LoRaWAN regulation and radio proposals | handoff §13–15 · architecture §20–29 |
 | Business hypotheses | handoff §16–18 |
 | Article strategy and datasets | `scientific_article_development_dossier_livestock_monitoring.docx` |

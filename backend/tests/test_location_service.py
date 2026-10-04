@@ -75,7 +75,7 @@ def test_classify_gap():
 def test_segment_track_empty():
     start = datetime(2026, 9, 22, 10, 0, 0, tzinfo=UTC)
     end = datetime(2026, 9, 22, 12, 0, 0, tzinfo=UTC)
-    segments, gaps = _segment_track([], [], start, end, is_lost=False)
+    segments, gaps = _segment_track([], [], start, end)
 
     assert len(segments) == 0
     assert len(gaps) == 1
@@ -112,7 +112,7 @@ def test_segment_track_with_gaps():
         is_reliable=True,
     )
 
-    segments, gaps = _segment_track([p1, p2, p3], [], start, end, is_lost=False)
+    segments, gaps = _segment_track([p1, p2, p3], [], start, end)
 
     assert len(segments) == 2
     assert len(segments[0].points) == 2
@@ -203,20 +203,25 @@ def test_get_current_location_lost_collar(db):
     )
     db.add(tracking)
 
-    telem = Telemetry(
-        animal_id=animal.id,
-        time=now - timedelta(minutes=10),
-        device_id="DEV-LOST-01",
-        latitude=46.0,
-        longitude=6.0,
-        location=WKTElement("POINT(6.0 46.0)", srid=4326),
-    )
-    db.add(telem)
+    # Collar lost 5 minutes ago (loss period dates). The point before the loss is
+    # the animal's last position; the point inside the loss period is equipment only.
+    db.add(DeviceLossPeriod(device_id="DEV-LOST-01", started_at=now - timedelta(minutes=5),
+                            declared_at=now, audit=[]))
+    for minutes, latitude in ((10, 46.0), (2, 47.0)):
+        db.add(Telemetry(
+            animal_id=animal.id,
+            time=now - timedelta(minutes=minutes),
+            device_id="DEV-LOST-01",
+            latitude=latitude,
+            longitude=6.0,
+            location=WKTElement(f"POINT(6.0 {latitude})", srid=4326),
+        ))
     db.commit()
 
     loc = get_current_location(db, animal, farm.id)
     assert loc is not None
-    assert loc.position_is_animal is False  # Lost collar = matériel seul !
+    assert loc.latitude == 46.0  # loss-period point excluded
+    assert loc.position_is_animal is True
     assert loc.device_status == "lost"
 
 

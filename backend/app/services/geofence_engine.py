@@ -20,6 +20,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.timezone import utc_now, ensure_utc
+from app.services.notification_service import NOTIFICATION_SUPPRESSED
 from app.services.telemetry_quality import eligible_clause
 from app.models.alert import Alert
 from app.models.animal import Animal
@@ -207,9 +208,11 @@ def evaluate_geofencing(
 
     generated_alerts: List[Alert] = []
 
-    # 4. Zone de danger (priorité absolue, déclenchement immédiat sur 1 fix)
-    for dz in in_danger_zones:
-        existing_alerts = (
+    # 4. Zone de danger (priorité absolue, déclenchement immédiat sur 1 fix).
+    # Danger alerts are resolved by a human only. While one is open we record when
+    # the animal was last detected inside and when it was first seen outside again.
+    open_danger_alerts = [
+        a for a in (
             db.query(Alert)
             .filter(
                 Alert.animal_id == animal.id,
@@ -219,13 +222,29 @@ def evaluate_geofencing(
             )
             .all()
         )
+        if (getattr(a, "alert_metadata", None) or {}).get("sub_type", "danger_zone_entry") == "danger_zone_entry"
+    ]
+    stamp_iso = measurement_time.isoformat()
+    inside_ids = {dz.id for dz in in_danger_zones}
+    for open_alert in open_danger_alerts:
+        meta = dict(open_alert.alert_metadata or {})
+        if meta.get("geofence_id") not in inside_ids and not meta.get("left_zone_at"):
+            meta["left_zone_at"] = stamp_iso
+            open_alert.alert_metadata = meta
+
+    for dz in in_danger_zones:
         existing = next(
-            (a for a in existing_alerts if (getattr(a, "alert_metadata", None) or {}).get("geofence_id") == dz.id),
+            (a for a in open_danger_alerts if (getattr(a, "alert_metadata", None) or {}).get("geofence_id") == dz.id),
             None,
         )
         if existing:
+            # Re-entry (or continued presence) while the alert is open: same alert.
             meta = dict(existing.alert_metadata or {})
-            meta["last_detected_at"] = measurement_time.isoformat()
+            if meta.get("left_zone_at"):
+                meta["reentry_count"] = int(meta.get("reentry_count") or 0) + 1
+                meta["left_zone_at"] = None
+            meta["last_detected_at"] = stamp_iso
+            meta["last_detected_inside_at"] = stamp_iso
             meta["latitude"] = latitude
             meta["longitude"] = longitude
             existing.alert_metadata = meta
@@ -244,7 +263,10 @@ def evaluate_geofencing(
                     "geofence_name": dz.name,
                     "latitude": latitude,
                     "longitude": longitude,
-                    "last_detected_at": measurement_time.isoformat(),
+                    "last_detected_at": stamp_iso,
+                    "last_detected_inside_at": stamp_iso,
+                    "left_zone_at": None,
+                    "reentry_count": 0,
                 },
             )
             db.add(alert)
@@ -315,6 +337,15 @@ def evaluate_geofencing(
                         meta["longitude"] = longitude
                         active_exit.alert_metadata = meta
                     else:
+                        exit_metadata = {
+                            "sub_type": "pasture_exit",
+                            "latitude": latitude,
+                            "longitude": longitude,
+                            "last_detected_at": measurement_time.isoformat(),
+                        }
+                        if in_danger_zones:
+                            # Same fix is in a danger zone: keep the exit alert, notify only the danger alert.
+                            exit_metadata[NOTIFICATION_SUPPRESSED] = "covered_by_danger_alert"
                         exit_alert = Alert(
                             animal_id=animal.id,
                             farm_id=animal.farm_id,
@@ -323,15 +354,11 @@ def evaluate_geofencing(
                             title="Pasture boundary exit",
                             message=f"Animal {animal.name} exited pasture boundary (confirmed by 2 consecutive fixes).",
                             triggered_at=measurement_time,
-                            alert_metadata={
-                                "sub_type": "pasture_exit",
-                                "latitude": latitude,
-                                "longitude": longitude,
-                                "last_detected_at": measurement_time.isoformat(),
-                            },
+                            alert_metadata=exit_metadata,
                         )
                         db.add(exit_alert)
-                        generated_alerts.append(exit_alert)
+                        if not in_danger_zones:
+                            generated_alerts.append(exit_alert)
                         logger.warning(f"⚠️ WARNING GEOFENCE ALERT: Animal {animal.id} confirmed outside pasture.")
                 else:
                     logger.info(f"Animal {animal.id} is 1st fix outside pasture; awaiting 2nd fix confirmation (anti-jitter).")

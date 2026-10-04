@@ -1,0 +1,46 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> fbc3952585f9, baseline_existing_schema
+INFO  [alembic.runtime.migration] Running upgrade fbc3952585f9 -> 9c312871348b, add_accel_3axes_windowing
+INFO  [alembic.runtime.migration] Running upgrade 9c312871348b -> 2082c4e4b0dc, add_predicted_behavior_to_telemetry
+INFO  [alembic.runtime.migration] Running upgrade 2082c4e4b0dc -> 187d38a14511, add_daily_behavior_summary_table
+INFO  [alembic.runtime.migration] Running upgrade 187d38a14511 -> 0a6e1e7a1828, update_alerts_type_check_constraint
+INFO  [alembic.runtime.migration] Running upgrade 0a6e1e7a1828 -> 093cf2d65539, add_gin_index_alert_metadata
+INFO  [alembic.runtime.migration] Running upgrade 093cf2d65539 -> 29135abe6072, add_alert_feedback_and_unique_constraints
+INFO  [alembic.runtime.migration] Running upgrade 29135abe6072 -> b4e8f1a2c3d4, add_farm_memberships_table
+INFO  [alembic.runtime.migration] Running upgrade b4e8f1a2c3d4 -> c7b2a4d9e1f0, add unique daily anomaly alert index
+INFO  [alembic.runtime.migration] Running upgrade c7b2a4d9e1f0 -> d8e4f6a1b2c3, reconcile required farm-scoped columns
+INFO  [alembic.runtime.migration] Running upgrade d8e4f6a1b2c3 -> e9f5a7b2c3d4, add daily job execution history
+INFO  [alembic.runtime.migration] Running upgrade e9f5a7b2c3d4 -> f0a6b8c3d4e5, ensure geofence polygon GiST index
+INFO  [alembic.runtime.migration] Running upgrade f0a6b8c3d4e5 -> 1b7d9e4c5a6f, Enforce one assigned animal per physical device.
+INFO  [alembic.runtime.migration] Running upgrade 1b7d9e4c5a6f -> 2c8e0f6a7b9d, Backfill device rows for existing animal assignments.
+INFO  [alembic.runtime.migration] Running upgrade 2c8e0f6a7b9d -> 3d9f1b2c4a6e, Add optional device binary identifiers and secret fingerprints.
+INFO  [alembic.runtime.migration] Running upgrade 3d9f1b2c4a6e -> 4e0a2c3d5b7f, Add persistent revocation, loss history and telemetry provenance (no backfill).
+INFO  [alembic.runtime.migration] Running upgrade 4e0a2c3d5b7f -> 5f1b3d4e6c8a, Add isolated untimed telemetry archive; no historical backfill.
+INFO  [alembic.runtime.migration] Running upgrade 5f1b3d4e6c8a -> 6a2c4e5f7b8d, Add animal_tracking_periods and alerts.farm_id for historical provenance.
+INFO  [alembic.runtime.migration] Running upgrade 6a2c4e5f7b8d -> 7b3d5f6a8c9e, Bootstrap prospective tracking and durable farm creation receipts.
+INFO  [alembic.runtime.migration] Running upgrade 7b3d5f6a8c9e -> 8c4e6a1b2d3f, Add notifications tables: push_devices, notification_preferences, notification_deliveries
+INFO  [alembic.runtime.migration] Running upgrade 8c4e6a1b2d3f -> 9d5f7b2c3e4a, Add veterinary tables: veterinary_cases, veterinary_entries
+disposable database: livestock_audit_cde7dd170f1e49c780d12b9bd61759ac
+PASS  N4 one delivery per eligible user (owner, farmer, vet), not per device                             [1, 2, 3]
+PASS  N6 enqueue twice -> no duplicate (key alert_id+user_id+channel+event_type)                         
+PASS  N6b owner with 2 devices: one delivery row, pushed to both devices, device_id keeps only the last  pushes=2 row=('sent', 0, None, datetime.datetime(2026, 10, 3, 13, 21, 8, 246294), 2)
+PASS  N6c vet without a push device -> 'failed' NO_ACTIVE_DEVICE (no retry)                              ('failed', 0, 'NO_ACTIVE_DEVICE', datetime.datetime(2026, 10, 3, 13, 21, 8, 254657), None)
+PASS  N8 farmer membership revoked before dispatch -> cancelled PERMISSION_REVOKED, not sent             ('cancelled', 0, 'PERMISSION_REVOKED', datetime.datetime(2026, 10, 3, 13, 21, 8, 422246), None)
+PASS  N8b farm owner (farms.owner_id) with membership revoked -> still SENT (owner bypass)               ('sent', 0, None, datetime.datetime(2026, 10, 3, 13, 21, 8, 422246), 4)
+PASS  N9 preference changed after enqueue (min_severity=critical) -> cancelled PREFERENCE_DISABLED       ('cancelled', 0, 'PREFERENCE_DISABLED', datetime.datetime(2026, 10, 3, 13, 21, 8, 476440), None)
+FAIL  N9b quiet-hours fields exist on NotificationPreference                                             ['id', 'user_id', 'farm_id', 'categories', 'min_severity', 'enabled', 'created_at', 'updated_at']
+PASS  N10 retryable error: retries with backoff 30/60/120 s, then failed after 4 attempts                [('retry', 1, 30), ('retry', 2, 60), ('retry', 3, 120), ('failed', 3, None), ('failed', 3, None), ('failed', 3, None)] calls=4
+PASS  N11 DeviceNotRegistered -> token deactivated, delivery failed                                      active=False ('failed', 0, 'DeviceNotRegistered')
+PASS  N11b ExpoPushProvider: non-Expo token -> deactivate_token=True, no network                         InvalidPushToken
+PASS  N10b one device OK + one retryable failure -> whole delivery 'sent', failed device never retried   ('sent', 0, None)
+PASS  N12 two dispatchers at once: no notification sent twice (SKIP LOCKED)                              pushes=5 unique=5 processed=[0, 5]
+PASS  N12b exception mid-batch: already-pushed notification is pushed AGAIN on next run (at-least-once)  first_run=[12] second_run=[12, 13]
+PASS  N12c status 'sending' is never used (allowed by the CHECK constraint)                              no code path sets status='sending'
+PASS  N14 POST /notifications/dispatch as users.role=farmer (no farm membership) -> 403                  403
+PASS  N14 POST /notifications/dispatch as users.role=vet (no farm membership) -> 403                     403
+PASS  N14 POST /notifications/dispatch as users.role=owner (no farm membership) -> 200                   200
+PASS  N14 POST /notifications/dispatch as users.role=admin (no farm membership) -> 200                   200
+
+18/19 expectations met
+dropped: livestock_audit_cde7dd170f1e49c780d12b9bd61759ac

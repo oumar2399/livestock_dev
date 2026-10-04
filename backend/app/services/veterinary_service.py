@@ -130,9 +130,12 @@ def update_veterinary_case(
     farm_id: int,
     case_id: int,
     data: VeterinaryCaseUpdate,
+    user: User,
 ) -> VeterinaryCase:
     """
     Met à jour le statut ou le titre d'un dossier vétérinaire.
+    Chaque changement de statut ajoute une entrée 'status_change' au journal, dans
+    la même transaction ; closed_at reflète l'état courant, le journal garde l'historique.
     """
     case = get_veterinary_case(db, farm_id, case_id)
     now = datetime.utcnow()
@@ -140,7 +143,15 @@ def update_veterinary_case(
     if data.title is not None:
         case.title = data.title
 
-    if data.status is not None:
+    if data.status is not None and data.status != case.status:
+        db.add(VeterinaryEntry(
+            case_id=case.id,
+            author_user_id=user.id,
+            entry_type="status_change",
+            content=f"Status: {case.status} → {data.status}",
+            occurred_at=now,
+            created_at=now,
+        ))
         case.status = data.status
         if data.status == "closed":
             case.closed_at = now

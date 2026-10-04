@@ -10,7 +10,8 @@ Il orchestre :
   1. L'initialisation de l'ecran LCD (interface visuelle terrain KIC).
   2. La verification du chien de garde materiel (Watchdog WDT).
   3. L'execution continue de la boucle B.4 (15s IMU Welford 10Hz, GPS temps reel).
-  4. La protection contre la perte de donnees sous canopee via l'archive v3 flash.
+  4. L'archive v3 flash (fenetres sans heure UTC fiable) : OPTIONNELLE et desactivee
+     par defaut ; active seulement si device_config.UNTIMED_ARCHIVE_ENABLED = True.
   5. Le superviseur de resilience (gestion du 401 basse consommation, reboot sur panne).
 """
 
@@ -18,8 +19,8 @@ import gc
 import sys
 import time
 
-# Permettre l'import des modules que ce soit a la racine ou dans /tests
-for path in (".", "tests", "/flash", "/flash/tests"):
+# Firmware modules live at the flash root only; bench copies in /tests are never imported.
+for path in (".", "/flash"):
     if path not in sys.path:
         sys.path.append(path)
 
@@ -90,6 +91,7 @@ class DisplayManager:
             pass
 
     def get_battery_level(self):
+        """Battery percentage, or None when it cannot be read (never a made-up value)."""
         if HAS_HARDWARE_UI and power is not None:
             try:
                 lvl = power.getBatteryLevel()
@@ -97,13 +99,17 @@ class DisplayManager:
                     return int(lvl)
             except Exception:
                 pass
-        return 85
+        return None
 
     def update_battery(self, level):
         if not self.enabled:
             return
         try:
-            if isinstance(level, int) and level > 0:
+            if level is None:
+                lcd.setTextColor(COLOR_YELLOW)
+                lcd.setCursor(220, 10)
+                lcd.print("BAT ?   ")
+            elif isinstance(level, int) and level > 0:
                 col = COLOR_GREEN if level > 50 else (COLOR_YELLOW if level > 20 else COLOR_RED)
                 lcd.setTextColor(col)
                 lcd.setCursor(220, 10)
@@ -115,7 +121,7 @@ class DisplayManager:
         except Exception:
             pass
 
-    def show_startup(self, dev_id, transport_id):
+    def show_startup(self, dev_id, transport_id, archive_enabled=False):
         if not self.enabled:
             return
         try:
@@ -124,7 +130,7 @@ class DisplayManager:
             lcd.print("Dev: " + str(dev_id) + " | TID: " + str(transport_id) + "     ")
             lcd.setTextColor(COLOR_GRAY)
             lcd.setCursor(10, 52)
-            lcd.print("FW: v2.0 (B.4+v3) | GPS: Active   ")
+            lcd.print(startup_firmware_text(archive_enabled))
         except Exception:
             pass
 
@@ -208,6 +214,10 @@ class DisplayManager:
             pass
 
 
+def startup_firmware_text(archive_enabled):
+    return "FW: v2.0 (B.4) | v3: " + ("ON " if archive_enabled else "OFF") + "   "
+
+
 display = DisplayManager()
 
 
@@ -245,14 +255,15 @@ def main():
         while True:
             time.sleep(1)
 
-    dev_id = getattr(config, "DEVICE_ID", "M5-COLLAR")
-    transport_id = getattr(config, "TRANSPORT_ID", 101)
-    display.show_startup(dev_id, transport_id)
-
-    # Forcer les parametres de production vitaux
+    # Forcer les parametres de production vitaux. The v3 archive stays off unless
+    # the private configuration enables it explicitly.
     config.PRODUCTION_MODE = True
     config.B4_ISOLATED_BENCH = False
-    config.UNTIMED_ARCHIVE_ENABLED = getattr(config, "UNTIMED_ARCHIVE_ENABLED", True)
+    config.UNTIMED_ARCHIVE_ENABLED = bool(getattr(config, "UNTIMED_ARCHIVE_ENABLED", False))
+
+    dev_id = getattr(config, "DEVICE_ID", "M5-COLLAR")
+    transport_id = getattr(config, "TRANSPORT_ID", 101)
+    display.show_startup(dev_id, transport_id, config.UNTIMED_ARCHIVE_ENABLED)
 
     wdt = init_watchdog()
     cycle_counter = 0

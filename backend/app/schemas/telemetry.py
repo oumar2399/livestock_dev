@@ -98,8 +98,8 @@ class TelemetryResponse(TelemetryBase):
 
     time                : datetime
     animal_id           : Optional[int] = None
-    battery             : int = Field(..., alias="battery_level",
-                            serialization_alias="battery")
+    battery             : Optional[int] = Field(..., alias="battery_level",
+                                      serialization_alias="battery")
     has_feedback        : Optional[bool] = False
     feedback_verdict    : Optional[str] = None
     feedback_correction : Optional[str] = None
@@ -107,6 +107,8 @@ class TelemetryResponse(TelemetryBase):
 class BinaryTelemetryCreate(TelemetryCreate):
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)
+    # None = battery unknown (firmware sent 255). JSON keeps a required 0-100 value.
+    battery: Optional[int] = Field(..., ge=0, le=100)
 
     @model_validator(mode="after")
     def coordinate_pair(self):
@@ -128,5 +130,5 @@ class TelemetryLatest(BaseModel):
     behavior_eligible: Optional[bool] = None
     activity    : float
     activity_state : Optional[str] = None
-    battery     : int
+    battery     : Optional[int]
     last_update : datetime

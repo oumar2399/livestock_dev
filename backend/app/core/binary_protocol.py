@@ -2,9 +2,11 @@
 
 from types import MappingProxyType
 
-PROTOCOL_VERSION = 1
+# Legacy v1 (5 s, 50 samples): still decoded, then rejected with 422 at ingestion.
+LEGACY_V1_PROTOCOL_VERSION = 1
 PROTOCOL_PROFILES = MappingProxyType({1: (10, 50), 2: (10, 150)})
 GPS_ABSENT = -2147483648
+BATTERY_UNKNOWN = 255  # firmware sentinel: battery unreadable, stored as NULL
 HEADER_FORMAT = "<BH"
 HEADER_SIZE = 3
 PACKET_FORMAT = "<BHIiiBB12h2H"
@@ -22,7 +24,7 @@ ACCEL_SCALE = 1_000
 TRANSPORT_ID_MIN = 1
 TRANSPORT_ID_MAX = 65535
 SAMPLE_RATE = 10
-WINDOW_SAMPLES = 50
+LEGACY_V1_WINDOW_SAMPLES = 50
 VARIANCE_DDOF = 0
 FEATURE_LIMIT_G = 6.0
 FEATURE_NAMES = (

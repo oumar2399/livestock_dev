@@ -6,6 +6,7 @@ import struct
 PACKET_FORMAT = "<BHIiiBB12h2H"
 UNTIMED_FORMAT = "<BHQIIBiiBB12h2H"
 GPS_ABSENT = -2147483648
+BATTERY_UNKNOWN = 255  # battery could not be read; the backend stores NULL
 
 
 def rounded(value, scale):
@@ -62,7 +63,7 @@ class Window:
                            reason, *self._wire_values(gps, battery))
 
     def _wire_values(self, gps, battery):
-        if not 0 <= battery <= 100:
+        if battery != BATTERY_UNKNOWN and not 0 <= battery <= 100:
             raise ValueError("Invalid battery")
         lat, lon, satellites = GPS_ABSENT, GPS_ABSENT, 0
         if gps is not None:

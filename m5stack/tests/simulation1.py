@@ -2,6 +2,11 @@
 Livestock Monitoring System - v2.0
 Windowed accelerometry : 3 axes X/Y/Z à 10 Hz sur fenêtres de 5s
 Features statistiques envoyées au backend (mean, std, min, max)
+
+HISTORICAL — INCOMPATIBLE with the current backend: its JSON mode sends 5 s
+windows (rejected with 422, only 15 s windows are accepted) and no
+X-Device-Secret (JSON ingestion requires a provisioned device, else 401).
+Use m5stack/main.py (binary v2) for the current device.
 """
 import device_config as config
 

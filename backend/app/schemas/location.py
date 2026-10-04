@@ -48,7 +48,7 @@ class TrackSegment(BaseModel):
     start_time: datetime
     end_time: datetime
     is_proven: bool = True
-    quality: str = "reliable"  # "reliable" | "degraded" | "uncertain"
+    quality: str = "reliable"  # "reliable" | "degraded" (loss-period points are not in the track)
 
 
 class GapInfo(BaseModel):

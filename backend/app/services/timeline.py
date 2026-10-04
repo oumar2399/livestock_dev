@@ -15,6 +15,7 @@ from app.models.daily_summary import DailyBehaviorSummary
 from app.models.feedback import AlertFeedback, PredictionFeedback
 from app.models.veterinary import VeterinaryCase, VeterinaryEntry
 from app.schemas.timeline import TimelineEventType, TimelineItem, TimelinePage
+from app.services.provenance_service import day_proven_in_farm, proven_in_farm
 
 
 @dataclass(frozen=True)
@@ -91,9 +92,18 @@ def _apply_cursor(query, time_column, id_column, event_type, cursor):
     return query.filter(or_(time_column < cursor_time, same_time))
 
 
-def _alert_items(db, animal_id, start, end, cursor, fetch_limit):
+def _alert_in_farm(farm_id):
+    """Alerts carry their own farm_id; legacy rows without it fall back to the tracking periods."""
+    return or_(
+        Alert.farm_id == farm_id,
+        and_(Alert.farm_id.is_(None),
+             proven_in_farm(Alert.animal_id, Alert.triggered_at, farm_id, naive_utc=True)),
+    )
+
+
+def _alert_items(db, animal_id, farm_id, start, end, cursor, fetch_limit):
     event_type = TimelineEventType.ALERT.value
-    query = db.query(Alert).filter(Alert.animal_id == animal_id)
+    query = db.query(Alert).filter(Alert.animal_id == animal_id, _alert_in_farm(farm_id))
     query = _apply_bounds(query, Alert.triggered_at, start, end)
     query = _apply_cursor(query, Alert.triggered_at, Alert.id, event_type, cursor)
     rows = query.order_by(Alert.triggered_at.desc(), Alert.id.desc()).limit(fetch_limit)
@@ -117,10 +127,12 @@ def _alert_items(db, animal_id, start, end, cursor, fetch_limit):
     ]
 
 
-def _prediction_feedback_items(db, animal_id, start, end, cursor, fetch_limit):
+def _prediction_feedback_items(db, animal_id, farm_id, start, end, cursor, fetch_limit):
     event_type = TimelineEventType.PREDICTION_FEEDBACK.value
     query = db.query(PredictionFeedback).filter(
-        PredictionFeedback.animal_id == animal_id
+        PredictionFeedback.animal_id == animal_id,
+        proven_in_farm(PredictionFeedback.animal_id, PredictionFeedback.telemetry_time,
+                       farm_id, naive_utc=True),
     )
     query = _apply_bounds(query, PredictionFeedback.created_at, start, end)
     query = _apply_cursor(
@@ -157,9 +169,13 @@ def _prediction_feedback_items(db, animal_id, start, end, cursor, fetch_limit):
     ]
 
 
-def _alert_feedback_items(db, animal_id, start, end, cursor, fetch_limit):
+def _alert_feedback_items(db, animal_id, farm_id, start, end, cursor, fetch_limit):
     event_type = TimelineEventType.ALERT_FEEDBACK.value
-    query = db.query(AlertFeedback).filter(AlertFeedback.animal_id == animal_id)
+    query = (
+        db.query(AlertFeedback)
+        .join(Alert, Alert.id == AlertFeedback.alert_id)
+        .filter(AlertFeedback.animal_id == animal_id, _alert_in_farm(farm_id))
+    )
     query = _apply_bounds(query, AlertFeedback.created_at, start, end)
     query = _apply_cursor(
         query, AlertFeedback.created_at, AlertFeedback.id, event_type, cursor
@@ -186,10 +202,11 @@ def _alert_feedback_items(db, animal_id, start, end, cursor, fetch_limit):
     ]
 
 
-def _daily_summary_items(db, animal_id, start, end, cursor, fetch_limit):
+def _daily_summary_items(db, animal_id, farm_id, start, end, cursor, fetch_limit):
     event_type = TimelineEventType.DAILY_SUMMARY.value
     query = db.query(DailyBehaviorSummary).filter(
-        DailyBehaviorSummary.animal_id == animal_id
+        DailyBehaviorSummary.animal_id == animal_id,
+        day_proven_in_farm(DailyBehaviorSummary.animal_id, DailyBehaviorSummary.date, farm_id),
     )
     query = _apply_bounds(query, DailyBehaviorSummary.created_at, start, end)
     query = _apply_cursor(
@@ -223,12 +240,12 @@ def _daily_summary_items(db, animal_id, start, end, cursor, fetch_limit):
     ]
 
 
-def _veterinary_entry_items(db, animal_id, start, end, cursor, fetch_limit):
+def _veterinary_entry_items(db, animal_id, farm_id, start, end, cursor, fetch_limit):
     event_type = TimelineEventType.VETERINARY_ENTRY.value
     query = (
         db.query(VeterinaryEntry)
         .join(VeterinaryCase, VeterinaryEntry.case_id == VeterinaryCase.id)
-        .filter(VeterinaryCase.animal_id == animal_id)
+        .filter(VeterinaryCase.animal_id == animal_id, VeterinaryCase.farm_id == farm_id)
     )
     query = _apply_bounds(query, VeterinaryEntry.occurred_at, start, end)
     query = _apply_cursor(
@@ -273,21 +290,29 @@ LOADERS = {
 def build_timeline(
     db: Session,
     animal_id: int,
+    farm_id: int,
     event_types: Optional[Iterable[TimelineEventType]],
     date_from: Optional[date],
     date_to: Optional[date],
     limit: int,
     cursor_value: Optional[str],
+    include_veterinary: bool = False,
 ) -> TimelinePage:
+    """Timeline of `animal_id` as seen by `farm_id`: only events proven for that farm.
+
+    Veterinary entries are returned only when `include_veterinary` is True.
+    """
     cursor = decode_cursor(cursor_value) if cursor_value else None
     start, end = _date_bounds(date_from, date_to)
     selected = set(event_types or LOADERS.keys())
+    if not include_veterinary:
+        selected.discard(TimelineEventType.VETERINARY_ENTRY)
     fetch_limit = limit + 1
     items: list[TimelineItem] = []
 
     for event_type, loader in LOADERS.items():
         if event_type in selected:
-            items.extend(loader(db, animal_id, start, end, cursor, fetch_limit))
+            items.extend(loader(db, animal_id, farm_id, start, end, cursor, fetch_limit))
 
     items.sort(
         key=lambda item: (

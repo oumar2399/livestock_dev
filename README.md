@@ -11,8 +11,8 @@ les donnees historiques. Voir [la transition 15 s](docs/transition_15s.md).
 | Dossier/document | Responsabilite |
 | --- | --- |
 | [Vue d'ensemble](project_overview.md) | Resume court des deux documents de reference |
-| [Handoff](project_master_handoff_revised_2026-09-23.md) | Etat actuel, decisions, limites et prochaine etape |
-| [Architecture](project_architecture_revised_2026-09-23.md) | Flux de donnees et responsabilites techniques |
+| [Handoff](project_master_handoff.md) | Etat actuel, decisions, limites et prochaine etape |
+| [Architecture](project_architecture.md) | Flux de donnees et responsabilites techniques |
 | [Index documentaire](docs/README.md) | Plans, comptes rendus et niveaux de validation |
 | [Firmware](m5stack/README.md) | Sources uniques, configuration privee et transfert M5 |
 | `backend/app/` | API, ingestion, ML et traitements metier |

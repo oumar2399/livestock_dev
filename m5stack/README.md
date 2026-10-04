@@ -16,7 +16,13 @@ modules dans `tests/`. Les versions historiques restent consultables dans Git.
 
 `PRODUCTION_MODE=True` selectionne le mode autonome ; ce nom de configuration
 ne signifie pas que le dispositif est qualifie pour un deploiement terrain.
-L'archive v3 reste desactivee dans le modele de configuration.
+L'archive v3 reste desactivee dans le modele de configuration, et `main.py`
+la considere desactivee si `device_config.py` ne definit pas le drapeau.
+`main.py` n'ajoute que la racine (`.`, `/flash`) a `sys.path` : aucun module
+de `tests/` n'est importe par le firmware autonome.
+
+Batterie illisible : le paquet porte la valeur 255 (stockee NULL cote serveur,
+"inconnue") et l'ecran affiche `BAT ?`. Aucune valeur de repli n'est inventee.
 
 ## Transfert sur la carte
 
@@ -61,9 +67,13 @@ L'archive v3 reste desactivee dans le modele de configuration.
   materiels de transport et de pannes ; configuration privee specifique.
 - `tests/simulation1.py`, `tests/device_config.example.py` : ancien chemin JSON
   5 s conserve ; ce modele de configuration n'est pas celui de `main.py`.
-- `gps-code/index.py` : prototype GPS historique, pas une dependance autonome.
+- `archive/gps_code_index.py` (ancien `gps-code/index.py`) : prototype GPS
+  historique archive, pas une dependance ; ne pas le copier sur la carte.
 
 Pour un banc, transferer le script choisi a cote des memes modules principaux.
+`test_fault_tolerance.py`, `test_binary_telemetry.py` et `diagnose_gps_clock.py`
+ajoutent eux-memes `/flash/tests` a `sys.path` pour trouver leur configuration
+ou leurs voisins dans `/flash/tests`.
 Les scripts `profile_gps_parser`, `validate_gps_filter` et
 `validate_gps_filter_synthetic` se lancent explicitement au REPL par
 `import nom_du_script`, puis `nom_du_script.main()` ; leur simple import ne lance

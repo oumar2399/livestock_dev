@@ -152,12 +152,15 @@ def test_preview_limit_is_bounded(limit, api_client):
 
 
 @pytest.mark.parametrize('path', ['preview', 'export'])
-def test_missing_farm_and_cross_farm_animal_are_rejected(path, api_client):
+def test_missing_farm_or_animal_is_rejected_but_past_farm_is_allowed(path, api_client):
     client, db, _, _ = api_client
     db.query.return_value.filter.return_value.first.return_value = None
     assert client.get(f'/api/v1/reports/{path}/alerts?farm_id=3').status_code == 404
-    db.query.return_value.filter.return_value.first.side_effect = [(3,), SimpleNamespace(farm_id=4)]
-    assert client.get(f'/api/v1/reports/{path}/alerts?farm_id=3&animal_id=7').status_code == 400
+    db.query.return_value.filter.return_value.first.side_effect = [(3,), None]
+    assert client.get(f'/api/v1/reports/{path}/alerts?farm_id=3&animal_id=7').status_code == 404
+    # farm_id filters on the farm at measurement time: an animal now in another farm is valid.
+    db.query.return_value.filter.return_value.first.side_effect = [(3,), (7,)]
+    assert client.get(f'/api/v1/reports/{path}/alerts?farm_id=3&animal_id=7').status_code == 200
 
 
 @pytest.mark.parametrize('dataset', list(ReportDataset))

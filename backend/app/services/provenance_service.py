@@ -6,12 +6,77 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional, Sequence
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy.orm import Session, aliased
+from sqlalchemy import DateTime, and_, cast, exists, func, or_, select, text
 
+from app.core.config import TARGET_TIMEZONE
 from app.core.timezone import utc_now, ensure_utc
 from app.models.provenance import AnimalTrackingPeriod
 from app.models.animal import Animal
+
+
+# ── Shared SQL provenance rules ──────────────────────────────────────────────
+# Same rule as /farms/{id}/locations*: a row belongs to a farm only when a
+# tracking period of that animal on that farm covers its time
+# (valid_from <= t < valid_to, open-ended when valid_to is NULL).
+
+def _as_utc(time_column, naive_utc: bool):
+    # Naive columns store UTC; make the comparison independent of the session timezone.
+    return func.timezone("UTC", time_column) if naive_utc else time_column
+
+
+def _covers(period, animal_column, instant):
+    return and_(
+        period.animal_id == animal_column,
+        period.valid_from <= instant,
+        or_(period.valid_to.is_(None), period.valid_to > instant),
+    )
+
+
+def proven_in_farm(animal_column, time_column, farm, *, naive_utc: bool = False):
+    """EXISTS clause: the row's time lies in a tracking period of the animal on `farm`."""
+    period = aliased(AnimalTrackingPeriod)
+    return exists(select(period.id).where(
+        _covers(period, animal_column, _as_utc(time_column, naive_utc)),
+        period.farm_id == farm,
+    ))
+
+
+def _local_day_bounds(date_column):
+    start = func.timezone(TARGET_TIMEZONE, cast(date_column, DateTime))
+    return start, start + text("INTERVAL '1 day'")
+
+
+def day_proven_in_farm(animal_column, date_column, farm):
+    """EXISTS clause: the whole local day (TARGET_TIMEZONE) lies in one period on `farm`.
+
+    A transfer day is split between two farms, so it is proven for neither.
+    """
+    period = aliased(AnimalTrackingPeriod)
+    day_start, day_end = _local_day_bounds(date_column)
+    return exists(select(period.id).where(
+        period.animal_id == animal_column,
+        period.farm_id == farm,
+        period.valid_from <= day_start,
+        or_(period.valid_to.is_(None), period.valid_to >= day_end),
+    ))
+
+
+def period_at_time(animal_column, time_column, *, naive_utc: bool = False):
+    """(alias, ON clause) for an outer join to the period covering the row's time."""
+    period = aliased(AnimalTrackingPeriod)
+    return period, _covers(period, animal_column, _as_utc(time_column, naive_utc))
+
+
+def period_covering_day(animal_column, date_column):
+    """(alias, ON clause) for an outer join to the period covering the whole local day."""
+    period = aliased(AnimalTrackingPeriod)
+    day_start, day_end = _local_day_bounds(date_column)
+    return period, and_(
+        period.animal_id == animal_column,
+        period.valid_from <= day_start,
+        or_(period.valid_to.is_(None), period.valid_to >= day_end),
+    )
 
 
 def record_tracking_period(

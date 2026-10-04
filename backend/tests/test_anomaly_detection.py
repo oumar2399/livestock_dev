@@ -32,13 +32,13 @@ def test_median_and_mad_computation():
     assert abs(med - 50.0) < 0.1
     assert mad >= 0.0
 
-    # Z-score for normal value
+    # Z-score for normal value (alert threshold: |Z| >= 3.5)
     z_normal = compute_modified_z_score(51.0, med, mad)
-    assert z_normal < 3.0
+    assert z_normal < 3.5
 
     # Z-score for extreme low value
     z_low = compute_modified_z_score(10.0, med, mad)
-    assert z_low > 3.0
+    assert z_low >= 3.5
 
 
 def test_anomaly_detection_flow():
@@ -187,8 +187,8 @@ def test_anomaly_detection_flow():
         db.commit()
         db.refresh(animal_zero)
 
-        # 10 days telemetry for warm-up
-        for d in range(10):
+        # 10 days telemetry for warm-up, all BEFORE the evaluated date (warm-up window)
+        for d in range(1, 11):
             db.add(Telemetry(
                 time=base_time - timedelta(days=d),
                 animal_id=animal_zero.id,
@@ -225,6 +225,11 @@ def test_anomaly_detection_flow():
         assert alert_zero.type == AlertType.ACTIVITY_DEVIATION_HIGH.value
         assert "pts vs habitude" in alert_zero.message
         assert "+15.0 pts" in alert_zero.message
+        # Identical baseline (MAD = MeanAD = 0): no Z-score, warning on a >= 5 pt change.
+        assert alert_zero.severity == AlertSeverity.WARNING.value
+        assert alert_zero.alert_metadata["z_scale"] == "none"
+        assert alert_zero.alert_metadata["z_score"] is None
+        assert alert_zero.alert_metadata["reason"] == "baseline_without_variation"
 
         print(f"PASS: Zero median alert generated: {alert_zero.message}")
 

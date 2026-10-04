@@ -150,24 +150,17 @@ def register(
     """
     Inscription nouvel utilisateur
     
-    Note : La création d'un compte 'admin' via cette route est bloquée.
-    Les admins sont créés directement en BDD ou via /auth/users (admin existant).
-    
+    New accounts always get the default account role; any "role" sent by the
+    client is ignored. Admins are created in the database or by an existing
+    admin (PUT /auth/users/{id}/role).
+
     Body JSON:
     {
         "email": "fermier@example.com",
         "password": "motdepasse123",
-        "name": "Tanaka Hiroshi",
-        "role": "farmer"
+        "name": "Tanaka Hiroshi"
     }
     """
-    # Bloquer création admin via API publique
-    if data.role == "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Impossible de créer un compte admin via l'API publique",
-        )
-
     # Vérifier email unique
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
@@ -181,7 +174,6 @@ def register(
         email=data.email,
         password_hash=hash_password(data.password),
         name=data.name,
-        role=data.role,
         phone=data.phone,
     )
     db.add(user)

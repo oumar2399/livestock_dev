@@ -249,6 +249,7 @@ def test_clinical_neutrality_no_auto_feedback(db, vet_setup):
         farm_id=farm1.id,
         case_id=case.id,
         data=VeterinaryCaseUpdate(status="closed"),
+        user=vet,
     )
 
     # Vérification stricte : Zéro AlertFeedback créé implicitement
@@ -289,6 +290,8 @@ def test_timeline_integration_veterinary_entry(db, vet_setup):
     timeline = build_timeline(
         db=db,
         animal_id=animal1.id,
+        farm_id=farm1.id,
+        include_veterinary=True,
         event_types=None,  # tous les types
         date_from=None,
         date_to=None,

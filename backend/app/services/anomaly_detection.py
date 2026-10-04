@@ -1,16 +1,23 @@
 """
 Anomaly Detection Service — Behavioral Anomaly Detection & Safeguards
 ======================================================================
-1. Warm-up Safeguard: Ensures animal has sufficient distinct days before evaluation.
-2. Modified Z-Score: Computes robust Median and MAD statistics on DailyBehaviorSummary.
-3. Directional Alerts: Triggers 'activity_deviation_low' or 'activity_deviation_high'
+1. Warm-up Safeguard: at least MIN_HISTORY_DAYS distinct days of eligible telemetry
+   in the MAX_WINDOW_DAYS days before the evaluated date.
+2. Modified Z-Score (Iglewicz & Hoaglin, 1993) on DailyBehaviorSummary.pct_active:
+   Z = 0.6745 * (x - median) / MAD. When MAD == 0 (more than half of the baseline
+   days identical), the mean absolute deviation about the median is used instead:
+   Z = (x - median) / (1.2533 * MeanAD). When both are 0 there is no Z-score.
+3. Alert rule: |x - median| >= MIN_ACTIVITY_CHANGE_PTS percentage points AND
+   |Z| >= Z_THRESHOLD (3.5, the value recommended by Iglewicz & Hoaglin). Without a
+   Z-score, the change alone decides (warning, reason "baseline_without_variation").
+4. Directional Alerts: 'activity_deviation_low' or 'activity_deviation_high',
    without making biological/diagnostic assumptions.
 """
 
 import os
 import logging
 import statistics
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta
 from typing import Optional, Tuple, List
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import Session
@@ -20,7 +27,7 @@ from app.models.telemetry import Telemetry
 from app.models.daily_summary import DailyBehaviorSummary
 from app.models.alert import Alert
 from app.schemas.alert import AlertType, AlertSeverity
-from app.core.timezone import TARGET_TZ, utc_now
+from app.core.timezone import TARGET_TZ
 from app.core.config import TARGET_TIMEZONE
 from app.services.telemetry_quality import eligible_clause, lock_behavior
 from app.models.telemetry_quality import BehaviorRebuild
@@ -31,7 +38,14 @@ logger = logging.getLogger(__name__)
 # Default configuration via environment variables
 MIN_HISTORY_DAYS = int(os.getenv("MIN_HISTORY_DAYS", 10))
 MAX_WINDOW_DAYS = int(os.getenv("MAX_WINDOW_DAYS", 20))
-Z_THRESHOLD = float(os.getenv("Z_THRESHOLD", 3.0))
+Z_THRESHOLD = float(os.getenv("Z_THRESHOLD", 3.5))
+# No alert below this absolute change of pct_active (percentage points), whatever the Z-score.
+MIN_ACTIVITY_CHANGE_PTS = float(os.getenv("MIN_ACTIVITY_CHANGE_PTS", 5))
+# Heuristic tier, not from the literature: |Z| >= 4.5 is reported as "critical".
+CRITICAL_Z_THRESHOLD = 4.5
+
+MAD_CONSISTENCY = 0.6745      # Iglewicz & Hoaglin (1993)
+MEAN_AD_CONSISTENCY = 1.2533  # sqrt(pi / 2): MeanAD scale for a normal distribution
 
 
 def has_sufficient_history(
@@ -39,18 +53,23 @@ def has_sufficient_history(
     animal_id: int,
     min_days: int = MIN_HISTORY_DAYS,
     max_window_days: int = MAX_WINDOW_DAYS,
+    target_date: Optional[date] = None,
 ) -> bool:
     """
-    Check if an animal has data for at least `min_days` distinct calendar days
-    within the last `max_window_days` sliding window.
+    Check if an animal has eligible telemetry on at least `min_days` distinct local
+    days (TARGET_TIMEZONE) within the `max_window_days` days BEFORE `target_date`
+    (the evaluated date, excluded). Defaults to today's local date.
     """
-    cutoff_time = utc_now() - timedelta(days=max_window_days)
+    target_date = target_date or datetime.now(TARGET_TZ).date()
+    window_start = datetime.combine(target_date - timedelta(days=max_window_days), time.min, tzinfo=TARGET_TZ)
+    window_end = datetime.combine(target_date, time.min, tzinfo=TARGET_TZ)
 
     distinct_days_count = (
         db.query(func.count(func.distinct(cast(func.timezone(TARGET_TIMEZONE, Telemetry.time), Date))))
         .filter(
             Telemetry.animal_id == animal_id,
-            Telemetry.time >= cutoff_time,
+            Telemetry.time >= window_start,
+            Telemetry.time < window_end,
             eligible_clause(),
         )
         .scalar()
@@ -59,7 +78,7 @@ def has_sufficient_history(
     has_enough = distinct_days_count >= min_days
     logger.debug(
         f"Animal #{animal_id} warm-up check: {distinct_days_count}/{min_days} distinct days "
-        f"in the last {max_window_days} days. Sufficient = {has_enough}"
+        f"in the {max_window_days} days before {target_date}. Sufficient = {has_enough}"
     )
 
     return has_enough
@@ -86,11 +105,30 @@ def compute_median_and_mad(values: List[float]) -> Tuple[float, float]:
 
 def compute_modified_z_score(val: float, median_val: float, mad_val: float) -> float:
     """
-    Compute Modified Z-score using Boris Iglewicz and David Hoaglin's formula:
-    Z = |val - median| / (1.4826 * MAD + 1e-6)
+    |Modified Z-score| per Iglewicz & Hoaglin (1993): |0.6745 * (val - median) / MAD|.
+    MAD must be > 0; use score_deviation() for the MAD == 0 fallbacks.
     """
-    denom = 1.4826 * mad_val + 1e-6
-    return abs(val - median_val) / denom
+    if mad_val <= 0:
+        raise ValueError("MAD must be positive; use score_deviation() when MAD == 0")
+    return abs(MAD_CONSISTENCY * (val - median_val) / mad_val)
+
+
+def score_deviation(value: float, baseline: List[float]) -> Tuple[Optional[float], str, float, float, float]:
+    """
+    Robust deviation of `value` from `baseline`.
+
+    Returns (|Z| or None, scale, median, MAD, MeanAD) where scale is:
+      "MAD"    : Z = 0.6745 * (x - median) / MAD
+      "MeanAD" : MAD == 0, Z = (x - median) / (1.2533 * MeanAD), MeanAD about the median
+      "none"   : MAD == MeanAD == 0 (all baseline days identical), no Z-score
+    """
+    median_val, mad_val = compute_median_and_mad(baseline)
+    mean_ad = statistics.fmean(abs(v - median_val) for v in baseline) if baseline else 0.0
+    if mad_val > 0:
+        return compute_modified_z_score(value, median_val, mad_val), "MAD", median_val, mad_val, mean_ad
+    if mean_ad > 0:
+        return abs(value - median_val) / (MEAN_AD_CONSISTENCY * mean_ad), "MeanAD", median_val, mad_val, mean_ad
+    return None, "none", median_val, mad_val, mean_ad
 
 
 def evaluate_animal_anomaly(
@@ -122,8 +160,9 @@ def evaluate_animal_anomaly(
         Alert.alert_metadata["quality_invalidated_at"].astext.is_not(None),
     ).first():
         return None
-    # 1. Warm-up safeguard
-    if not has_sufficient_history(db, animal_id, min_days=min_days, max_window_days=max_window_days):
+    # 1. Warm-up safeguard (history before the evaluated date)
+    if not has_sufficient_history(db, animal_id, min_days=min_days, max_window_days=max_window_days,
+                                  target_date=target_date):
         logger.info(f"Animal #{animal_id}: Insufficient history for anomaly detection on {target_date}. Skipping.")
         return None
 
@@ -163,25 +202,31 @@ def evaluate_animal_anomaly(
         logger.info(f"Animal #{animal_id}: Baseline count ({len(baseline_pcts)}) < {min_days} on {target_date}. Skipping.")
         return None
 
-    # 4. Compute Median, MAD, and Z-score
-    median_val, mad_val = compute_median_and_mad(baseline_pcts)
-    z_score = compute_modified_z_score(target_summary.pct_active, median_val, mad_val)
+    # 4. Robust deviation (MAD, MeanAD fallback, or no Z-score)
+    z_score, z_scale, median_val, mad_val, mean_ad = score_deviation(target_summary.pct_active, baseline_pcts)
+    change_pts = abs(target_summary.pct_active - median_val)
+    z_text = "n/a" if z_score is None else f"{z_score:.2f}"
 
     logger.info(
         f"Animal #{animal_id} on {target_date}: pct_active={target_summary.pct_active:.1f}%, "
-        f"baseline_median={median_val:.1f}%, MAD={mad_val:.1f}%, Z-score={z_score:.2f}"
+        f"baseline_median={median_val:.1f}%, MAD={mad_val:.2f}, MeanAD={mean_ad:.2f}, "
+        f"scale={z_scale}, Z={z_text}"
     )
 
-    # 5. Check anomaly threshold
-    if z_score < z_threshold:
+    # 5. Alert rule: a minimum absolute change, then the Z threshold when a Z exists.
+    if change_pts < MIN_ACTIVITY_CHANGE_PTS:
+        return None
+    if z_score is not None and z_score < z_threshold:
         return None
 
     # Retrieve animal for notification text
     animal = db.query(Animal).filter(Animal.id == animal_id).first()
     animal_name = animal.name if animal else f"Animal #{animal_id}"
 
-    # Symmetric severity classification
-    severity = AlertSeverity.CRITICAL.value if z_score >= 4.5 else AlertSeverity.WARNING.value
+    # Symmetric severity; without a Z-score the alert is a warning.
+    severity = (AlertSeverity.CRITICAL.value
+                if z_score is not None and z_score >= CRITICAL_Z_THRESHOLD
+                else AlertSeverity.WARNING.value)
 
     # Dynamic unit calculation (% vs pts)
     if median_val > 0:
@@ -233,25 +278,25 @@ def evaluate_animal_anomaly(
             "pct_active": target_summary.pct_active,
             "baseline_median": median_val,
             "baseline_mad": mad_val,
-            "z_score": round(z_score, 2),
+            "baseline_mean_ad": round(mean_ad, 4),
+            "z_scale": z_scale,
+            "z_score": None if z_score is None else round(z_score, 2),
+            **({"reason": "baseline_without_variation"} if z_scale == "none" else {}),
             "delta_pct": round(delta_pct, 1),
             "unit": unit,
         },
     )
 
     db.add(alert)
+    db.flush()
+    # Intent in the alert's transaction; a failure only rolls back its savepoint.
+    from app.services.notification_service import enqueue_in_savepoint
+    enqueue_in_savepoint(db, [alert])
     db.commit()
     db.refresh(alert)
 
-    try:
-        from app.services.notification_service import enqueue_alert_notification
-        enqueue_alert_notification(db, alert)
-        db.commit()
-    except Exception:
-        logger.exception("Failed to enqueue notification for anomaly alert %s", alert.id)
-
     logger.warning(
-        f"ANOMALY ALERT CREATED: [{severity.upper()}] {title} - {message} (Z={z_score:.2f})"
+        f"ANOMALY ALERT CREATED: [{severity.upper()}] {title} - {message} (scale={z_scale}, Z={z_text})"
     )
     return alert
 

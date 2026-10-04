@@ -62,7 +62,7 @@ def test_update_omissions_and_nullable_fields(binary_case, animal_client):
 
 
 @pytest.mark.parametrize("loaded", [False, True])
-def test_delete_cascades_dependents_but_retains_raw_telemetry(binary_case, animal_client, loaded):
+def test_delete_with_history_is_refused_and_nothing_is_removed(binary_case, animal_client, loaded):
     case = binary_case
     db, animal_id = case.db, case.animal.id
     other = Animal(farm_id=case.farm.id, name="Keep me")
@@ -90,11 +90,10 @@ def test_delete_cascades_dependents_but_retains_raw_telemetry(binary_case, anima
     else:
         db.expire(case.animal)
     response = animal_client.delete(f"/api/v1/animals/{animal_id}")
-    assert response.status_code == 204, response.text
-    assert db.query(Animal).filter_by(id=animal_id).count() == 0
-    for model in (DailyBehaviorSummary, Alert, PredictionFeedback, AlertFeedback):
-        assert db.query(model).filter_by(animal_id=animal_id).count() == 0
-    assert db.query(Telemetry).filter_by(animal_id=animal_id).count() == 1
+    assert response.status_code == 409 and response.json()["detail"] == "animal_has_history"
+    assert db.query(Animal).filter_by(id=animal_id).count() == 1
+    for model in (DailyBehaviorSummary, Alert, PredictionFeedback, AlertFeedback, Telemetry):
+        assert db.query(model).filter_by(animal_id=animal_id).count() == 1
     assert db.query(DailyBehaviorSummary).filter_by(animal_id=other.id).count() == 1
     assert db.query(Animal).filter_by(id=other.id).count() == 1
 

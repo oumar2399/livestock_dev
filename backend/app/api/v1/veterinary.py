@@ -152,6 +152,7 @@ def update_veterinary_case(
         farm_id=farm_id,
         case_id=case_id,
         data=payload,
+        user=current_user,
     )
     return _format_case_response(case, include_entries=True)
 

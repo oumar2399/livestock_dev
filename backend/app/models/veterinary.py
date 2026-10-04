@@ -103,7 +103,9 @@ class VeterinaryEntry(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    entry_type = Column(String(30), nullable=False)  # observation, intervention, follow_up, assessment, note
+    # observation, intervention, follow_up, assessment, note (written by people);
+    # status_change (written by the system on every case status change).
+    entry_type = Column(String(30), nullable=False)
     content = Column(Text, nullable=False)
     occurred_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -114,7 +116,7 @@ class VeterinaryEntry(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "entry_type IN ('observation', 'intervention', 'follow_up', 'assessment', 'note')",
+            "entry_type IN ('observation', 'intervention', 'follow_up', 'assessment', 'note', 'status_change')",
             name="ck_veterinary_entry_type",
         ),
         Index("idx_vet_entries_case_occurred", "case_id", "occurred_at"),
