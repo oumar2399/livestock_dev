@@ -67,7 +67,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         "sub": str(user_id),
         "email": email,
         "role": role,        # farmer | owner | vet | admin
-        "farm_ids": [1, 2]   # fermes accessibles
+        "name": name         # farms are not in the token; access is read from the database
     }
     """
     to_encode = data.copy()

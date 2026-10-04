@@ -25,7 +25,6 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQueryClient } from '@tanstack/react-query';
 
 import { Colors, Spacing, Typography, Radius } from '../constants/config';
 import { useAuthStore } from '../store/authStore';
@@ -137,7 +136,6 @@ const ROLE_COLORS: Record<string, string> = {
 function DrawerContent(props: DrawerContentComponentProps) {
   const insets = useSafeAreaInsets();
   const { user, role, logout } = useAuthStore();
-  const queryClient = useQueryClient();
   const farmState = useFarmStore();
   const { farms, currentFarmId, selectFarm, loadFarms } = farmState;
   const currentRole = selectedFarmRole(role, farmState);
@@ -150,8 +148,8 @@ function DrawerContent(props: DrawerContentComponentProps) {
 
   const handleFarmChange = async (farmId: number) => {
     if (farmId === currentFarmId) return;
+    // selectFarm clears the query and offline caches before switching.
     if (await selectFarm(farmId)) {
-      queryClient.clear();
       go('HomeTabs');
     }
   };

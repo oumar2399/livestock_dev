@@ -50,22 +50,22 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 
 | Area | Status | Key facts | Ref |
 |---|---|---|---|
-| Firmware | ✅ | `m5stack/main.py`; cycle ≈ 19.4 s; WDT; v3 archive off by default (`UNTIMED_ARCHIVE_ENABLED=False`); unreadable battery sent as 255 = unknown (stored NULL, LCD `BAT ?`) | handoff §3.2 |
+| Firmware | ✅ | `m5stack/main.py`; cycle ≈ 19.4 s; WDT; v3 archive off by default (`UNTIMED_ARCHIVE_ENABLED=False`); unreadable battery sent as 255 = unknown (stored NULL, LCD `BAT ?`, mobile "Unknown") | handoff §3.2 |
 | Telemetry v2 | ✅ | 45 B, reliable UTC required, GPS may be absent | handoff §4.1 |
 | Telemetry v3 | 🟡 | 58 B, no reliable UTC → separate `untimed_telemetry`; off by default (backend `BINARY_V3_ENABLED=false`); power-loss persistence not validated | handoff §4.2 |
 | ML model | ✅ | RF, Active/Resting, 15 s only loaded; 5 s rejected (422) | handoff §5.2 |
-| Multi-farm RBAC | ✅ | `admin` platform role; `owner/farmer/vet` per farm; JWT carries no farms | arch §11 |
-| Geofencing | ✅ | `ST_Covers`; fix ≥ 4 satellites, ≤ 25 km/h, ≤ 300 s old; danger = immediate, resolved by humans only; pasture exit = 2 fixes ≤ 120 s apart, auto-resolved on return; one notification per fix (danger wins over pasture exit) | handoff §8.2 |
-| Location / history | ✅ | gaps > 30 min segmented; quality `reliable/degraded`; loss-period points removed from the track; telemetry attributed to the animal holding the collar at reception time | handoff §8.3 |
+| Multi-farm RBAC | ✅ | `admin` platform role; `owner/farmer/vet` per farm; JWT carries no farms; mobile uses the selected farm's role (B5) | arch §11 |
+| Geofencing | ✅ | `ST_Covers`; fix ≥ 4 satellites, ≤ 25 km/h, ≤ 300 s old; danger = immediate, resolved by humans only; pasture exit = 2 fixes ≤ 120 s apart, auto-resolved on return; one notification per fix (danger wins over pasture exit); mobile alert card shows "Last detected inside" / "No longer detected inside" | handoff §8.2 |
+| Location / history | ✅ | gaps > 30 min segmented; quality `reliable/degraded`; loss-period points removed from the track; telemetry attributed to the animal holding the collar at reception time; map draws no dashed "uncertain" style | handoff §8.3 |
 | Notifications | 🟡 | backend outbox only (intent in the alert transaction, 24 h reconciliation, `SKIP LOCKED`, retry); no mobile token registration, no automatic dispatch (admin-only endpoint), no quiet hours; real phone reception not validated | handoff §8.4 |
-| Offline | 🟡 | module exists, not integrated (cache and banner not used by any screen) | handoff §8.5 |
-| Veterinary | ✅ | `VeterinaryCase` + append-only entries; no automatic diagnosis | handoff §8.6 |
+| Offline | 🟡 | module exists, not integrated (cache and banner not used by any screen); farm change clears the query cache and the offline cache (B5) | handoff §8.5 |
+| Veterinary | ✅ | `VeterinaryCase` + append-only entries; status changes journaled (`STATUS CHANGE` in the app); no automatic diagnosis | handoff §8.6 |
 | Reports / data quality | ✅ | provenance periods; `available/no_data/not_computable/partial` | handoff §8.7 |
 | Anomaly detection | 🟡 | daily modified Z (Iglewicz & Hoaglin), Z ≥ 3.5, MeanAD fallback, change ≥ 5 pts; min 10 days history in 20-day window; inactive on new data while `ANOMALY_MIN_COVERAGE_SECONDS` is unset; scheduler off by default | arch §17 |
 | Previews only | — | video, AI assistant, marketplace (no real backend) | arch §12.2 |
 | LoRaWAN | 💡 | documented, not implemented | handoff §13–15 |
 
-**Software checks:** 624 backend tests passed, 0 failed, 0 skipped (commit `bc03c42` + uncommitted B2–B4 changes; `scripts/run_isolated_tests.py tests` on a disposable database; 2026-10-04 11:39 +0900) · 85 mobile tests [to verify: commit and date] · TypeScript clean · Alembic reconciled since B1 (`bc03c42`), `alembic check` clean.
+**Software checks:** 624 backend tests passed, 0 failed, 0 skipped (commit `bc03c42` + uncommitted B2–B4 changes; `scripts/run_isolated_tests.py tests` on a disposable database; 2026-10-04 11:39 +0900) · 98 mobile tests passed, 0 failed; TypeScript clean (commit `62badba` + uncommitted B5 changes; from `mobile-app`: `node --test tests/*.test.cjs` and `tsc --noEmit`; 2026-10-04 13:06 +0900) · Alembic reconciled since B1 (`bc03c42`), `alembic check` clean.
 
 ---
 

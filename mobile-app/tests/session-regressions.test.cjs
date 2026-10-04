@@ -49,6 +49,7 @@ function harness() {
       pairs.forEach(([key, value]) => saved.set(key, value));
     },
     multiRemove: async (keys) => keys.forEach((key) => saved.delete(key)),
+    getAllKeys: async () => Array.from(saved.keys()),
     setItem: async (key, value) => saved.set(key, value),
     removeItem: async (key) => saved.delete(key),
   };
@@ -320,6 +321,42 @@ test('farm selection supports multiple assigned farms and rejects unassigned ids
   assert.equal(await h.farms.getState().selectFarm(25), true);
   await h.farms.getState().loadFarms();
   assert.equal(h.farms.getState().currentFarmId, 25);
+});
+
+test('changing farm clears the query cache and the offline cache of the previous farm', async () => {
+  const h = harness();
+  await h.login();
+  h.farms.setState({ farms: [{ id: 17 }, { id: 25 }], currentFarmId: 17 });
+  h.queryClient.setQueryData(['animals', 17], [{ id: 1, name: 'Old farm animal' }]);
+  h.saved.set('@offline_cache:1:17:animals_list:all', '{}');
+
+  // Re-selecting the current farm keeps both caches.
+  assert.equal(await h.farms.getState().selectFarm(17), true);
+  assert.equal(h.queryClient.getQueryCache().getAll().length, 1);
+  assert.equal(h.saved.has('@offline_cache:1:17:animals_list:all'), true);
+
+  assert.equal(await h.farms.getState().selectFarm(25), true);
+  assert.equal(h.farms.getState().currentFarmId, 25);
+  assert.equal(h.queryClient.getQueryCache().getAll().length, 0);
+  assert.equal([...h.saved.keys()].some((key) => key.startsWith('@offline_cache:')), false);
+  assert.equal(h.saved.get('@livestock/current_farm_id'), '25');
+});
+
+test('role helpers follow the selected farm, platform admin aside', async () => {
+  const h = harness();
+  await h.login();
+  h.auth.setState({ role: 'vet' });
+  h.farms.setState({ farms: [{ id: 17, membership_role: 'vet' }, { id: 25, membership_role: 'owner' }],
+    currentFarmId: 17, isLoading: false, error: null });
+  const helpers = () => {
+    const s = h.auth.getState();
+    return { vet: s.isVet(), owner: s.isOwner(), farmer: s.isFarmer(), edit: s.canEdit(), health: s.canViewHealth(), admin: s.isAdmin() };
+  };
+  assert.deepEqual(helpers(), { vet: true, owner: false, farmer: false, edit: false, health: true, admin: false });
+  h.farms.setState({ currentFarmId: 25 });
+  assert.deepEqual(helpers(), { vet: false, owner: true, farmer: false, edit: false, health: false, admin: false });
+  h.auth.setState({ role: 'admin' });
+  assert.deepEqual(helpers(), { vet: false, owner: false, farmer: false, edit: true, health: true, admin: true });
 });
 
 test('clearing farms invalidates a pending selection before it can restore state', async () => {

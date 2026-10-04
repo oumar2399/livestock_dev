@@ -24,13 +24,18 @@ import {
 } from '../../hooks/useVeterinary';
 import { useAnimals } from '../../hooks/useAnimals';
 import { VeterinaryCase, VeterinaryEntry } from '../../api/veterinary';
+import { selectedFarmRole } from '../../utils/selectedFarmRole';
+import { entryTypeLabel } from '../../utils/veterinaryLabels';
 
 // ─── VetOptionsScreen ─────────────────────────────────────────────────────────
 export default function VetOptionsScreen() {
   const role = useAuthStore((state) => state.role);
-  const currentFarmId = useFarmStore((state) => state.currentFarmId);
-  const isVetOrAdmin = role === 'vet' || role === 'admin';
-  const isOwner = role === 'owner';
+  const farmState = useFarmStore();
+  const currentFarmId = farmState.currentFarmId;
+  // Same source as Profile / Drawer: the role in the selected farm (platform admin aside).
+  const farmRole = selectedFarmRole(role, farmState);
+  const isVetOrAdmin = farmRole === 'vet' || farmRole === 'admin';
+  const isOwner = farmRole === 'owner';
 
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
@@ -65,9 +70,32 @@ export default function VetOptionsScreen() {
   const updateCaseMutation = useUpdateVeterinaryCase();
   const addEntryMutation = useAddCaseEntry();
 
+  // A form opens empty after Cancel / close or a successful save; a failed save keeps the text.
+  const resetCreateForm = () => {
+    setSelectedAnimalId(null);
+    setCaseTitle('');
+    setInitialEntryType('observation');
+    setInitialContent('');
+  };
+
+  const resetEntryForm = () => {
+    setNewEntryType('observation');
+    setNewContent('');
+  };
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    resetCreateForm();
+  };
+
+  const closeAddEntryModal = () => {
+    setShowAddEntryModal(false);
+    resetEntryForm();
+  };
+
   const handleCreateCase = async () => {
     if (!selectedAnimalId || !caseTitle.trim()) {
-      Alert.alert('Champs obligatoires', 'Veuillez sélectionner un animal et indiquer un titre.');
+      Alert.alert('Required fields', 'Please select an animal and enter a title.');
       return;
     }
 
@@ -82,19 +110,16 @@ export default function VetOptionsScreen() {
             }
           : undefined,
       });
-      setShowCreateModal(false);
-      setCaseTitle('');
-      setInitialContent('');
-      setSelectedAnimalId(null);
+      closeCreateModal();
       refetch();
     } catch (err: any) {
-      Alert.alert('Erreur', err?.message || 'Impossible de créer le dossier.');
+      Alert.alert('Error', err?.message || 'Unable to create the case.');
     }
   };
 
   const handleAddEntry = async () => {
     if (!selectedCaseId || !newContent.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir le contenu de la note.');
+      Alert.alert('Error', 'Please enter the note content.');
       return;
     }
 
@@ -106,10 +131,9 @@ export default function VetOptionsScreen() {
           content: newContent.trim(),
         },
       });
-      setShowAddEntryModal(false);
-      setNewContent('');
+      closeAddEntryModal();
     } catch (err: any) {
-      Alert.alert('Erreur', err?.message || "Impossible d'ajouter l'entrée.");
+      Alert.alert('Error', err?.message || 'Unable to add the entry.');
     }
   };
 
@@ -121,18 +145,18 @@ export default function VetOptionsScreen() {
         payload: { status: newStatus },
       });
     } catch (err: any) {
-      Alert.alert('Erreur', err?.message || 'Impossible de modifier le statut.');
+      Alert.alert('Error', err?.message || 'Unable to change the status.');
     }
   };
 
   if (!isVetOrAdmin && !isOwner) {
     return (
-      <DrawerScreenBase title="Dossiers Vétérinaires">
+      <DrawerScreenBase title="Veterinary Records">
         <View style={styles.restrictedContainer}>
           <Ionicons name="lock-closed-outline" size={48} color={Colors.text.muted} />
-          <Text style={styles.restrictedTitle}>Accès réservé</Text>
+          <Text style={styles.restrictedTitle}>Restricted access</Text>
           <Text style={styles.restrictedDesc}>
-            Les dossiers cliniques et interventions médicales sont réservés aux vétérinaires et propriétaires de la ferme.
+            Clinical records and medical interventions are restricted to the farm's veterinarians and owners.
           </Text>
         </View>
       </DrawerScreenBase>
@@ -142,12 +166,12 @@ export default function VetOptionsScreen() {
   const cases = casesData?.cases || [];
 
   return (
-    <DrawerScreenBase title="Suivi Vétérinaire">
+    <DrawerScreenBase title="Veterinary Follow-up">
       <View style={styles.container}>
         {/* Header avec action de création si VET/ADMIN */}
         <View style={styles.topBar}>
           <Text style={styles.headerSubtitle}>
-            {cases.length} dossier{cases.length > 1 ? 's' : ''} clinique{cases.length > 1 ? 's' : ''}
+            {cases.length} clinical case{cases.length === 1 ? '' : 's'}
           </Text>
           {isVetOrAdmin && (
             <TouchableOpacity
@@ -155,7 +179,7 @@ export default function VetOptionsScreen() {
               onPress={() => setShowCreateModal(true)}
             >
               <Ionicons name="add" size={18} color="#FFFFFF" />
-              <Text style={styles.createButtonText}>Nouveau dossier</Text>
+              <Text style={styles.createButtonText}>New case</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -164,14 +188,15 @@ export default function VetOptionsScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.filterBar}
           contentContainerStyle={styles.filterScroll}
         >
           {[
-            { label: 'Tous', value: undefined },
-            { label: 'En cours', value: 'provisional' },
-            { label: 'Confirmés', value: 'confirmed' },
-            { label: 'Écartés', value: 'ruled_out' },
-            { label: 'Fermés', value: 'closed' },
+            { label: 'All', value: undefined },
+            { label: 'Provisional', value: 'provisional' },
+            { label: 'Confirmed', value: 'confirmed' },
+            { label: 'Ruled out', value: 'ruled_out' },
+            { label: 'Closed', value: 'closed' },
           ].map((f) => {
             const isSelected = statusFilter === f.value;
             return (
@@ -196,7 +221,7 @@ export default function VetOptionsScreen() {
         ) : cases.length === 0 ? (
           <View style={styles.centerContainer}>
             <Ionicons name="medical-outline" size={48} color={Colors.text.muted} />
-            <Text style={styles.emptyText}>Aucun dossier vétérinaire trouvé</Text>
+            <Text style={styles.emptyText}>No veterinary cases found</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.caseList}>
@@ -209,7 +234,7 @@ export default function VetOptionsScreen() {
                 <View style={styles.caseHeader}>
                   <View style={styles.caseTitleRow}>
                     <Ionicons name="document-text-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.caseTitle}>{c.title}</Text>
+                    <Text style={styles.caseTitle} numberOfLines={2}>{c.title}</Text>
                   </View>
                   <View
                     style={[
@@ -225,10 +250,10 @@ export default function VetOptionsScreen() {
 
                 <View style={styles.caseMetaRow}>
                   <Text style={styles.caseAnimal}>
-                    Animal : {c.animal_name || `#${c.animal_id}`}
+                    Animal: {c.animal_name || `#${c.animal_id}`}
                   </Text>
                   <Text style={styles.caseEntries}>
-                    {c.entries_count} note{c.entries_count > 1 ? 's' : ''}
+                    {c.entries_count} note{c.entries_count === 1 ? '' : 's'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -247,7 +272,7 @@ export default function VetOptionsScreen() {
             <View style={styles.detailModalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle} numberOfLines={1}>
-                  {caseDetail?.title || 'Dossier clinique'}
+                  {caseDetail?.title || 'Clinical case'}
                 </Text>
                 <TouchableOpacity onPress={() => setSelectedCaseId(null)}>
                   <Ionicons name="close" size={24} color={Colors.text.primary} />
@@ -263,18 +288,18 @@ export default function VetOptionsScreen() {
                   {/* Statut & Actions */}
                   <View style={styles.detailInfoBox}>
                     <Text style={styles.detailAnimalName}>
-                      Animal : {caseDetail.animal_name || `#${caseDetail.animal_id}`}
+                      Animal: {caseDetail.animal_name || `#${caseDetail.animal_id}`}
                     </Text>
                     <Text style={styles.detailOpener}>
-                      Ouvert par : {caseDetail.opener_name || `Utilisateur #${caseDetail.opened_by}`}
+                      Opened by: {caseDetail.opener_name || `User #${caseDetail.opened_by}`}
                     </Text>
                     <Text style={styles.detailDate}>
-                      Date : {new Date(caseDetail.opened_at).toLocaleDateString()}
+                      Date: {new Date(caseDetail.opened_at).toLocaleDateString()}
                     </Text>
 
                     {isVetOrAdmin && (
                       <View style={styles.statusButtonsRow}>
-                        <Text style={styles.statusLabel}>Modifier statut :</Text>
+                        <Text style={styles.statusLabel}>Change status:</Text>
                         {(['provisional', 'confirmed', 'ruled_out', 'closed'] as const).map(
                           (st) => (
                             <TouchableOpacity
@@ -302,26 +327,26 @@ export default function VetOptionsScreen() {
 
                   {/* Journal des entrées */}
                   <View style={styles.journalHeader}>
-                    <Text style={styles.journalTitle}>Journal d'interventions</Text>
+                    <Text style={styles.journalTitle}>Case journal</Text>
                     {isVetOrAdmin && (
                       <TouchableOpacity
                         style={styles.addEntryBtn}
                         onPress={() => setShowAddEntryModal(true)}
                       >
                         <Ionicons name="add-circle-outline" size={16} color={Colors.primary} />
-                        <Text style={styles.addEntryBtnText}>Ajouter note</Text>
+                        <Text style={styles.addEntryBtnText}>Add note</Text>
                       </TouchableOpacity>
                     )}
                   </View>
 
                   {caseDetail.entries.length === 0 ? (
-                    <Text style={styles.emptyEntries}>Aucune note enregistrée.</Text>
+                    <Text style={styles.emptyEntries}>No notes recorded.</Text>
                   ) : (
                     caseDetail.entries.map((entry) => (
                       <View key={entry.id} style={styles.entryCard}>
                         <View style={styles.entryHeader}>
                           <Text style={styles.entryType}>
-                            {entry.entry_type.toUpperCase()}
+                            {entryTypeLabel(entry.entry_type)}
                           </Text>
                           <Text style={styles.entryDate}>
                             {new Date(entry.occurred_at).toLocaleString()}
@@ -345,18 +370,20 @@ export default function VetOptionsScreen() {
           visible={showCreateModal}
           animationType="fade"
           transparent={true}
-          onRequestClose={() => setShowCreateModal(false)}
+          onRequestClose={closeCreateModal}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.createModalContent}>
-              <Text style={styles.modalTitle}>Nouveau Dossier Clinique</Text>
+              <Text style={styles.modalTitle}>New Clinical Case</Text>
 
+              <ScrollView style={styles.formScroll} contentContainerStyle={styles.formBody} keyboardShouldPersistTaps="handled">
               {/* Sélection de l'animal */}
-              <Text style={styles.inputLabel}>Sélectionner un animal</Text>
+              <Text style={styles.inputLabel}>Select an animal</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.animalPicker}
+                contentContainerStyle={styles.animalPickerContent}
               >
                 {(animalsList?.animals || []).map((a) => {
                   const isSelected = selectedAnimalId === a.id;
@@ -375,33 +402,34 @@ export default function VetOptionsScreen() {
               </ScrollView>
 
               {/* Titre */}
-              <Text style={styles.inputLabel}>Intitulé du suivi</Text>
+              <Text style={styles.inputLabel}>Case title</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Ex : Examen podologique, toux suspecte..."
+                placeholder="E.g. hoof examination, suspected cough..."
                 placeholderTextColor={Colors.text.muted}
                 value={caseTitle}
                 onChangeText={setCaseTitle}
               />
 
               {/* Note initiale */}
-              <Text style={styles.inputLabel}>Observation initiale (optionnelle)</Text>
+              <Text style={styles.inputLabel}>Initial observation (optional)</Text>
               <TextInput
                 style={[styles.textInput, styles.textArea]}
-                placeholder="Observations cliniques constatées par le praticien..."
+                placeholder="Clinical observations made by the practitioner..."
                 placeholderTextColor={Colors.text.muted}
                 multiline
                 numberOfLines={3}
                 value={initialContent}
                 onChangeText={setInitialContent}
               />
+              </ScrollView>
 
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.cancelBtn}
-                  onPress={() => setShowCreateModal(false)}
+                  onPress={closeCreateModal}
                 >
-                  <Text style={styles.cancelBtnText}>Annuler</Text>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.submitBtn}
@@ -411,7 +439,7 @@ export default function VetOptionsScreen() {
                   {createCaseMutation.isPending ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.submitBtnText}>Créer le dossier</Text>
+                    <Text style={styles.submitBtnText}>Create case</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -424,13 +452,14 @@ export default function VetOptionsScreen() {
           visible={showAddEntryModal}
           animationType="fade"
           transparent={true}
-          onRequestClose={() => setShowAddEntryModal(false)}
+          onRequestClose={closeAddEntryModal}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.createModalContent}>
-              <Text style={styles.modalTitle}>Ajouter une Note Clinique</Text>
+              <Text style={styles.modalTitle}>Add a Clinical Note</Text>
 
-              <Text style={styles.inputLabel}>Type d'acte</Text>
+              <ScrollView style={styles.formScroll} contentContainerStyle={styles.formBody} keyboardShouldPersistTaps="handled">
+              <Text style={styles.inputLabel}>Entry type</Text>
               <View style={styles.entryTypeRow}>
                 {(['observation', 'intervention', 'follow_up', 'note'] as const).map(
                   (t) => {
@@ -455,23 +484,24 @@ export default function VetOptionsScreen() {
                 )}
               </View>
 
-              <Text style={styles.inputLabel}>Contenu de la note</Text>
+              <Text style={styles.inputLabel}>Note content</Text>
               <TextInput
                 style={[styles.textInput, styles.textArea]}
-                placeholder="Détail de l'observation, traitement administré, recommandations..."
+                placeholder="Observation details, treatment given, recommendations..."
                 placeholderTextColor={Colors.text.muted}
                 multiline
                 numberOfLines={4}
                 value={newContent}
                 onChangeText={setNewContent}
               />
+              </ScrollView>
 
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.cancelBtn}
-                  onPress={() => setShowAddEntryModal(false)}
+                  onPress={closeAddEntryModal}
                 >
-                  <Text style={styles.cancelBtnText}>Annuler</Text>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.submitBtn}
@@ -481,7 +511,7 @@ export default function VetOptionsScreen() {
                   {addEntryMutation.isPending ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.submitBtnText}>Enregistrer</Text>
+                    <Text style={styles.submitBtnText}>Save</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -523,10 +553,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
   },
+  // A horizontal ScrollView grows to fill the column unless told not to (chips became tall boxes).
+  filterBar: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   filterScroll: {
     paddingHorizontal: Spacing.base,
-    gap: Spacing.xs,
-    paddingBottom: Spacing.xs,
+    gap: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    alignItems: 'center',
   },
   filterChip: {
     paddingHorizontal: Spacing.md,
@@ -541,9 +577,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   filterText: {
-    fontSize: Typography.xs,
-    color: Colors.text.muted,
-    fontWeight: '600',
+    fontSize: Typography.sm,
+    color: Colors.text.secondary,
+    fontWeight: '500',
   },
   filterTextSelected: {
     color: Colors.primary,
@@ -554,7 +590,7 @@ const styles = StyleSheet.create({
   },
   caseCard: {
     backgroundColor: Colors.bg.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     padding: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border.default,
@@ -563,7 +599,8 @@ const styles = StyleSheet.create({
   caseHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
   },
   caseTitleRow: {
     flexDirection: 'row',
@@ -572,6 +609,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   caseTitle: {
+    flexShrink: 1,
     fontSize: Typography.base,
     fontWeight: '600',
     color: Colors.text.primary,
@@ -655,9 +693,16 @@ const styles = StyleSheet.create({
   },
   createModalContent: {
     width: '100%',
+    maxHeight: '85%',
     backgroundColor: Colors.bg.card,
     borderRadius: Radius.lg,
-    padding: Spacing.md,
+    padding: Spacing.base,
+    gap: Spacing.sm,
+  },
+  formScroll: {
+    flexGrow: 0,
+  },
+  formBody: {
     gap: Spacing.xs,
   },
   modalHeader: {
@@ -710,16 +755,18 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   stButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
     backgroundColor: Colors.bg.card,
   },
   stButtonActive: {
     backgroundColor: Colors.primary,
   },
   stButtonText: {
-    fontSize: 10,
+    fontSize: Typography.xs,
     color: Colors.text.secondary,
   },
   stButtonTextActive: {
@@ -782,36 +829,46 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'right',
   },
+  // Inputs and labels follow FarmCreateModal / AnimalFormScreen.
   inputLabel: {
-    fontSize: Typography.xs,
+    fontSize: Typography.sm,
     fontWeight: '600',
     color: Colors.text.secondary,
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
+    marginBottom: 2,
   },
   textInput: {
+    minHeight: 44,
     backgroundColor: Colors.bg.input,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 8,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
     color: Colors.text.primary,
-    fontSize: Typography.sm,
+    fontSize: Typography.base,
     borderWidth: 1,
     borderColor: Colors.border.default,
   },
   textArea: {
-    height: 70,
+    minHeight: 100,
+    maxHeight: 160,
     textAlignVertical: 'top',
   },
   animalPicker: {
-    flexDirection: 'row',
-    marginVertical: 4,
+    flexGrow: 0,
+    flexShrink: 0,
+    marginVertical: Spacing.xs,
+  },
+  animalPickerContent: {
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   animalChip: {
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     paddingVertical: 6,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
     backgroundColor: Colors.bg.elevated,
-    marginRight: Spacing.xs,
   },
   animalChipSelected: {
     backgroundColor: Colors.primary + '25',
@@ -819,7 +876,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   animalChipText: {
-    fontSize: Typography.xs,
+    fontSize: Typography.sm,
     color: Colors.text.secondary,
   },
   animalChipTextSelected: {
@@ -829,13 +886,15 @@ const styles = StyleSheet.create({
   entryTypeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.xs,
-    marginVertical: 4,
+    gap: Spacing.sm,
+    marginVertical: Spacing.xs,
   },
   entryTypeChip: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border.default,
     backgroundColor: Colors.bg.elevated,
   },
   entryTypeChipSelected: {
@@ -844,32 +903,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   entryTypeText: {
-    fontSize: 10,
+    fontSize: Typography.sm,
     color: Colors.text.secondary,
   },
   entryTypeTextSelected: {
     color: Colors.primary,
     fontWeight: '700',
   },
+  // Footer buttons follow FarmCreateModal.
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     gap: Spacing.sm,
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
   },
   cancelBtn: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.bg.input,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtnText: {
     fontSize: Typography.sm,
-    color: Colors.text.muted,
+    fontWeight: '600',
+    color: Colors.text.secondary,
   },
   submitBtn: {
+    flex: 2,
     backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   submitBtnText: {
     fontSize: Typography.sm,

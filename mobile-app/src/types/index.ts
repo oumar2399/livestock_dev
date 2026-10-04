@@ -81,7 +81,7 @@ export interface TelemetryRecord {
   feedback_verdict?: string | null;
   feedback_correction?: string | null;
   temperature: number | null;
-  battery: number;
+  battery: number | null;
 }
 
 export interface TelemetryLatest {
@@ -98,7 +98,7 @@ export interface TelemetryLatest {
   activity_state: ActivityState | null;
   predicted_behavior?: string | null;
   behavior_confidence?: number | null;
-  battery: number;
+  battery: number | null;
   last_update: string;
 }
 
@@ -325,7 +325,8 @@ export type TimelineEventType =
   | 'alert'
   | 'prediction_feedback'
   | 'alert_feedback'
-  | 'daily_summary';
+  | 'daily_summary'
+  | 'veterinary_entry';
 
 export interface TimelineItem {
   id: string;
@@ -581,7 +582,7 @@ export interface TrackSegment {
   start_time: string;
   end_time: string;
   is_proven: boolean;
-  quality: 'reliable' | 'degraded' | 'uncertain';
+  quality: 'reliable' | 'degraded';
 }
 
 export interface GapInfo {

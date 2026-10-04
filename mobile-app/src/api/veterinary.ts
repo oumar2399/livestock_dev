@@ -8,7 +8,8 @@ export interface VeterinaryEntry {
   case_id: number;
   author_user_id?: number | null;
   author_name?: string | null;
-  entry_type: 'observation' | 'intervention' | 'follow_up' | 'assessment' | 'note';
+  // status_change is written by the backend on every case status change; never sent by the app.
+  entry_type: 'observation' | 'intervention' | 'follow_up' | 'assessment' | 'note' | 'status_change';
   content: string;
   occurred_at: string;
   created_at: string;

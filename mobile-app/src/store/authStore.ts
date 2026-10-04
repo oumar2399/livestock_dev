@@ -11,6 +11,7 @@ import { useFarmStore } from './farmStore';
 import { advanceSessionEpoch, getSessionEpoch, withSessionStorage } from './sessionLifecycle';
 import { Config } from '../constants/config';
 import { LoginCredentials } from '../types';
+import { selectedFarmRole } from '../utils/selectedFarmRole';
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
 
@@ -260,11 +261,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // ─── Helpers rôles ────────────────────────────────────────────────────────
   // Utilisés dans l'UI : if (canEdit()) → afficher bouton Supprimer
+  // isAdmin is the platform role; the others use the role in the selected farm
+  // (same source as Profile / Drawer).
 
   isAdmin:       () => get().role === 'admin',
-  isFarmer:      () => get().role === 'farmer',
-  isVet:         () => get().role === 'vet',
-  isOwner:       () => get().role === 'owner',
-  canEdit:       () => ['farmer', 'admin'].includes(get().role ?? ''),
-  canViewHealth: () => ['vet', 'farmer', 'admin'].includes(get().role ?? ''),
+  isFarmer:      () => farmRole(get().role) === 'farmer',
+  isVet:         () => farmRole(get().role) === 'vet',
+  isOwner:       () => farmRole(get().role) === 'owner',
+  canEdit:       () => ['farmer', 'admin'].includes(farmRole(get().role) ?? ''),
+  canViewHealth: () => ['vet', 'farmer', 'admin'].includes(farmRole(get().role) ?? ''),
 }));
+
+function farmRole(accountRole: UserRole | null) {
+  return selectedFarmRole(accountRole, useFarmStore.getState());
+}

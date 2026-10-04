@@ -11,6 +11,7 @@ import { Colors, Radius, Spacing, Typography } from '../../constants/config';
 import { useAnimals } from '../../hooks/useAnimals';
 import { useAnimalTimeline } from '../../hooks/useHistory';
 import { TimelineEventType, TimelineItem } from '../../types';
+import { eventVisual } from '../../utils/timelineVisuals';
 
 type Period = 7 | 30 | 0;
 
@@ -21,13 +22,6 @@ const EVENT_FILTERS: { value: TimelineEventType | null; label: string }[] = [
   { value: 'prediction_feedback', label: 'Predictions' },
   { value: 'alert_feedback', label: 'Feedback' },
 ];
-
-const eventVisuals: Record<TimelineEventType, { icon: string; color: string }> = {
-  alert: { icon: 'warning-outline', color: Colors.severity.warning },
-  daily_summary: { icon: 'calendar-outline', color: Colors.severity.info },
-  prediction_feedback: { icon: 'analytics-outline', color: Colors.primary },
-  alert_feedback: { icon: 'checkmark-done-outline', color: '#9B59B6' },
-};
 
 export default function HistoryScreen() {
   const animalsQuery = useAnimals({ page_size: 100 });
@@ -55,7 +49,7 @@ export default function HistoryScreen() {
   const selectedAnimal = animals.find((animal) => animal.id === animalId);
 
   const renderEvent = ({ item }: { item: TimelineItem }) => {
-    const visual = eventVisuals[item.event_type];
+    const visual = eventVisual(item.event_type);
     return (
       <View style={styles.eventRow}>
         <View style={[styles.eventIcon, { backgroundColor: visual.color + '20' }]}>

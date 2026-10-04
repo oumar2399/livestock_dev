@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import apiClient from '../api/client';
+import { queryClient } from '../api/queryClient';
 import { FarmAccess } from '../types';
+import { clearAllOfflineCache } from '../utils/offlineCache';
 import { getSessionEpoch, withSessionStorage } from './sessionLifecycle';
 
 
@@ -64,7 +66,12 @@ export const useFarmStore = create<FarmState>((set, get) => ({
       if (isCurrent()) await AsyncStorage.setItem(CURRENT_FARM_KEY, String(farmId));
     });
     if (!isCurrent()) return false;
+    const changed = get().currentFarmId !== farmId;
+    // Drop the previous farm's data before any screen can render it under the new farm.
+    if (changed) queryClient.clear();
     set({ currentFarmId: farmId, isLoading: false });
+    // Outside withSessionStorage: the purge takes the same storage queue itself.
+    if (changed) await clearAllOfflineCache();
     return true;
   },
 

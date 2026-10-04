@@ -123,8 +123,8 @@ Cette architecture LoRaWAN est **proposée et documentée**, mais **pas encore i
 État retenu pour la documentation courante :
 
 - **624 tests backend réussis, 0 échec, 0 ignoré** — commit `bc03c42` + modifications B2–B4 non commitées ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-04 11:39 +0900 ;
-- **85 tests mobile réussis** [to verify : commit et date] ;
-- TypeScript vérifié sans erreur ;
+- **98 tests mobile réussis, 0 échec** — commit `62badba` + modifications B5 non commitées ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-04 13:06 +0900 ;
+- TypeScript vérifié sans erreur (`tsc --noEmit`, même commit, 2026-10-04 13:06 +0900) ;
 - schéma / migrations Alembic **réconciliés** depuis B1 (`bc03c42`), `alembic check` propre.
 
 Les anciens nombres de tests (`43`, `54`, `57`, `61`, `73`, `76`, etc.) restent uniquement des **résultats historiques de lots ou de campagnes intermédiaires**. Ils ne doivent pas être utilisés comme total courant.
@@ -251,7 +251,7 @@ Le parsing GPS a été découplé de la boucle IMU pour ne plus perturber l’é
 
 La fenêtre n’est pas envoyée si un échantillon dépasse ±4 g, arrive avec plus de 20 ms de retard, si la fin de fenêtre est en retard, ou si l’UTC n’est pas strictement croissant.
 
-Batterie illisible : envoyée comme 255 = inconnue, stockée NULL côté backend ; LCD `BAT ?`.
+Batterie illisible : envoyée comme 255 = inconnue, stockée NULL côté backend ; LCD `BAT ?` ; l’app mobile affiche « Unknown » (B5).
 
 Des cycles stabilisés d’environ **19,4 s** ont été rapportés dans la documentation après optimisation fast-bytes.
 
@@ -549,6 +549,8 @@ Les JWT n’embarquent pas les fermes accessibles ; les permissions sont relues 
 
 Le rôle éventuellement choisi à l’inscription est ignoré (rôle par défaut uniquement).
 
+Côté mobile (B5), l’écran vétérinaire et les helpers `isVet`, `isOwner`, `isFarmer`, `canEdit`, `canViewHealth` utilisent le rôle dans la ferme sélectionnée (même source que Profil / Drawer) ; seul `admin` reste un rôle plateforme.
+
 ### Pourquoi
 
 Cela évite qu’un token valide pendant 24 h conserve des autorisations déjà révoquées.
@@ -609,7 +611,8 @@ La consolidation la plus récente ajoute :
 - rejet des arrivées hors ordre ;
 - savepoint PostGIS pour qu’une erreur spatiale ne devienne pas une fausse alerte ;
 - alerte danger ouverte : métadonnées `last_detected_inside_at`, `left_zone_at`, `reentry_count` ;
-- une notification par fix : si le même fix est en zone danger et hors pâturage, l’alerte de sortie est conservée avec `notification_suppressed` et seule l’alerte danger est notifiée.
+- une notification par fix : si le même fix est en zone danger et hors pâturage, l’alerte de sortie est conservée avec `notification_suppressed` et seule l’alerte danger est notifiée ;
+- mobile (B5) : la carte d’alerte danger affiche « Last detected inside » et, si `left_zone_at` est renseigné, « No longer detected inside ».
 
 ---
 
@@ -625,7 +628,7 @@ La consolidation la plus récente ajoute :
 - points situés dans une période de perte retirés du tracé ;
 - qualification `reliable` (tous les points ≥ 4 satellites) ou `degraded` ;
 - télémétrie attribuée à l’animal qui porte le collier au moment de la réception ;
-- affichage mobile multi-segments.
+- affichage mobile multi-segments (plus de style pointillé `uncertain` depuis B5).
 
 ---
 
@@ -664,6 +667,8 @@ Le cache (`offlineCache.ts`) et la bannière (`OfflineBanner.tsx`) existent mais
 - cache purgé au logout et au changement de ferme ;
 - bannière explicite d’ancienneté des données.
 
+B5 : le changement de ferme vide le cache de requêtes et le cache offline.
+
 ---
 
 ## 8.6 Workflow vétérinaire
@@ -677,7 +682,8 @@ Le cache (`offlineCache.ts`) et la bannière (`OfflineBanner.tsx`) existent mais
 - écriture réservée au vétérinaire / admin
 - timeline unifiée
 - changement de statut journalisé (entrée `status_change`)
-- suppression d’un animal ayant un historique → 409 `animal_has_history`.
+- suppression d’un animal ayant un historique → 409 `animal_has_history`
+- mobile (B5) : en-tête « STATUS CHANGE » pour ces entrées ; timeline backend en anglais (« Veterinary note: … », « Status change »).
 
 ### Principe clinique
 
@@ -778,7 +784,7 @@ Pour éviter toute ambiguïté avec les sections historiques :
 - ✅ **Roadmap applicative correspondante** : les lots mentionnés ci-dessus sont faits ; les anciennes phrases indiquant qu’ils sont “prochains”, “futurs” ou “non codés” sont obsolètes.
 - ✅ **Idempotence création ferme** : version récente PostgreSQL durable.
 - ✅ **Alembic / schéma** : réconcilié depuis B1 (`bc03c42`).
-- ✅ **Tests mobile courants** : **85** [to verify : commit et date].
+- ✅ **Tests mobile courants** : **98** (commit `62badba` + B5 non commité, `node --test tests/*.test.cjs`, 2026-10-04 13:06 +0900).
 
 ---
 
