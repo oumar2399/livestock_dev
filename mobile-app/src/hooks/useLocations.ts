@@ -9,6 +9,7 @@ import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { locationsApi, LocationHistoryParams } from '../api/locations';
 import { LocationPoint, LocationHistoryResponse } from '../types';
 import { Config } from '../constants/config';
+import { pollUnlessGone } from '../api/queryPolicy';
 import { useFarmStore } from '../store/farmStore';
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ export function useFarmLocations(
     },
     enabled: !!currentFarmId,
     staleTime: Config.STALE_TIME_SHORT,
-    refetchInterval: Config.MAP_REFRESH_INTERVAL, // 10s
+    refetchInterval: pollUnlessGone(Config.MAP_REFRESH_INTERVAL), // 10s, stops on 403/404
     ...options,
   });
 }
@@ -67,7 +68,7 @@ export function useAnimalLocation(
     },
     enabled: !!currentFarmId && !!animalId,
     staleTime: Config.STALE_TIME_SHORT,
-    refetchInterval: Config.MAP_REFRESH_INTERVAL, // 10s
+    refetchInterval: pollUnlessGone(Config.MAP_REFRESH_INTERVAL), // 10s, stops on 403/404
     ...options,
   });
 }

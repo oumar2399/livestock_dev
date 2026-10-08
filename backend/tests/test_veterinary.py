@@ -105,7 +105,8 @@ def vet_setup(db):
 
 
 def test_veterinary_rbac_matrix(db, vet_setup):
-    """Vérifie la matrice de permissions : vet écrit, owner lit, farmer est refusé."""
+    """Permission matrix (Phase 3): vet writes everything, owner and farmer read and add
+    observation notes only, nobody but the vet changes the status."""
     from app.core.dependencies import get_current_user
     from app.db.database import get_db
 
@@ -132,24 +133,36 @@ def test_veterinary_rbac_matrix(db, vet_setup):
     assert resp_vet.status_code == 201
     case_id = resp_vet.json()["id"]
 
-    # 2. Le FARMER essaie de lire les dossiers -> REFUS 403
+    # 2. The FARMER reads the cases (applies the treatments day to day) -> 200
     app.dependency_overrides[get_current_user] = lambda: farmer
     resp_farmer_get = client.get(f"/api/v1/farms/{farm1.id}/veterinary-cases")
-    assert resp_farmer_get.status_code == 403
+    assert resp_farmer_get.status_code == 200
 
-    # Le FARMER essaie d'écrire une entrée -> REFUS 403
+    # ...may add an observation note -> 201
+    resp_farmer_obs = client.post(
+        f"/api/v1/farms/{farm1.id}/veterinary-cases/{case_id}/entries",
+        json={"entry_type": "observation", "content": "Boite moins ce matin"},
+    )
+    assert resp_farmer_obs.status_code == 201
+
+    # ...but no other entry type -> 403
     resp_farmer_post = client.post(
         f"/api/v1/farms/{farm1.id}/veterinary-cases/{case_id}/entries",
         json={"entry_type": "note", "content": "Tentative farmer"},
     )
     assert resp_farmer_post.status_code == 403
 
+    # ...and no status change -> 403
+    resp_farmer_patch = client.patch(
+        f"/api/v1/farms/{farm1.id}/veterinary-cases/{case_id}", json={"status": "closed"})
+    assert resp_farmer_patch.status_code == 403
+
     # 3. Le OWNER consulte le dossier -> SUCCÈS 200 (lecture seule)
     app.dependency_overrides[get_current_user] = lambda: owner
     resp_owner_get = client.get(f"/api/v1/farms/{farm1.id}/veterinary-cases/{case_id}")
     assert resp_owner_get.status_code == 200
     assert resp_owner_get.json()["title"] == "Suspicion boiterie patte avant"
-    assert len(resp_owner_get.json()["entries"]) == 1
+    assert len(resp_owner_get.json()["entries"]) == 2  # initial entry + farmer observation
 
     # Le OWNER essaie de modifier le statut -> REFUS 403 (seul vet/admin peut modifier)
     resp_owner_patch = client.patch(

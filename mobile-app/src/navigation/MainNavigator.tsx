@@ -21,6 +21,14 @@ import AnimalDetailScreen from '../screens/AnimalDetailScreen';
 import AnimalFormScreen  from '../screens/AnimalFormScreen';
 import AlertsListScreen  from '../screens/AlertsListScreen';
 import ProfileScreen     from '../screens/ProfileScreen';
+import { withFarm } from '../components/RequireFarm';
+import { useFarmStore } from '../store/farmStore';
+
+// Farm-scoped screens ask for a farm instead of loading data when none is selected.
+const FarmDashboard = withFarm(DashboardScreen);
+const FarmMap = withFarm(MapScreen);
+const FarmAnimalsList = withFarm(AnimalsListScreen);
+const FarmAlertsList = withFarm(AlertsListScreen);
 
 // ─── Bouton hamburger ─────────────────────────────────────────────────────────
 
@@ -41,9 +49,11 @@ function HamburgerButton() {
 
 const AnimalsStack = createNativeStackNavigator<AnimalsStackParamList>();
 function AnimalsNavigator() {
+  // A new farm remounts the stack on the list: no detail of another farm's animal survives.
+  const currentFarmId = useFarmStore((state) => state.currentFarmId);
   return (
-    <AnimalsStack.Navigator screenOptions={{ headerShown: false }}>
-      <AnimalsStack.Screen name="AnimalsList"  component={AnimalsListScreen} />
+    <AnimalsStack.Navigator key={String(currentFarmId)} screenOptions={{ headerShown: false }}>
+      <AnimalsStack.Screen name="AnimalsList"  component={FarmAnimalsList} />
       <AnimalsStack.Screen name="AnimalDetail" component={AnimalDetailScreen} />
       <AnimalsStack.Screen name="AnimalForm"   component={AnimalFormScreen} />
     </AnimalsStack.Navigator>
@@ -54,7 +64,7 @@ const AlertsStack = createNativeStackNavigator<AlertsStackParamList>();
 function AlertsNavigator() {
   return (
     <AlertsStack.Navigator screenOptions={{ headerShown: false }}>
-      <AlertsStack.Screen name="AlertsList" component={AlertsListScreen} />
+      <AlertsStack.Screen name="AlertsList" component={FarmAlertsList} />
     </AlertsStack.Navigator>
   );
 }
@@ -114,20 +124,21 @@ export default function MainNavigator() {
     >
       <Tab.Screen
         name="Dashboard"
-        component={DashboardScreen}
+        component={FarmDashboard}
         options={{ tabBarLabel: 'Home' }}
       />
       {/* Map : header géré par MapScreen lui-même (overlay transparent) */}
       <Tab.Screen
         name="Map"
-        component={MapScreen}
+        component={FarmMap}
         options={{ tabBarLabel: 'Map', headerShown: false }}
       />
       {/* Troupeau : header géré par AnimalsListScreen (ScreenHeader component) */}
       <Tab.Screen
         name="Animals"
         component={AnimalsNavigator}
-        options={{ tabBarLabel: 'Herd', headerShown: false }}
+        // Leaving the Herd tab returns it to the list: old details are never shown again.
+        options={{ tabBarLabel: 'Herd', headerShown: false, popToTopOnBlur: true }}
       />
       <Tab.Screen
         name="Alerts"

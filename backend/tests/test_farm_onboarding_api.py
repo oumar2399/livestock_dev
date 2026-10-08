@@ -19,8 +19,8 @@ def farm_test_context(db):
     user = User(
         email=f"onboarding-{suffix}@example.com",
         password_hash="dummy-hash",
-        name="Onboarding User",
-        role="farmer",  # Regular user
+        name="Onboarding Admin",
+        role="admin",  # Phase 3: only the platform admin creates farms
     )
     db.add(user)
     db.commit()
@@ -35,7 +35,7 @@ def farm_test_context(db):
     return {"user": user, "client": client, "db": db}
 
 
-def test_create_farm_auto_membership(farm_test_context):
+def test_admin_creates_farm_without_becoming_a_member(farm_test_context):
     client = farm_test_context["client"]
     db = farm_test_context["db"]
     user = farm_test_context["user"]
@@ -49,20 +49,20 @@ def test_create_farm_auto_membership(farm_test_context):
     assert res.status_code == 201
     data = res.json()
     assert data["name"] == "Ferme du Pilote"
-    assert data["owner_id"] == user.id
-    assert data["membership_role"] == "owner"
+    # The owner is invited afterwards; memberships are the only access source.
+    assert data["owner_id"] is None
+    assert data["membership_role"] == "admin"
     assert "manage_farm" in data["permissions"]
     assert "edit_animals" in data["permissions"]
+    assert db.query(FarmMembership).filter(FarmMembership.farm_id == data["id"]).count() == 0
 
-    # Verify in DB
-    membership = (
-        db.query(FarmMembership)
-        .filter(FarmMembership.farm_id == data["id"], FarmMembership.user_id == user.id)
-        .first()
-    )
-    assert membership is not None
-    assert membership.role == "owner"
-    assert membership.status == "active"
+
+def test_non_admin_cannot_create_a_farm(farm_test_context):
+    user = farm_test_context["user"]
+    user.role = "owner"
+    farm_test_context["db"].commit()
+    response = farm_test_context["client"].post("/api/v1/farms/", json={"name": "Self-service farm"})
+    assert response.status_code == 403
 
 
 def test_create_farm_idempotency_retry(farm_test_context):
@@ -92,7 +92,8 @@ def test_create_farm_idempotency_retry(farm_test_context):
     assert data1["name"] == data2["name"]
 
     # Verify no duplicate farm in DB
-    farms_count = db.query(Farm).filter(Farm.name == "Ferme Idempotente", Farm.owner_id == user.id).count()
+    farms_count = db.query(Farm).filter(Farm.id == data1["id"]).count()
+    assert db.query(Farm).filter(Farm.name == "Ferme Idempotente").count() == farms_count
     assert farms_count == 1
 
 
@@ -135,5 +136,5 @@ def test_list_and_get_farm(farm_test_context):
     get_res = client.get(f"/api/v1/farms/{farm_id}")
     assert get_res.status_code == 200
     assert get_res.json()["id"] == farm_id
-    assert get_res.json()["membership_role"] == "owner"
+    assert get_res.json()["membership_role"] == "admin"
     assert "manage_farm" in get_res.json()["permissions"]

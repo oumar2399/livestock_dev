@@ -36,7 +36,7 @@ export class ApiError extends Error {
 
 export class NetworkError extends Error {
   constructor() {
-    super('Impossible de joindre le serveur. Vérifiez votre connexion réseau.');
+    super('Cannot reach the server. Check your network connection.');
     this.name = 'NetworkError';
   }
 }
@@ -117,7 +117,7 @@ apiClient.interceptors.response.use(
 
     // Extraire message d'erreur FastAPI (format: { detail: "..." })
     const detail = (data as { detail?: unknown })?.detail;
-    const message = typeof detail === 'string' ? detail : getDefaultMessage(status);
+    const message = typeof detail === 'string' ? detail : validationMessage(detail) ?? getDefaultMessage(status);
 
     const requestConfig = error.config as RetryableRequestConfig | undefined;
     const isAuthenticationRequest = [
@@ -146,16 +146,25 @@ apiClient.interceptors.response.use(
 
 function getDefaultMessage(status: number): string {
   const messages: Record<number, string> = {
-    400: 'Données invalides',
-    401: 'Non authentifié',
-    403: 'Accès non autorisé',
-    404: 'Ressource introuvable',
-    409: 'Conflit - ressource déjà existante',
-    422: 'Erreur de validation',
-    500: 'Erreur interne du serveur',
-    503: 'Service temporairement indisponible',
+    400: 'Invalid data',
+    401: 'Not signed in',
+    403: 'You do not have permission to do this',
+    404: 'Not found',
+    409: 'Conflict with existing data',
+    422: 'Some fields are invalid',
+    500: 'Internal server error',
+    503: 'Service temporarily unavailable',
   };
-  return messages[status] ?? `Erreur HTTP ${status}`;
+  return messages[status] ?? `HTTP error ${status}`;
+}
+
+/** FastAPI validation errors: [{loc: [..., "field"], msg}] -> "field: msg; ..." */
+export function validationMessage(detail: unknown): string | null {
+  if (!Array.isArray(detail) || detail.length === 0) return null;
+  return detail.map((item) => {
+    const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : null;
+    return field && field !== 'body' ? `${field}: ${item?.msg ?? 'invalid'}` : String(item?.msg ?? 'invalid');
+  }).join('; ');
 }
 
 export default apiClient;

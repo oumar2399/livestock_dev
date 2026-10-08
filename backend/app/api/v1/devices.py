@@ -17,9 +17,14 @@ from app.db.database import get_db
 from app.models.device import Device
 from app.models.animal import Animal
 from app.models.user import User
-from app.schemas.device import DeviceResponse, DeviceUpdate
+from app.schemas.device import DeviceCreate, DeviceProvisioned, DeviceResponse, DeviceUpdate
 from app.core.dependencies import get_current_user
-from app.core.security import hash_device_secret, verify_device_secret
+from sqlalchemy import func, text
+
+from app.core.config import DEVICE_TRANSPORT_ID_START
+from app.core.binary_protocol import TRANSPORT_ID_MAX
+from app.core.security import generate_device_secret, hash_device_secret, verify_device_secret
+from app.services.device_health import describe_device
 from app.core.timezone import utc_now
 from app.services.telemetry_quality import update_loss_period
 from app.core.access import (
@@ -82,7 +87,51 @@ def list_devices(
         # Regular user sees only devices from their farms (no orphans)
         query = query.filter(Device.farm_id.in_(accessible))
 
-    return query.order_by(Device.last_seen.desc().nullslast()).all()
+    return [describe_device(db, device) for device in query.order_by(Device.last_seen.desc().nullslast()).all()]
+
+
+# ─── POST /devices (add a collar to a farm, secret returned once) ───────────
+
+def _next_transport_id(db: Session) -> int:
+    """Lowest free transport ID from DEVICE_TRANSPORT_ID_START (caller holds the lock)."""
+    used = {row[0] for row in db.query(Device.transport_id)
+            .filter(Device.transport_id >= DEVICE_TRANSPORT_ID_START).all()}
+    for candidate in range(DEVICE_TRANSPORT_ID_START, TRANSPORT_ID_MAX + 1):
+        if candidate not in used:
+            return candidate
+    raise HTTPException(status_code=409, detail="No transport ID left")
+
+
+@router.post("/", response_model=DeviceProvisioned, status_code=201)
+def create_device(
+    payload: DeviceCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Add a collar to a farm (manage_devices: owner, farmer, admin). The server picks
+    the transport ID and generates the secret; the answer is the only time the secret
+    is returned — only its SHA-256 fingerprint is stored.
+    """
+    require_farm(current_user, payload.farm_id, "manage_devices", db)
+    # One allocation at a time, so two creations never get the same transport ID.
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('device-transport-id'))"))
+    # Case-insensitive: older IDs may contain lower case, and "m5-a" vs "M5-A" would be
+    # two collars nobody can tell apart.
+    existing = db.query(Device.id).filter(func.upper(Device.id) == payload.device_id).first()
+    if existing is not None:
+        raise HTTPException(status_code=409, detail=f"Device {existing[0]} already exists")
+    secret = generate_device_secret()
+    device = Device(id=payload.device_id, farm_id=payload.farm_id, status="active",
+                    transport_id=_next_transport_id(db), device_secret=hash_device_secret(secret))
+    db.add(device)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=f"Device {payload.device_id} already exists") from None
+    db.refresh(device)
+    return {**describe_device(db, device), "device_secret": secret}
 
 
 # ─── GET /devices/{id} (JWT mandatory, farm-scoped) ─────────────────────────
@@ -99,7 +148,7 @@ def get_device(
         raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
 
     assert_device_visible(current_user, device, db)
-    return device
+    return describe_device(db, device)
 
 
 # ─── PATCH /devices/{id} (JWT mandatory, permission-checked) ────────────────

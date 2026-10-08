@@ -18,6 +18,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 
 import { useTelemetryLatest } from '../hooks/useTelemetry';
 import { useLocationHistory } from '../hooks/useLocations';
+import { useFarmDevices } from '../hooks/useDevices';
+import { useAnimals } from '../hooks/useAnimals';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import { PositionedTelemetry as TelemetryLatest, ActivityState, LocationHistoryResponse } from '../types';
 import { mapAnimals, positionRecency } from '../utils/geofenceMap';
@@ -28,6 +30,10 @@ import {
   batteryColor,
   batteryIcon,
   formatBattery,
+  collarStatus,
+  collarMarkerStyle,
+  collarMarkerLabel,
+  animalStatusLabel,
 } from '../utils/helpers';
 import { LoadingState, ErrorState } from '../components/ui';
 
@@ -147,17 +153,19 @@ function AnimalMarker({
   onPress: () => void;
 }) {
   const state = resolveActivityState(point);
-  const color = isIsolated ? Colors.severity.critical : activityStateColor(state);
+  // The collar status (maintenance, lost, retired) changes the marker; isolation keeps its red.
+  const look = collarMarkerStyle(collarStatus(point.device_status).state, activityStateColor(state));
+  const color = isIsolated ? Colors.severity.critical : look.color;
 
   return (
     <Marker
       coordinate={{ latitude: point.latitude, longitude: point.longitude }}
       onPress={onPress}
     >
-      <View style={styles.markerContainer}>
+      <View style={[styles.markerContainer, { opacity: look.opacity }]}>
         {/* Halo rouge si isolé */}
         {isIsolated && <View style={styles.isolatedHalo} />}
-        <View style={[styles.markerOuter, { borderColor: color }]}>
+        <View style={[styles.markerOuter, { borderColor: color }, look.dashed && styles.markerDashed]}>
           <View style={[styles.markerInner, { backgroundColor: color }]}>
             <Text style={styles.markerInitial}>
               {point.animal_name[0].toUpperCase()}
@@ -165,12 +173,20 @@ function AnimalMarker({
           </View>
         </View>
         <View style={[styles.markerTail, { backgroundColor: color }]} />
-        {/* Icône alerte si isolé */}
-        {isIsolated && (
+        {/* Collar badge first (wrench = maintenance, ? = lost), else the isolation "!" */}
+        {look.badge === 'maintenance' ? (
+          <View style={[styles.isolatedBadge, { backgroundColor: look.color }]}>
+            <Ionicons name="construct" size={9} color="#fff" />
+          </View>
+        ) : look.badge === 'lost' ? (
+          <View style={styles.isolatedBadge}>
+            <Text style={styles.isolatedBadgeText}>?</Text>
+          </View>
+        ) : isIsolated ? (
           <View style={styles.isolatedBadge}>
             <Text style={styles.isolatedBadgeText}>!</Text>
           </View>
-        )}
+        ) : null}
       </View>
     </Marker>
   );
@@ -222,6 +238,7 @@ function AnimalInfoSheet({
   historyData,
   isHistoryLoading,
   onFitTrack,
+  animalStatus,
 }: {
   point: TelemetryLatest | null;
   isIsolated: boolean;
@@ -234,8 +251,10 @@ function AnimalInfoSheet({
   historyData?: LocationHistoryResponse;
   isHistoryLoading: boolean;
   onFitTrack: () => void;
+  animalStatus?: string;
 }) {
   if (!point) return null;
+  const collar = collarStatus(point.device_status);
   const state      = resolveActivityState(point);
   const stateColor = activityStateColor(state);
   const batColor   = batteryColor(point.battery);
@@ -262,8 +281,8 @@ function AnimalInfoSheet({
           <Ionicons name="alert-circle-outline" size={16} color="#E67E22" />
           <Text style={styles.lostCollarMapText}>
             {point.device_status === 'lost'
-              ? 'Collier égaré — position du matériel seul, pas de l’animal.'
-              : 'Matériel seul — position non garantie de l’animal.'}
+              ? 'Collar lost — this is the collar\'s position, not the animal\'s.'
+              : 'Equipment only — this position is not guaranteed to be the animal\'s.'}
           </Text>
         </View>
       )}
@@ -277,6 +296,9 @@ function AnimalInfoSheet({
         <View style={styles.infoSheetTitle}>
           <Text style={styles.infoAnimalName}>{point.animal_name}</Text>
           <Text style={styles.infoDeviceId}>Device: {point.device_id}</Text>
+          <Text style={styles.infoDeviceId}>
+            Animal: {animalStatus ? animalStatusLabel(animalStatus as any) : '–'} · <Text style={{ color: collar.color }}>{collar.label}</Text>
+          </Text>
         </View>
         <TouchableOpacity onPress={onClose} hitSlop={12}>
           <Ionicons name="close" size={22} color={Colors.text.secondary} />
@@ -488,8 +510,27 @@ export default function MapScreen() {
     return { label: hours > 0 ? `Last fix ${hours}h ago` : `Last fix ${diffMin}m ago`, color: '#95A5A6', isRecent: false };
   }, [mostRecentTimestamp]);
 
+  const { data: devices } = useFarmDevices();
+  const { data: animalsData } = useAnimals({ page_size: 100 }, undefined, true);
+  const animalStatusById = useMemo(
+    () => new Map((animalsData?.animals ?? []).map((animal) => [animal.id, animal.status as string])),
+    [animalsData],
+  );
+  // The device list knows the collar status even when telemetry is old.
+  const withCollarStatus = useCallback(
+    <T extends { device_id: string; device_status?: string | null }>(p: T): T => ({
+      ...p, device_status: devices?.find((device) => device.id === p.device_id)?.status ?? p.device_status,
+    }),
+    [devices],
+  );
+  // Positions that belong to the collar, not the animal (lost collar): their own marker.
+  const collarPoints = useMemo(
+    () => mapAnimals(data ?? []).filter(p => p.position_is_animal === false).map(withCollarStatus),
+    [data, withCollarStatus],
+  );
+
   const allPoints = useMemo(() => {
-  return mapAnimals(data ?? []).filter(p => p.position_is_animal !== false).map(p => ({
+  return mapAnimals(data ?? []).filter(p => p.position_is_animal !== false).map(withCollarStatus).map(p => ({
     ...p,
     latitude:  parseFloat(String(p.latitude)),
     longitude: parseFloat(String(p.longitude)),
@@ -497,17 +538,19 @@ export default function MapScreen() {
     // Unknown battery (firmware 255, stored NULL) stays null; never a guessed value.
     battery:   p.battery == null ? null : parseInt(String(p.battery), 10),
     })).filter(p => !isNaN(p.latitude) && !isNaN(p.longitude));
-  }, [data]);
+  }, [data, withCollarStatus]);
 
   useEffect(() => {
-    setSelectedAnimal((current) => current ? allPoints.find((point) => point.animal_id === current.animal_id) ?? null : null);
+    setSelectedAnimal((current) => current
+      ? (allPoints as TelemetryLatest[]).concat(collarPoints).find((point) => point.animal_id === current.animal_id) ?? null
+      : null);
     setSelectedCluster((current) => {
       if (!current) return null;
       const ids = new Set(current.points.map((point) => point.animal_id));
       const members = allPoints.filter((point) => ids.has(point.animal_id));
       return members.length ? { ...current, points: members, ...centroid(members) } : null;
     });
-  }, [allPoints]);
+  }, [allPoints, collarPoints]);
 
   const [showTrack, setShowTrack] = useState(false);
   const [trackHours, setTrackHours] = useState(24);
@@ -558,6 +601,18 @@ export default function MapScreen() {
   const route = useRoute<any>();
   const focusAnimalId = route.params?.focusAnimalId;
   const initialShowTrack = route.params?.showTrack;
+  // From Device details: last known position of a collar (e.g. offline), to go and find it.
+  const focusPosition: { latitude: number; longitude: number; label: string } | undefined = route.params?.focusPosition;
+
+  useEffect(() => {
+    if (!focusPosition || !mapRef.current) return;
+    mapRef.current.animateToRegion({
+      latitude: focusPosition.latitude,
+      longitude: focusPosition.longitude,
+      latitudeDelta: 0.005,
+      longitudeDelta: 0.005,
+    }, 600);
+  }, [focusPosition]);
 
   useEffect(() => {
     if (focusAnimalId && allPoints.length > 0) {
@@ -755,6 +810,33 @@ export default function MapScreen() {
           </Marker>
         ))}
 
+        {/* Collars shown on their own (lost / equipment only): position of the collar, not the animal */}
+        {collarPoints.map((p) => (
+          <Marker
+            key={`collar-${p.device_id}`}
+            coordinate={{ latitude: p.latitude, longitude: p.longitude }}
+            onPress={() => setSelectedAnimal(p)}
+          >
+            <View style={styles.markerContainer}>
+              <View style={[styles.markerOuter, styles.markerDashed, { borderColor: '#E74C3C' }]}>
+                <Ionicons name="hardware-chip-outline" size={18} color="#E74C3C" />
+              </View>
+              <Text style={styles.collarMarkerLabel}>{collarMarkerLabel(p.device_id, p.device_status)}</Text>
+            </View>
+          </Marker>
+        ))}
+
+        {focusPosition && (
+          <Marker coordinate={{ latitude: focusPosition.latitude, longitude: focusPosition.longitude }}>
+            <View style={styles.markerContainer}>
+              <View style={[styles.markerOuter, styles.markerDashed, { borderColor: '#F39C12' }]}>
+                <Ionicons name="locate-outline" size={18} color="#F39C12" />
+              </View>
+              <Text style={[styles.collarMarkerLabel, { color: '#F39C12' }]}>{focusPosition.label}</Text>
+            </View>
+          </Marker>
+        )}
+
         {/* ── Trajectoire historique GPS (Lot B) ── */}
         {showTrack && historyData && historyData.segments.map((segment, sIdx) => {
           const coords = segment.points.map(pt => ({
@@ -895,6 +977,7 @@ export default function MapScreen() {
       {selectedAnimal && (
         <AnimalInfoSheet
           point={selectedAnimal}
+          animalStatus={animalStatusById.get(selectedAnimal.animal_id)}
           isIsolated={isolatedIds.has(selectedAnimal.animal_id)}
           onClose={() => {
             setSelectedAnimal(null);
@@ -1024,6 +1107,8 @@ const styles = StyleSheet.create({
 
   // Marqueur individuel
   markerContainer: { alignItems: 'center' },
+  markerDashed: { borderStyle: 'dashed' },
+  collarMarkerLabel: { marginTop: 2, fontSize: 10, fontWeight: '700', color: '#E74C3C', backgroundColor: 'rgba(13,27,42,0.85)', paddingHorizontal: 4, borderRadius: 4 },
   markerOuter: { width: 38, height: 38, borderRadius: 19, borderWidth: 2.5, backgroundColor: 'rgba(13,27,42,0.85)', alignItems: 'center', justifyContent: 'center' },
   markerInner: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   markerInitial: { color: '#fff', fontWeight: '700', fontSize: 13 },

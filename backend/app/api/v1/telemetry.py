@@ -34,7 +34,8 @@ from app.services.untimed_telemetry import ingest_untimed
 from app.services import binary_telemetry, ml_inference
 from app.core import binary_protocol
 from app.core.security import DEVICE_SECRET_HEADER, verify_device_secret
-from app.core.timezone import to_utc_naive, utc_now
+from app.core.config import BINARY_MAX_CLOCK_SKEW_SECONDS
+from app.core.timezone import ensure_utc, to_utc_naive, utc_now
 from app.services.telemetry_quality import eligible_clause
 from app.services.provenance_service import proven_in_farm
 from app.api.v1.feedback import submit_prediction_feedback as upsert_prediction_feedback
@@ -76,7 +77,8 @@ async def read_binary_body(request: Request) -> bytes:
 @router.post("/", response_model=TelemetryResponse, status_code=201,
              responses={200: {"model": TelemetryResponse}, 401: {"description": "Invalid device credentials"},
                         404: {"description": "No active animal assigned"},
-                        409: {"description": "Measurement conflict"}})
+                        409: {"description": "Measurement conflict"},
+                        422: {"description": "Invalid measurement or timestamp too far in the future"}})
 def receive_telemetry(
     data: TelemetryCreate,
     response: Response,
@@ -90,7 +92,13 @@ def receive_telemetry(
     detection is possible.
     """
     _authenticated_device(db, device_secret, device_id=data.device_id)
-    result = ingest_telemetry(data, db, idempotent=data.timestamp is not None)
+    received_at = utc_now()
+    # Same future limit as the binary path: a future-dated row would make every later
+    # fix "out of order" and block geofencing for the device.
+    if data.timestamp is not None and ensure_utc(data.timestamp) > received_at + timedelta(
+            seconds=BINARY_MAX_CLOCK_SKEW_SECONDS):
+        raise HTTPException(status_code=422, detail="Timestamp exceeds the allowed clock skew")
+    result = ingest_telemetry(data, db, idempotent=data.timestamp is not None, received_at=received_at)
     response.status_code = 201 if result.created else 200
     return result.telemetry
 

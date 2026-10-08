@@ -13,6 +13,7 @@ import {
   FeedbackCreate,
 } from '../types';
 import { Config } from '../constants/config';
+import { pollUnlessGone } from '../api/queryPolicy';
 import { useFarmStore } from '../store/farmStore';
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ export function useTelemetryLatest(
       throw new Error('Unable to load telemetry for the complete herd.');
     },
     staleTime: Config.STALE_TIME_SHORT,
-    refetchInterval: Config.MAP_REFRESH_INTERVAL,    // 10s
+    refetchInterval: pollUnlessGone(Config.MAP_REFRESH_INTERVAL), // 10s, stops on 403/404
     refetchIntervalInBackground: false,               // Stop si app en arrière-plan
     ...options,
     enabled: currentFarmId !== null && (options?.enabled ?? true),
@@ -80,7 +81,7 @@ export function useTelemetryHistory(
     queryKey: telemetryKeys.history(animalId, hours),
     queryFn: () => telemetryApi.getHistory(animalId, hours),
     staleTime: 0,
-    refetchInterval: Config.MAP_REFRESH_INTERVAL, // Polling auto toutes les 10s (synchronisé avec M5Stack)
+    refetchInterval: pollUnlessGone(Config.MAP_REFRESH_INTERVAL), // 10s, stops on 403/404 (deleted animal)
     refetchIntervalInBackground: false,
     enabled: animalId > 0,
     ...options,

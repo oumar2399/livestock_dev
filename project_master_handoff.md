@@ -122,9 +122,9 @@ Cette architecture LoRaWAN est **proposée et documentée**, mais **pas encore i
 
 État retenu pour la documentation courante :
 
-- **624 tests backend réussis, 0 échec, 0 ignoré** — commit `bc03c42` + modifications B2–B4 non commitées ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-04 11:39 +0900 ;
-- **98 tests mobile réussis, 0 échec** — commit `62badba` + modifications B5 non commitées ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-04 13:06 +0900 ;
-- TypeScript vérifié sans erreur (`tsc --noEmit`, même commit, 2026-10-04 13:06 +0900) ;
+- **703 tests backend réussis, 0 échec, 0 ignoré** — commit `6c5f786` + modifications Phase 2 et 3 non commitées ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-08 13:02 +0900 ;
+- **130 tests mobile réussis, 0 échec** — commit `6c5f786` + modifications Phase 2 et 3 non commitées ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-08 13:00 +0900 ;
+- TypeScript vérifié sans erreur (`tsc --noEmit`, même commit, 2026-10-08 13:00 +0900) ;
 - schéma / migrations Alembic **réconciliés** depuis B1 (`bc03c42`), `alembic check` propre.
 
 Les anciens nombres de tests (`43`, `54`, `57`, `61`, `73`, `76`, etc.) restent uniquement des **résultats historiques de lots ou de campagnes intermédiaires**. Ils ne doivent pas être utilisés comme total courant.
@@ -203,7 +203,7 @@ Cette question porte sur **l’intégration, la robustesse, la qualité des donn
 - Wi‑Fi pour le prototype actuel.
 - Firmware autonome de référence : `m5stack/main.py`.
 - Configuration privée : `m5stack/device_config.py`.
-- Versions : MicroPython / UIFlow [to verify] ; driver `mpu6886` [to verify] (non présent dans le dépôt).
+- Versions : MicroPython 1.12.0 (M5Stack ESP32 firmware, build 02357a94d, 2026-02-06), read with os.uname() on 2026-10-05.
 
 ### Profil nominal
 
@@ -433,7 +433,7 @@ Artifact :
 
 - fenêtre 5 s ;
 - classes Active / Resting ;
-- balanced accuracy de référence ~0.9216 ;
+- balanced accuracy de référence 0.9212 (LOAO, métadonnées de l’artefact) ;
 - conservé pour comparaison scientifique ;
 - non chargé par le serveur actuel.
 
@@ -529,7 +529,8 @@ Table `Telemetry` :
 - géographie PostGIS ;
 - hypertable TimescaleDB ;
 - `predicted_behavior` distinct de `activity_state` ;
-- provenance temporelle conservée via `received_at`, `time_source`, version protocole et flags de qualité.
+- provenance temporelle conservée via `received_at`, `time_source`, version protocole et flags de qualité ;
+- JSON comme binaire : horodatage refusé s’il dépasse la réception de plus de 300 s (422 « Timestamp exceeds the allowed clock skew »). Une ligne datée dans le futur rendait chaque fix suivant « hors ordre » et bloquait le geofencing du collier.
 
 ---
 
@@ -550,6 +551,20 @@ Les JWT n’embarquent pas les fermes accessibles ; les permissions sont relues 
 Le rôle éventuellement choisi à l’inscription est ignoré (rôle par défaut uniquement).
 
 Côté mobile (B5), l’écran vétérinaire et les helpers `isVet`, `isOwner`, `isFarmer`, `canEdit`, `canViewHealth` utilisent le rôle dans la ferme sélectionnée (même source que Profil / Drawer) ; seul `admin` reste un rôle plateforme.
+
+Phase 3 (test d’acceptation du 2026-10-07) :
+
+- rôles par ferme : **owner** = tous les droits de la ferme, y compris les membres ; **farmer** = droits opérationnels (troupeau, colliers, zones, alertes, feedback, notes d’observation pour le vétérinaire), sans gestion des membres ; **vet** = lecture + écriture vétérinaire complète, sans traitement d’alertes ni feedback (sa conclusion est le statut du dossier) ;
+- fermes créées par l’admin seulement, qui invite ensuite le propriétaire ; inscription publique fermée par défaut (`PUBLIC_REGISTRATION_ENABLED`) ; premier admin par `scripts/create_admin.py` ;
+- écran Users : boutons « Change role » et « Revoke » par membre, « You » sur sa propre ligne.
+
+Correctifs Phase 2 (test d’acceptation du 2026-10-07) :
+
+- la dernière ferme choisie est mémorisée **par utilisateur** et restaurée seulement si elle figure encore dans ses fermes ; elle n’est plus effacée à la connexion ;
+- l’admin sans ferme mémorisée démarre **sans ferme sélectionnée** (jamais une ferme réelle arbitraire) ; les onglets Accueil, Troupeau, Carte et Alertes demandent alors de choisir une ferme ;
+- l’écran Users affiche la ferme cible et demande « Invite <email> as <role> into <farm>? » avant d’envoyer ;
+- personne ne change son propre rôle dans une ferme : 403 « You cannot change your own role. » (admin plateforme non concerné) ;
+- les messages d’accès du serveur sont en anglais (« Farm not found », « Access to this farm denied », « Permission denied: <permission> », « Animal not found ») et s’affichent dans des dialogues titrés (« Not allowed », « Not found », « Could not save »…).
 
 ### Pourquoi
 
@@ -584,6 +599,10 @@ Trois dimensions séparées :
 3. statut matériel du collier.
 
 Les anciennes formulations trompeuses de type “Live” ont été supprimées.
+
+Colliers (Phase 3) : ajout dans l’appli par owner / farmer (secret montré une seule fois, QR code) ; indicateurs hors ligne > 30 min, batterie ≤ 25 %, pas de fix > 60 min, batterie illisible > 60 min — indicateurs seulement, « lost » reste une décision humaine ; seuil hors ligne à revoir pour LoRaWAN (architecture §12.1c).
+
+Statut de l’animal et statut du collier sont deux champs distincts et étiquetés partout (« Animal: Active », « Collar in maintenance », « Behaviour: Resting ») ; le statut du collier vient de la liste des devices de la ferme (repli : `device_status` de la télémétrie).
 
 La température IMU est présentée comme température de boîtier, pas comme température corporelle de l’animal.
 
@@ -628,7 +647,9 @@ La consolidation la plus récente ajoute :
 - points situés dans une période de perte retirés du tracé ;
 - qualification `reliable` (tous les points ≥ 4 satellites) ou `degraded` ;
 - télémétrie attribuée à l’animal qui porte le collier au moment de la réception ;
-- affichage mobile multi-segments (plus de style pointillé `uncertain` depuis B5).
+- affichage mobile multi-segments (plus de style pointillé `uncertain` depuis B5) ;
+- marqueur de carte selon le statut du collier : maintenance (gris, clé), perdu (bord rouge pointillé, « ? »), retiré (estompé) ; un collier perdu apparaît comme marqueur séparé « Collar <id> — lost » à sa dernière position (position du collier, pas de l’animal) ;
+- une fiche d’animal supprimé n’est plus interrogée : pas de nouvel essai sur 4xx, arrêt du rafraîchissement sur 403/404, retour à la liste sans empiler un nouvel écran, onglet Troupeau remis sur la liste au changement de ferme et en le quittant.
 
 ---
 
@@ -698,7 +719,9 @@ Le backend ne génère ni diagnostic ni traitement.
 - provenance `animal_tracking_periods` ;
 - filtre de provenance commun : historique, `latest`, timeline, exports recherche ;
 - télémétrie antérieure à la période de la ferme masquée (conservée en base et dans les exports admin) ;
-- résumés du jour de transfert dans aucune des deux fermes ;
+- résumés du jour de transfert dans aucune des deux fermes dans les exports et rapports ;
+- **après un transfert (Phase 3)**, dans l’appli, la ferme qui reçoit voit l’historique de santé (alertes santé / anomalie, dossiers vétérinaires en lecture seule, résumés journaliers), pas les positions passées ni les alertes geofence / batterie / hors ligne de l’ancienne ferme (règle détaillée : architecture §10) ;
+- transfert fait par l’admin dans l’appli : collier déplacé avec l’animal, alertes ouvertes de l’ancienne ferme résolues comme `animal_transferred` ;
 - filtre ferme des exports = ferme au moment de la mesure ;
 - qualité par période prouvée ;
 - overview owner ;
@@ -784,7 +807,7 @@ Pour éviter toute ambiguïté avec les sections historiques :
 - ✅ **Roadmap applicative correspondante** : les lots mentionnés ci-dessus sont faits ; les anciennes phrases indiquant qu’ils sont “prochains”, “futurs” ou “non codés” sont obsolètes.
 - ✅ **Idempotence création ferme** : version récente PostgreSQL durable.
 - ✅ **Alembic / schéma** : réconcilié depuis B1 (`bc03c42`).
-- ✅ **Tests mobile courants** : **98** (commit `62badba` + B5 non commité, `node --test tests/*.test.cjs`, 2026-10-04 13:06 +0900).
+- ✅ **Tests mobile courants** : **130** (commit `6c5f786` + modifications Phase 2 et 3 non commitées, `node --test tests/*.test.cjs`, 2026-10-08 13:00 +0900).
 
 ---
 

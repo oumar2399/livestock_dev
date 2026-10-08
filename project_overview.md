@@ -51,12 +51,14 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 | Area | Status | Key facts | Ref |
 |---|---|---|---|
 | Firmware | ✅ | `m5stack/main.py`; cycle ≈ 19.4 s; WDT; v3 archive off by default (`UNTIMED_ARCHIVE_ENABLED=False`); unreadable battery sent as 255 = unknown (stored NULL, LCD `BAT ?`, mobile "Unknown") | handoff §3.2 |
-| Telemetry v2 | ✅ | 45 B, reliable UTC required, GPS may be absent | handoff §4.1 |
+| Telemetry v2 | ✅ | 45 B, reliable UTC required, GPS may be absent; JSON path refuses timestamps > 300 s ahead (422, same rule as binary) | handoff §4.1 |
 | Telemetry v3 | 🟡 | 58 B, no reliable UTC → separate `untimed_telemetry`; off by default (backend `BINARY_V3_ENABLED=false`); power-loss persistence not validated | handoff §4.2 |
 | ML model | ✅ | RF, Active/Resting, 15 s only loaded; 5 s rejected (422) | handoff §5.2 |
-| Multi-farm RBAC | ✅ | `admin` platform role; `owner/farmer/vet` per farm; JWT carries no farms; mobile uses the selected farm's role (B5) | arch §11 |
+| Multi-farm RBAC | ✅ | `admin` platform role; `owner/farmer/vet` per farm; JWT carries no farms; mobile uses the selected farm's role (B5); last selected farm remembered per user, admin starts with no farm, invitations confirmed with the target farm name; nobody changes their own farm role (403, admin excepted). Phase 3 roles: owner = all farm rights incl. members; farmer = operational (herd, devices, geofences, alerts, feedback, observation notes for the vet), no member management; vet = view + full veterinary write, no alert handling or feedback. Farms are created by the admin only; public registration closed (`PUBLIC_REGISTRATION_ENABLED`, default off); first admin with `scripts/create_admin.py` | arch §11 |
 | Geofencing | ✅ | `ST_Covers`; fix ≥ 4 satellites, ≤ 25 km/h, ≤ 300 s old; danger = immediate, resolved by humans only; pasture exit = 2 fixes ≤ 120 s apart, auto-resolved on return; one notification per fix (danger wins over pasture exit); mobile alert card shows "Last detected inside" / "No longer detected inside" | handoff §8.2 |
-| Location / history | ✅ | gaps > 30 min segmented; quality `reliable/degraded`; loss-period points removed from the track; telemetry attributed to the animal holding the collar at reception time; map draws no dashed "uncertain" style | handoff §8.3 |
+| Location / history | ✅ | gaps > 30 min segmented; quality `reliable/degraded`; loss-period points removed from the track; telemetry attributed to the animal holding the collar at reception time; map draws no dashed "uncertain" style; animal status and collar status shown as separate labelled fields, map marker follows the collar status, a lost collar is a separate "Collar <id> — lost" marker | handoff §8.3 |
+| Devices | ✅ | added in the app by owner / farmer: the server picks the transport ID (from 100) and the secret, shown once (text + QR code, `device_config.py` lines); device details screen; health indicators: offline > 30 min, battery ≤ 25 % (M5 reports 0/25/50/75/100 %), no GPS fix > 60 min, battery unreadable > 60 min — indicators only, "lost" stays a human decision; offline threshold to revisit for LoRaWAN uplink intervals | arch §12.1c |
+| Transfer | ✅ | by the admin in the app: collar moves with the animal, previous farm's open alerts resolved as `animal_transferred`; receiving farm sees the health history (health / anomaly alerts, vet cases read-only, daily summaries), not past locations or geofence / battery / offline alerts; exports and farm reports keep the strict period rule | arch §10 |
 | Notifications | 🟡 | backend outbox only (intent in the alert transaction, 24 h reconciliation, `SKIP LOCKED`, retry); no mobile token registration, no automatic dispatch (admin-only endpoint), no quiet hours; real phone reception not validated | handoff §8.4 |
 | Offline | 🟡 | module exists, not integrated (cache and banner not used by any screen); farm change clears the query cache and the offline cache (B5) | handoff §8.5 |
 | Veterinary | ✅ | `VeterinaryCase` + append-only entries; status changes journaled (`STATUS CHANGE` in the app); no automatic diagnosis | handoff §8.6 |
@@ -65,7 +67,7 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 | Previews only | — | video, AI assistant, marketplace (no real backend) | arch §12.2 |
 | LoRaWAN | 💡 | documented, not implemented | handoff §13–15 |
 
-**Software checks:** 624 backend tests passed, 0 failed, 0 skipped (commit `bc03c42` + uncommitted B2–B4 changes; `scripts/run_isolated_tests.py tests` on a disposable database; 2026-10-04 11:39 +0900) · 98 mobile tests passed, 0 failed; TypeScript clean (commit `62badba` + uncommitted B5 changes; from `mobile-app`: `node --test tests/*.test.cjs` and `tsc --noEmit`; 2026-10-04 13:06 +0900) · Alembic reconciled since B1 (`bc03c42`), `alembic check` clean.
+**Software checks:** 703 backend tests passed, 0 failed, 0 skipped (commit `6c5f786` + uncommitted Phase 2 and 3 changes; `scripts/run_isolated_tests.py tests` on a disposable database; 2026-10-08 13:02 +0900) · 130 mobile tests passed, 0 failed; TypeScript clean (commit `6c5f786` + uncommitted Phase 2 and 3 changes; from `mobile-app`: `node --test tests/*.test.cjs` and `tsc --noEmit`; 2026-10-08 13:00 +0900) · Alembic reconciled since B1 (`bc03c42`), `alembic check` clean (same backend run).
 
 ---
 
@@ -77,13 +79,13 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 - Balanced accuracy: **0.9386 ± 0.0467** (mean/fold) · **0.9519** (pooled)
 - Ablation at 15 s (pooled): purity 0.70 → 0.9413 · **0.80 → 0.9519** · 0.90 → 0.9210
 - Active windows kept: 47 (0.80) vs 32 (0.90). 30/60 s windows left some folds without both classes.
-- Historical 5 s model ≈ 0.9216 (not loaded). 4-class experiment ≈ 0.817 ± 0.044 (not deployed).
+- Historical 5 s model: balanced accuracy 0.9212 (not loaded). 4-class experiment ≈ 0.817 ± 0.044 (not deployed).
 
 ### Hardware (bench and outdoor, reported by project owner)
 
 | Test | Result | Scope |
 |---|---|---|
-| Sensor range | ±2g saturated, ±4g did not | bench only |
+| Sensor range | ±2g saturated, ±4g did not | bench only; reported in handoff, raw data not archived |
 | Test 1 — IMU/Welford | 150/150 samples in 15.01 s, no I2C error, Welford vs batch ~1e-7 | bench |
 | Test 2 — GPS clock | partial: hold/expiry observed; physical loss/recovery not qualified | bench |
 | Test 3 — transport v2 | 45 B identical to PC oracle (201, 762 ms); replay 200; PostGIS 201; bad secret 401 | bench |
@@ -93,7 +95,7 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 
 ⚠️ The HTTP client was rewritten on 21 Sept. The Test 4 PASS results do **not** validate the new client. It still needs M5 qualification.
 
-Evidence files (check they exist in `docs/`): `validation_m5stack_avant_lora.md`, `validation_test_4_resilience.md`, `validation_m5stack_integree_2026-09-19.md`, `validation_optimisation_gps_m5stack.md`, `transition_15s.md`, `validation_correctifs_transport_et_profil.md`.
+Evidence files (check they exist in `docs/`): `validation_m5stack_avant_lora.md`, `validation_test_4_resilience.md`, `validation_m5stack_integree_2026-09-19.md`, `validation_optimisation_gps_m5stack.md`. "15 s only, 5 s rejected (422)": enforced in `backend/app/services/telemetry_ingestion.py:83-84`, tested by `backend/tests/test_b4_firmware_fixes.py::test_v1_packet_still_decodes_and_is_still_rejected_with_422` and `backend/tests/test_binary_telemetry_api.py::test_model_profile_mismatch_and_unavailable_model`. HTTP client rewrite of 21 Sept: not yet qualified on device; evidence pending the M5 smoke/endurance test [to verify]. ML figures: `backend/ml/models/loao_metrics.json` and `backend/ml/ablation_results.json`.
 
 ---
 

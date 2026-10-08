@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
 
+from app.core.config import settings
 from app.db.database import get_db
 from app.models.user import User
 from app.models.farm import Farm
@@ -150,9 +151,11 @@ def register(
     """
     Inscription nouvel utilisateur
     
-    New accounts always get the default account role; any "role" sent by the
-    client is ignored. Admins are created in the database or by an existing
-    admin (PUT /auth/users/{id}/role).
+    Closed by default: accounts are created by invitation (POST
+    /farms/{id}/members). PUBLIC_REGISTRATION_ENABLED=true reopens it for
+    development only. New accounts always get the default account role; any
+    "role" sent by the client is ignored. The first admin is created with
+    scripts/create_admin.py.
 
     Body JSON:
     {
@@ -161,6 +164,11 @@ def register(
         "name": "Tanaka Hiroshi"
     }
     """
+    if not settings.PUBLIC_REGISTRATION_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is closed: accounts are created by invitation.",
+        )
     # Vérifier email unique
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:

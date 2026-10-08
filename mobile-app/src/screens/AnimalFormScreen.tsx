@@ -24,6 +24,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import apiClient from '../api/client';
 import { useFarmStore } from '../store/farmStore';
+import { useFarmDevices } from '../hooks/useDevices';
+import { assignableDevices } from '../utils/deviceStatus';
+import { showApiError } from '../utils/apiErrors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -138,6 +141,8 @@ export default function AnimalFormScreen() {
 
   const animalId: number | undefined = route.params?.animalId;
   const isEdit = !!animalId;
+  const { data: farmDevices } = useFarmDevices();
+  const deviceChoices = assignableDevices(farmDevices, animalId);
 
   const [form, setForm]         = useState<FormData>(DEFAULT_FORM);
   const [loading, setLoading]   = useState(false);
@@ -169,7 +174,7 @@ export default function AnimalFormScreen() {
           farm_id:         data.farm_id,
         });
       })
-      .catch(() => Alert.alert('Erreur', 'Impossible de charger les données'))
+      .catch((error) => showApiError(error, 'Could not load', 'Unable to load the animal'))
       .finally(() => setFetching(false));
   }, [animalId, isEdit]);
 
@@ -216,8 +221,8 @@ export default function AnimalFormScreen() {
         isEdit ? 'Animal modified successfully' : 'Animal added successfully',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-    } catch (err: any) {
-      Alert.alert('Error', String(err.response?.data?.detail ?? 'An error occurred'));
+    } catch (error) {
+      showApiError(error, 'Could not save', 'Unable to save the animal');
     } finally {
       setLoading(false);
     }
@@ -235,9 +240,11 @@ export default function AnimalFormScreen() {
             try {
               await apiClient.delete(`/animals/${animalId}`);
               queryClient.invalidateQueries({ queryKey: ['animals'] });
-              navigation.navigate('AnimalsList');
-            } catch {
-              Alert.alert('Error', 'Failed to delete the animal');
+              // Go back to the existing list: navigate() would push a new one and keep this
+              // deleted animal's screen mounted (and polling) underneath.
+              navigation.popTo('AnimalsList');
+            } catch (error) {
+              showApiError(error, 'Could not delete', 'Failed to delete the animal');
             }
           },
         },
@@ -338,27 +345,27 @@ export default function AnimalFormScreen() {
         <Text style={styles.sectionTitle}>M5Stack Sensor</Text>
 
         <View style={styles.fieldContainer}>
-          <FieldLabel label="Assigned Device ID" />
-          <View style={styles.deviceRow}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={form.assigned_device}
-              onChangeText={set('assigned_device')}
-              placeholder="Ex: M5-001"
-              placeholderTextColor={Colors.text.muted}
-              autoCapitalize="characters"
-            />
-            {form.assigned_device ? (
-              <TouchableOpacity
-                style={styles.clearDeviceBtn}
-                onPress={() => setForm(p => ({ ...p, assigned_device: '' }))}
-              >
-                <Ionicons name="close-circle" size={20} color={Colors.text.muted} />
-              </TouchableOpacity>
-            ) : null}
+          <FieldLabel label="Assigned Device" />
+          {/* Only the farm's collars not assigned to another animal (searchable picker: Phase 4) */}
+          <View style={styles.segmentRow}>
+            {[{ id: '', label: 'No device' },
+              ...deviceChoices.map((device) => ({ id: device.id, label: device.id }))].map(({ id, label }) => {
+              const active = form.assigned_device === id;
+              return (
+                <TouchableOpacity
+                  key={id || 'none'}
+                  style={[styles.segmentBtn, active && { borderColor: Colors.primary, backgroundColor: Colors.primary + '20' }]}
+                  onPress={() => setForm(p => ({ ...p, assigned_device: id }))}
+                >
+                  <Text style={[styles.segmentText, active && { color: Colors.primary, fontWeight: '700' }]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
           <Text style={styles.fieldHint}>
-            Leave blank if no sensor is assigned to this animal
+            {deviceChoices.length === 0
+              ? 'No free collar in this farm. Add one in Devices.'
+              : 'Collars already on another animal are not listed.'}
           </Text>
         </View>
 

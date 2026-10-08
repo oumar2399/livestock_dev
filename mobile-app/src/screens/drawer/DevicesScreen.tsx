@@ -1,34 +1,22 @@
 /**
- * DevicesScreen - M5Stack device management
- * Data comes from /devices table (auto-registered on first telemetry)
- * No more duplicate keys — device_id is primary key in devices table
+ * DevicesScreen - collars of the selected farm.
+ * Owners and farmers add collars here (the server returns the secret once) and open a
+ * collar for its details, status and health indicators.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  ActivityIndicator, RefreshControl, TouchableOpacity, Alert,
+  ActivityIndicator, RefreshControl, TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import DrawerScreenBase from './DrawerScreenBase';
+import AddDeviceModal from '../../components/AddDeviceModal';
 import { Colors, Spacing, Typography, Radius } from '../../constants/config';
 import { timeAgo } from '../../utils/helpers';
-import apiClient from '../../api/client';
-import { queryClient } from '../../api/queryClient';
 import { useFarmStore } from '../../store/farmStore';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface Device {
-  id:               string;
-  farm_id:          number | null;
-  model:            string | null;
-  firmware_version: string | null;
-  last_seen:        string | null;
-  battery_capacity: number | null;
-  status:           'active' | 'maintenance' | 'lost' | 'retired';
-  notes:            string | null;
-  created_at:       string;
-  ingestion_revoked_at?: string | null;
-}
+import { FarmDevice, useFarmDevices } from '../../hooks/useDevices';
+import { DEVICE_STATUS_LABELS, deviceHealthLines } from '../../utils/deviceStatus';
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -46,19 +34,12 @@ const STATUS_ICONS: Record<string, string> = {
   retired:     'archive-outline',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  active:      'Active',
-  maintenance: 'Maintenance',
-  lost:        'Lost',
-  retired:     'Retired',
-};
-
 // ─── Battery helper ───────────────────────────────────────────────────────────
 
 function batteryColor(level: number | null): string {
   if (level === null) return Colors.text.muted;
   if (level > 50) return Colors.primary;
-  if (level > 20) return Colors.severity.warning;
+  if (level > 25) return Colors.severity.warning;
   return Colors.severity.critical;
 }
 
@@ -66,200 +47,109 @@ function batteryIcon(level: number | null): string {
   if (level === null) return 'battery-dead-outline';
   if (level > 80) return 'battery-full-outline';
   if (level > 50) return 'battery-half-outline';
-  if (level > 20) return 'battery-low-outline';
+  if (level > 25) return 'battery-low-outline';
   return 'battery-dead-outline';
 }
 
 // ─── Device card ──────────────────────────────────────────────────────────────
 
-function DeviceCard({
-  device,
-  onChangeStatus,
-  canManage,
-}: {
-  device: Device;
-  onChangeStatus: (id: string, status: string) => void;
-  canManage: boolean;
-}) {
+function DeviceCard({ device, onPress }: { device: FarmDevice; onPress: () => void }) {
   const statusColor = STATUS_COLORS[device.status] ?? Colors.text.muted;
   const batColor    = batteryColor(device.battery_capacity);
+  const health      = deviceHealthLines(device.health);
 
   return (
-    <View style={styles.card}>
-      {/* Icon + ID */}
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.cardHeader}>
         <View style={[styles.deviceIcon, { backgroundColor: statusColor + '20' }]}>
-          <Ionicons
-            name={STATUS_ICONS[device.status] as any}
-            size={22}
-            color={statusColor}
-          />
+          <Ionicons name={STATUS_ICONS[device.status] as any} size={22} color={statusColor} />
         </View>
         <View style={styles.cardInfo}>
           <Text style={styles.deviceId}>{device.id}</Text>
-          <Text style={styles.deviceModel}>{device.model ?? 'M5Stack M5GO'}</Text>
-        </View>
-        {/* Status badge — tap to change */}
-        <TouchableOpacity
-          style={[styles.statusBadge, { backgroundColor: statusColor + '20', borderColor: statusColor + '50' }]}
-          onPress={() => canManage && onChangeStatus(device.id, device.status)}
-          disabled={!canManage}
-        >
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {STATUS_LABELS[device.status]}
+          <Text style={styles.deviceModel}>
+            {device.assigned_animal ? `On ${device.assigned_animal.name}` : 'Not assigned'}
           </Text>
-        </TouchableOpacity>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusColor + '20', borderColor: statusColor + '50' }]}>
+          <Text style={[styles.statusText, { color: statusColor }]}>{DEVICE_STATUS_LABELS[device.status] ?? device.status}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={Colors.text.muted} />
       </View>
 
-      {/* Details row */}
       <View style={styles.cardDetails}>
-        {/* Battery */}
         <View style={styles.detailItem}>
           <Ionicons name={batteryIcon(device.battery_capacity) as any} size={14} color={batColor} />
           <Text style={[styles.detailText, { color: batColor }]}>
             {device.battery_capacity !== null ? `${device.battery_capacity}%` : 'Unknown'}
           </Text>
         </View>
-
-        {/* Last seen */}
         <View style={styles.detailItem}>
           <Ionicons name="time-outline" size={14} color={Colors.text.muted} />
-          <Text style={styles.detailText}>
-            {device.last_seen ? timeAgo(device.last_seen) : 'Never'}
-          </Text>
-        </View>
-
-        {/* Registered */}
-        <View style={styles.detailItem}>
-          <Ionicons name="calendar-outline" size={14} color={Colors.text.muted} />
-          <Text style={styles.detailText}>
-            {new Date(device.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-          </Text>
+          <Text style={styles.detailText}>{device.last_seen ? timeAgo(device.last_seen) : 'Never'}</Text>
         </View>
       </View>
 
-      {/* Notes if any */}
+      {/* Health indicators (offline, needs attention) — never change the status by themselves */}
+      {health.map((line) => (
+        <Text key={line.label} style={[styles.healthText, { color: line.critical ? Colors.severity.critical : Colors.severity.warning }]}>
+          {line.label}
+        </Text>
+      ))}
       {device.ingestion_revoked_at && <Text style={styles.notes}>Reception revoked</Text>}
-      {device.notes && (
-        <Text style={styles.notes}>{device.notes}</Text>
-      )}
-    </View>
+      {device.notes && <Text style={styles.notes}>{device.notes}</Text>}
+    </TouchableOpacity>
   );
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DevicesScreen() {
-  const currentFarmId = useFarmStore((state) => state.currentFarmId);
+  const navigation = useNavigation<any>();
   const currentFarm = useFarmStore((state) =>
     state.farms.find((farm) => farm.id === state.currentFarmId),
   );
   const canManageDevices = currentFarm?.permissions.includes('manage_devices') ?? false;
-  const [devices,    setDevices]    = useState<Device[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      if (!currentFarmId) {
-        setDevices([]);
-        return;
-      }
-      const { data } = await apiClient.get('/devices/', { params: { farm_id: currentFarmId } });
-      setDevices(data);
-    } catch {
-      // Silently fail — devices table might be empty on first launch
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [currentFarmId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  // Change device status via PATCH /devices/{id}
-  const refreshDeviceData = () => {
-    for (const key of ['telemetry', 'activity', 'animals', 'alerts']) {
-      void queryClient.invalidateQueries({ queryKey: [key] });
-    }
-    void load();
-  };
-  const handleChangeStatus = (deviceId: string, currentStatus: string) => {
-    const statuses = ['active', 'maintenance', 'lost', 'retired'];
-    Alert.alert(
-      'Change Device Status',
-      `Update status for ${deviceId}:`,
-      [
-        ...statuses
-          .filter(s => s !== currentStatus)
-          .map(s => ({
-            text: STATUS_LABELS[s],
-            onPress: async () => {
-              if (currentStatus === 'lost' && s === 'active') {
-                Alert.alert('Collar recovered', 'Is this collar secured on the correct animal again?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Confirm remounted', onPress: async () => {
-                    try {
-                      await apiClient.patch(`/devices/${deviceId}`, { status: s, confirm_remounted: true });
-                      refreshDeviceData();
-                    } catch { Alert.alert('Error', 'Unable to confirm collar recovery.'); }
-                  } },
-                ]);
-                return;
-              }
-              try {
-                await apiClient.patch(`/devices/${deviceId}`, { status: s });
-                refreshDeviceData();
-              } catch {
-                Alert.alert('Error', 'Failed to update device status.');
-              }
-            },
-          })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ]
-    );
-  };
-
+  const { data, isLoading, refetch, isRefetching } = useFarmDevices();
+  const devices = data ?? [];
+  const [showAdd, setShowAdd] = useState(false);
   const activeCount = devices.filter(d => d.status === 'active').length;
 
   return (
     <DrawerScreenBase
       title="M5Stack Devices"
       subtitle={`${devices.length} registered · ${activeCount} active`}
+      rightAction={canManageDevices && currentFarm ? (
+        <TouchableOpacity onPress={() => setShowAdd(true)} hitSlop={8} accessibilityLabel="Add a device">
+          <Ionicons name="add-circle-outline" size={24} color={Colors.primary} />
+        </TouchableOpacity>
+      ) : undefined}
     >
-      {loading ? (
+      {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator color={Colors.primary} size="large" />
         </View>
       ) : (
         <FlatList
           data={devices}
-          keyExtractor={d => d.id}           // device_id is unique PK — no duplicates
+          keyExtractor={d => d.id}
           contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); load(); }}
-              tintColor={Colors.primary}
-            />
-          }
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={Colors.primary} />}
           renderItem={({ item }) => (
-            <DeviceCard
-              device={item}
-              onChangeStatus={handleChangeStatus}
-              canManage={canManageDevices}
-            />
+            <DeviceCard device={item} onPress={() => navigation.navigate('DeviceDetail', { deviceId: item.id })} />
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="hardware-chip-outline" size={48} color={Colors.text.muted} />
               <Text style={styles.emptyTitle}>No devices registered</Text>
               <Text style={styles.emptyText}>
-                Devices are automatically registered when they send their first telemetry data.
+                {canManageDevices ? 'Add a collar with the + button.' : 'Ask the farm owner or farmer to add collars.'}
               </Text>
             </View>
           }
         />
+      )}
+      {currentFarm && (
+        <AddDeviceModal visible={showAdd} farmId={currentFarm.id} farmName={currentFarm.name} onClose={() => setShowAdd(false)} />
       )}
     </DrawerScreenBase>
   );
@@ -309,6 +199,8 @@ const styles = StyleSheet.create({
   },
   detailItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
   detailText:  { fontSize: Typography.xs, color: Colors.text.muted },
+
+  healthText: { fontSize: Typography.xs, fontWeight: '600' },
 
   notes: {
     fontSize: Typography.xs,

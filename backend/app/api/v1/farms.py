@@ -20,7 +20,7 @@ from app.db.database import get_db
 from app.models.farm import Farm
 from app.models.membership import FarmMembership
 from app.models.user import User
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.core.access import (
     get_accessible_farm_ids,
     require_farm,
@@ -103,11 +103,13 @@ def list_farms(
 def create_farm(
     data: FarmCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """
-    Create a new farm. The creating user automatically becomes
-    an owner member with active status.
+    Create a new farm (platform admin only). The admin then invites the farm's
+    owner, whose account is created by the invitation. The admin is not added as
+    a member (it already sees every farm) and owner_id stays empty: memberships
+    are the only access source.
     Guarantees client-side idempotency if client_request_id is provided.
     """
     fingerprint = hashlib.sha256(json.dumps(
@@ -147,22 +149,13 @@ def create_farm(
                 }
 
     farm = Farm(
-        owner_id=current_user.id,
+        owner_id=None,
         name=data.name,
         address=data.address,
         size_hectares=data.size_hectares,
     )
     db.add(farm)
-    db.flush()  # Get farm.id before creating membership
-
-    # Auto-membership: owner / active
-    membership = FarmMembership(
-        user_id=current_user.id,
-        farm_id=farm.id,
-        role="owner",
-        status="active",
-    )
-    db.add(membership)
+    db.flush()  # Get farm.id for the idempotency receipt
     if data.client_request_id:
         db.add(FarmCreationRequest(
             user_id=current_user.id, request_id=data.client_request_id,

@@ -59,7 +59,7 @@ async function harness(options = {}) {
     'expo-location': location,
     './DrawerScreenBase': { __esModule: true, default: ({ children, rightAction, ...props }) => React.createElement('Screen', props, rightAction, children) },
     '../../store/farmStore': { useFarmStore: (selector) => selector({ currentFarmId: state.farmId,
-      farms: [1, 2].map((id) => ({ id, name: 'Farm ' + id, permissions: state.canManage ? ['manage_farm'] : ['view_animals'] })) }) },
+      farms: [1, 2].map((id) => ({ id, name: 'Farm ' + id, permissions: state.canManage ? ['manage_geofences'] : ['view_animals'] })) }) },
     '../../store/authStore': { useAuthStore: (selector) => selector({ role: 'farmer' }) },
     '../../hooks/useTelemetry': { useTelemetryLatest: () => ({ ...query(state.animals), isLoading: state.loading }) },
     '../../hooks/useGeofences': {

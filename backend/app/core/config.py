@@ -14,6 +14,17 @@ load_dotenv()
 TARGET_TIMEZONE = "Asia/Tokyo"  # TODO: basculer vers "Africa/Abidjan" avant tout déploiement terrain
 BINARY_MIN_TIMESTAMP = 1577836800  # 2020-01-01T00:00:00Z
 BINARY_MAX_CLOCK_SKEW_SECONDS = 300
+
+# Device health indicators (Phase 3). Indicators only: "lost" is still set by a human.
+# DEVICE_OFFLINE_AFTER_MINUTES suits the Wi-Fi prototype (one window about every 21 s);
+# it must be revisited for LoRaWAN uplink intervals.
+DEVICE_OFFLINE_AFTER_MINUTES = 30
+# The M5 power chip reports only 0/25/50/75/100 %, so "low" includes 25 %.
+DEVICE_LOW_BATTERY_PCT = 25
+DEVICE_NO_GPS_FIX_AFTER_MINUTES = 60
+DEVICE_BATTERY_UNKNOWN_AFTER_MINUTES = 60
+# Transport IDs handed out by POST /devices start here (1 and the bench range below stay manual).
+DEVICE_TRANSPORT_ID_START = 100
 _DEVELOPMENT_SECRET = "livestock-secret-key-change-in-production-2024"
 
 
@@ -33,6 +44,8 @@ class Settings:
     BINARY_V2_ENABLED: bool = _env_bool("BINARY_V2_ENABLED", True)
     BINARY_V3_ENABLED: bool = _env_bool("BINARY_V3_ENABLED", False)
     MODEL_15S_ENABLED: bool = _env_bool("MODEL_15S_ENABLED", True)
+    # Accounts come from invitations. Development may reopen POST /auth/register.
+    PUBLIC_REGISTRATION_ENABLED: bool = _env_bool("PUBLIC_REGISTRATION_ENABLED", False)
     MODEL_15S_PATH: str = os.getenv("MODEL_15S_PATH", "ml/models/behavior_classifier_v3_staged.pkl")
     # No unvalidated coverage threshold: new qualified days cannot raise anomalies until configured.
     ANOMALY_MIN_COVERAGE_SECONDS: float | None = (

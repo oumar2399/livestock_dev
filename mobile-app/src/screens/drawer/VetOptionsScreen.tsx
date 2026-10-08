@@ -26,6 +26,11 @@ import { useAnimals } from '../../hooks/useAnimals';
 import { VeterinaryCase, VeterinaryEntry } from '../../api/veterinary';
 import { selectedFarmRole } from '../../utils/selectedFarmRole';
 import { entryTypeLabel } from '../../utils/veterinaryLabels';
+import { showApiError } from '../../utils/apiErrors';
+
+const ROLE_LABELS: Record<string, string> = {
+  owner: 'Owner', farmer: 'Farmer', vet: 'Veterinarian', admin: 'Admin',
+};
 
 // ─── VetOptionsScreen ─────────────────────────────────────────────────────────
 export default function VetOptionsScreen() {
@@ -34,8 +39,13 @@ export default function VetOptionsScreen() {
   const currentFarmId = farmState.currentFarmId;
   // Same source as Profile / Drawer: the role in the selected farm (platform admin aside).
   const farmRole = selectedFarmRole(role, farmState);
+  const farmName = farmState.farms.find((farm) => farm.id === currentFarmId)?.name ?? 'no farm';
+  // Shown under the title: the role this screen used to decide what you may do.
+  const roleLine = 'Your role in ' + farmName + ': ' + (farmRole ? ROLE_LABELS[farmRole] : 'none');
+  // Vet (and admin): full veterinary write. Owner and farmer: read the cases and add
+  // observation notes only (they apply the treatments day to day).
   const isVetOrAdmin = farmRole === 'vet' || farmRole === 'admin';
-  const isOwner = farmRole === 'owner';
+  const canObserve = farmRole === 'owner' || farmRole === 'farmer';
 
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
@@ -66,6 +76,8 @@ export default function VetOptionsScreen() {
   );
 
   // Mutations
+  // After a transfer the receiving farm sees the previous farm's cases, read-only.
+  const caseReadOnly = !!caseDetail && caseDetail.farm_id !== currentFarmId;
   const createCaseMutation = useCreateVeterinaryCase();
   const updateCaseMutation = useUpdateVeterinaryCase();
   const addEntryMutation = useAddCaseEntry();
@@ -113,13 +125,13 @@ export default function VetOptionsScreen() {
       closeCreateModal();
       refetch();
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Unable to create the case.');
+      showApiError(err, 'Could not create case', 'Unable to create the case.');
     }
   };
 
   const handleAddEntry = async () => {
     if (!selectedCaseId || !newContent.trim()) {
-      Alert.alert('Error', 'Please enter the note content.');
+      Alert.alert('Required field', 'Please enter the note content.');
       return;
     }
 
@@ -127,13 +139,14 @@ export default function VetOptionsScreen() {
       await addEntryMutation.mutateAsync({
         caseId: selectedCaseId,
         payload: {
-          entry_type: newEntryType,
+          // Non-vets may only add observations; the server enforces it too.
+          entry_type: isVetOrAdmin ? newEntryType : 'observation',
           content: newContent.trim(),
         },
       });
       closeAddEntryModal();
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Unable to add the entry.');
+      showApiError(err, 'Could not add note', 'Unable to add the entry.');
     }
   };
 
@@ -145,18 +158,18 @@ export default function VetOptionsScreen() {
         payload: { status: newStatus },
       });
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Unable to change the status.');
+      showApiError(err, 'Could not change status', 'Unable to change the status.');
     }
   };
 
-  if (!isVetOrAdmin && !isOwner) {
+  if (!isVetOrAdmin && !canObserve) {
     return (
-      <DrawerScreenBase title="Veterinary Records">
+      <DrawerScreenBase title="Veterinary Records" subtitle={roleLine}>
         <View style={styles.restrictedContainer}>
           <Ionicons name="lock-closed-outline" size={48} color={Colors.text.muted} />
           <Text style={styles.restrictedTitle}>Restricted access</Text>
           <Text style={styles.restrictedDesc}>
-            Clinical records and medical interventions are restricted to the farm's veterinarians and owners.
+            Clinical records are available to the farm's members only.
           </Text>
         </View>
       </DrawerScreenBase>
@@ -166,7 +179,7 @@ export default function VetOptionsScreen() {
   const cases = casesData?.cases || [];
 
   return (
-    <DrawerScreenBase title="Veterinary Follow-up">
+    <DrawerScreenBase title="Veterinary Follow-up" subtitle={roleLine}>
       <View style={styles.container}>
         {/* Header avec action de création si VET/ADMIN */}
         <View style={styles.topBar}>
@@ -293,11 +306,14 @@ export default function VetOptionsScreen() {
                     <Text style={styles.detailOpener}>
                       Opened by: {caseDetail.opener_name || `User #${caseDetail.opened_by}`}
                     </Text>
+                    {caseReadOnly && (
+                      <Text style={styles.detailOpener}>Opened by a previous farm — read only. Open a new case to continue.</Text>
+                    )}
                     <Text style={styles.detailDate}>
                       Date: {new Date(caseDetail.opened_at).toLocaleDateString()}
                     </Text>
 
-                    {isVetOrAdmin && (
+                    {isVetOrAdmin && !caseReadOnly && (
                       <View style={styles.statusButtonsRow}>
                         <Text style={styles.statusLabel}>Change status:</Text>
                         {(['provisional', 'confirmed', 'ruled_out', 'closed'] as const).map(
@@ -328,13 +344,13 @@ export default function VetOptionsScreen() {
                   {/* Journal des entrées */}
                   <View style={styles.journalHeader}>
                     <Text style={styles.journalTitle}>Case journal</Text>
-                    {isVetOrAdmin && (
+                    {(isVetOrAdmin || canObserve) && !caseReadOnly && (
                       <TouchableOpacity
                         style={styles.addEntryBtn}
                         onPress={() => setShowAddEntryModal(true)}
                       >
                         <Ionicons name="add-circle-outline" size={16} color={Colors.primary} />
-                        <Text style={styles.addEntryBtnText}>Add note</Text>
+                        <Text style={styles.addEntryBtnText}>{isVetOrAdmin ? 'Add note' : 'Add observation'}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -456,11 +472,11 @@ export default function VetOptionsScreen() {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.createModalContent}>
-              <Text style={styles.modalTitle}>Add a Clinical Note</Text>
+              <Text style={styles.modalTitle}>{isVetOrAdmin ? 'Add a Clinical Note' : 'Add an Observation'}</Text>
 
               <ScrollView style={styles.formScroll} contentContainerStyle={styles.formBody} keyboardShouldPersistTaps="handled">
-              <Text style={styles.inputLabel}>Entry type</Text>
-              <View style={styles.entryTypeRow}>
+              {isVetOrAdmin && <Text style={styles.inputLabel}>Entry type</Text>}
+              {isVetOrAdmin && <View style={styles.entryTypeRow}>
                 {(['observation', 'intervention', 'follow_up', 'note'] as const).map(
                   (t) => {
                     const isSelected = newEntryType === t;
@@ -482,7 +498,7 @@ export default function VetOptionsScreen() {
                     );
                   },
                 )}
-              </View>
+              </View>}
 
               <Text style={styles.inputLabel}>Note content</Text>
               <TextInput

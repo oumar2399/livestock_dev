@@ -3,13 +3,19 @@ Routes API Animals - CRUD animaux
 Farm-scoped: all operations require active membership on the animal's farm.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from datetime import datetime
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 from app.db.database import get_db
 from app.models.alert import Alert
 from app.models.animal import Animal
+from app.models.device import Device
+from app.models.farm import Farm
 from app.models.daily_summary import DailyBehaviorSummary
 from app.models.feedback import AlertFeedback, PredictionFeedback
 from app.models.telemetry import Telemetry
@@ -301,3 +307,62 @@ def delete_animal(
     db.commit()
 
     return None  # 204 No Content
+
+
+
+# ============================================================
+# POST /api/v1/animals/{animal_id}/transfer - Transfer (admin)
+# ============================================================
+
+class AnimalTransfer(BaseModel):
+    target_farm_id: int = Field(..., gt=0)
+
+
+@router.post("/{animal_id}/transfer", response_model=AnimalResponse)
+def transfer_animal(
+    animal_id: int,
+    payload: AnimalTransfer,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Move an animal to another farm (platform admin only), in one transaction:
+    close the tracking period and open a new one (source 'farm_transfer'), move the
+    collar with the animal, and resolve the previous farm's open alerts on it as
+    "animal_transferred" (that farm can no longer act on them).
+    Afterwards the receiving farm sees the animal's health history, not its past
+    locations or the previous farm's geofence alerts (provenance_service).
+    """
+    animal = db.query(Animal).filter(Animal.id == animal_id).with_for_update().first()
+    if not animal:
+        raise HTTPException(status_code=404, detail="Animal not found")
+    target = db.get(Farm, payload.target_farm_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    old_farm = animal.farm_id
+    if target.id == old_farm:
+        raise HTTPException(status_code=409, detail="The animal is already in this farm")
+
+    now = datetime.utcnow()
+    for alert in db.query(Alert).filter(
+        Alert.animal_id == animal.id,
+        Alert.resolved_at.is_(None),
+        or_(Alert.farm_id == old_farm, Alert.farm_id.is_(None)),
+    ).all():
+        alert.resolved_at = now
+        alert.alert_metadata = {**(alert.alert_metadata or {}),
+                                "resolved_reason": "animal_transferred",
+                                "transferred_to_farm_id": target.id}
+
+    # The collar stays on the animal, so it moves with it.
+    if animal.assigned_device:
+        device = db.query(Device).filter(Device.id == animal.assigned_device).with_for_update().first()
+        if device:
+            device.farm_id = target.id
+
+    animal.farm_id = target.id
+    record_tracking_period(db=db, animal_id=animal.id, farm_id=target.id,
+                           device_id=animal.assigned_device, source="farm_transfer")
+    db.commit()
+    db.refresh(animal)
+    return animal

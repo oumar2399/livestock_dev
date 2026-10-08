@@ -13,6 +13,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.api.v1 import auth, farm_reports, history, notifications, reports, telemetry
 from app.core.dependencies import get_current_user
 from app.core.timezone import TARGET_TZ
@@ -154,7 +155,9 @@ def _csv(response):
 
 # ── 2.1 Provenance after a transfer ─────────────────────────────────────────
 
-def test_new_farm_gets_no_old_farm_rows_on_history_latest_and_timeline(world, client):
+def test_new_farm_gets_old_health_history_but_no_old_locations(world, client):
+    # Phase 3 (replaces B2 for health data): locations stay with the farm that recorded
+    # them; anomaly/health alerts, vet entries and daily summaries follow the animal.
     client.as_user(world.owner_b)
     rows = client.get(f"/api/v1/telemetry/history/{world.animal.id}", params={"hours": 168}).json()
     assert [row["latitude"] for row in rows] == [2.0]
@@ -164,10 +167,10 @@ def test_new_farm_gets_no_old_farm_rows_on_history_latest_and_timeline(world, cl
 
     items = client.get(f"/api/v1/animals/{world.animal.id}/timeline").json()["items"]
     alerts = {item["source_id"] for item in items if item["event_type"] == "alert"}
-    assert alerts == {world.alert_b.id}
-    assert [item for item in items if item["event_type"] == "daily_summary"] == []
+    assert alerts == {world.alert_b.id, world.alert_a.id, world.legacy_a.id}  # all "health" alerts
+    assert len([item for item in items if item["event_type"] == "daily_summary"]) == 2
     vet_notes = [item["data"]["content"] for item in items if item["event_type"] == "veterinary_entry"]
-    assert vet_notes == ["B-farm clinical note"]
+    assert vet_notes == ["B-farm clinical note", "A-farm clinical note"]
 
 
 def test_transfer_day_summary_is_proven_for_neither_farm(world, client):
@@ -218,15 +221,18 @@ def test_telemetry_without_period_stays_in_admin_export_with_empty_farm(world, c
 # ── 2.2 Vet entries need view_veterinary ────────────────────────────────────
 
 @pytest.mark.parametrize("event_types", [None, ["veterinary_entry"]])
-def test_farmer_timeline_has_no_vet_entries(world, client, event_types):
+def test_farmer_timeline_shows_the_animals_vet_entries(world, client, event_types):
+    # Phase 3: farmers have view_veterinary (they apply the vet's instructions), and the
+    # health history (including the previous farm's vet entries) follows the animal.
     params = {"event_type": event_types} if event_types else {}
     farmer_items = client.as_user(world.farmer_b).get(
         f"/api/v1/animals/{world.animal.id}/timeline", params=params).json()["items"]
-    assert [item for item in farmer_items if item["event_type"] == "veterinary_entry"] == []
+    assert [item["data"]["content"] for item in farmer_items if item["event_type"] == "veterinary_entry"] == [
+        "B-farm clinical note", "A-farm clinical note"]
     vet_items = client.as_user(world.vet_b).get(
         f"/api/v1/animals/{world.animal.id}/timeline", params=params).json()["items"]
     assert [item["data"]["content"] for item in vet_items if item["event_type"] == "veterinary_entry"] == [
-        "B-farm clinical note"]
+        "B-farm clinical note", "A-farm clinical note"]
 
 
 # ── 2.3 / 2.4 Dispatch and registration ─────────────────────────────────────
@@ -240,7 +246,8 @@ def test_dispatch_is_admin_only(world, client):
 
 
 @pytest.mark.parametrize("sent_role", ["owner", "vet", "admin", "not-a-role"])
-def test_registration_ignores_the_role_field(world, client, sent_role):
+def test_registration_ignores_the_role_field(world, client, sent_role, monkeypatch):
+    monkeypatch.setattr(settings, "PUBLIC_REGISTRATION_ENABLED", True)  # development switch
     response = client.post("/api/v1/auth/register", json={
         "email": f"new-{uuid4().hex[:8]}@example.com", "password": "secret123", "name": "New", "role": sent_role})
     assert response.status_code == 201

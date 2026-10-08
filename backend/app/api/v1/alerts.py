@@ -19,7 +19,8 @@ from app.schemas.alert import (
     AlertSeverity
 )
 from app.core.dependencies import get_current_user
-from app.core.access import require_farm, resolve_farm_scope
+from app.core.access import has_permission, require_farm, resolve_farm_scope
+from app.services.provenance_service import HEALTH_ALERT_TYPES, alert_visible_to_farms
 
 router = APIRouter(
     prefix="/alerts",
@@ -41,17 +42,17 @@ def list_alerts(
     current_user: User = Depends(get_current_user),
 ):
     """
-    List alerts — only for animals in the user's accessible farms.
+    List alerts visible to the user's accessible farms: each farm's own alerts, plus
+    the health alerts of the animals it holds now (Phase 3 transfer rule). A previous
+    farm's geofence / battery / offline alerts never follow a transferred animal.
     """
     accessible = resolve_farm_scope(current_user, db, farm_id)
+    visible = alert_visible_to_farms(accessible)
 
-    # Base query with animal join — scoped to accessible farms
     query = db.query(
         Alert,
         Animal.name.label('animal_name')
-    ).join(Animal, Alert.animal_id == Animal.id).filter(
-        Animal.farm_id.in_(accessible)
-    )
+    ).join(Animal, Alert.animal_id == Animal.id).filter(visible)
 
     # Filters
     if resolved is not None:
@@ -75,12 +76,7 @@ def list_alerts(
     results = query.limit(limit).all()
 
     # Count unresolved — scoped to accessible farms
-    unresolved_count = db.query(Alert).join(
-        Animal, Alert.animal_id == Animal.id
-    ).filter(
-        Animal.farm_id.in_(accessible),
-        Alert.resolved_at.is_(None),
-    ).count()
+    unresolved_count = db.query(Alert).filter(visible, Alert.resolved_at.is_(None)).count()
 
     # Format response
     alerts = []
@@ -108,7 +104,8 @@ def update_alert(
 ):
     """
     Acknowledge or resolve an alert.
-    Requires membership on the alert's animal's farm.
+    Requires manage_alerts (owner, farmer, admin) on a farm that sees the alert: the
+    farm that raised it, or the farm holding the animal now for a health alert.
     """
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
@@ -117,7 +114,11 @@ def update_alert(
     # Farm access check via the animal
     animal = db.query(Animal).filter(Animal.id == alert.animal_id).first()
     if animal:
-        require_farm(current_user, animal.farm_id, None, db)
+        farms = [alert.farm_id] if alert.farm_id is not None else []
+        if alert.farm_id in (None, animal.farm_id) or alert.type in HEALTH_ALERT_TYPES:
+            farms.append(animal.farm_id)
+        if not any(has_permission(current_user, farm, "manage_alerts", db) for farm in farms):
+            require_farm(current_user, farms[0], "manage_alerts", db)  # raises the clear 403/404
 
     # Update fields
     update_dict = update_data.dict(exclude_unset=True)

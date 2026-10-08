@@ -79,6 +79,57 @@ def period_covering_day(animal_column, date_column):
     )
 
 
+# ── Visibility after a transfer (Phase 3, replaces part of B2) ─────────────
+# The farm currently holding an animal sees its HEALTH history from every farm
+# (anomaly / health alerts, veterinary cases and entries, daily activity summaries).
+# Location data (telemetry, positions, tracks) and farm-bound alerts (geofence,
+# battery, offline) stay with the farm that recorded them. Farm reports and CSV
+# exports keep the strict period rule.
+HEALTH_ALERT_TYPES = ("activity_deviation_low", "activity_deviation_high", "health")
+
+
+def animal_now_in_farms(animal_column, farm_ids: Sequence[int]):
+    """EXISTS clause: the animal currently belongs to one of `farm_ids`. Aliased so it
+    stays a real subquery inside queries that already join `animals`."""
+    current = aliased(Animal)
+    return exists(select(current.id).where(current.id == animal_column, current.farm_id.in_(list(farm_ids))))
+
+
+def _proven_in_farms(animal_column, time_column, farm_ids: Sequence[int], *, naive_utc: bool = False):
+    period = aliased(AnimalTrackingPeriod)
+    return exists(select(period.id).where(
+        _covers(period, animal_column, _as_utc(time_column, naive_utc)),
+        period.farm_id.in_(list(farm_ids)),
+    ))
+
+
+def alert_visible_to_farms(farm_ids: Sequence[int]):
+    """Alerts a farm sees: its own; legacy rows by tracking period; health alerts of
+    the animals it holds now, whichever farm raised them."""
+    from app.models.alert import Alert
+    return or_(
+        Alert.farm_id.in_(list(farm_ids)),
+        and_(Alert.farm_id.is_(None),
+             _proven_in_farms(Alert.animal_id, Alert.triggered_at, farm_ids, naive_utc=True)),
+        and_(Alert.type.in_(HEALTH_ALERT_TYPES), animal_now_in_farms(Alert.animal_id, farm_ids)),
+    )
+
+
+def vet_case_visible_to_farms(farm_ids: Sequence[int]):
+    """Veterinary cases a farm sees: its own, plus every case of the animals it holds now
+    (cases opened by a previous farm are read-only for it)."""
+    from app.models.veterinary import VeterinaryCase
+    return or_(VeterinaryCase.farm_id.in_(list(farm_ids)),
+               animal_now_in_farms(VeterinaryCase.animal_id, farm_ids))
+
+
+def summary_visible_to_farm(animal_column, date_column, farm: int):
+    """Daily activity summaries: proven days, plus every day of the animals it holds now
+    (the transfer-day summary therefore goes to the receiving farm)."""
+    return or_(day_proven_in_farm(animal_column, date_column, farm),
+               animal_now_in_farms(animal_column, [farm]))
+
+
 def record_tracking_period(
     db: Session,
     animal_id: int,

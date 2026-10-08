@@ -4,7 +4,9 @@ Prototype de suivi bovin : M5Stack, API FastAPI, PostgreSQL/PostGIS/TimescaleDB
 et application mobile Expo. Le flux autonome actuel est binaire v2, 15 s / 150
 echantillons a 10 Hz. JSON reste disponible avec ce meme profil explicite.
 Les nouveaux envois 5 s / v1 ou sans profil sont refuses (422), sans modifier
-les donnees historiques. Voir [la transition 15 s](docs/transition_15s.md).
+les donnees historiques. Voir `backend/app/services/telemetry_ingestion.py:83-84` et les tests
+`backend/tests/test_b4_firmware_fixes.py::test_v1_packet_still_decodes_and_is_still_rejected_with_422`
+et `backend/tests/test_binary_telemetry_api.py::test_model_profile_mismatch_and_unavailable_model`.
 
 ## Points d'entree
 

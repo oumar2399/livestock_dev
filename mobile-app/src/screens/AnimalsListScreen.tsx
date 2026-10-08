@@ -20,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAnimals } from '../hooks/useAnimals';
 import { useTelemetryLatest } from '../hooks/useTelemetry';
+import { useFarmDevices } from '../hooks/useDevices';
+import { collarHealthSuffix } from '../utils/deviceStatus';
 import { useFarmStore } from '../store/farmStore';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import { Animal, AnimalStatus, TelemetryLatest } from '../types';
@@ -34,6 +36,8 @@ import {
   formatWeight,
   batteryColor,
   evaluateFreshness,
+  animalCollarStatus,
+  CollarStatus,
 } from '../utils/helpers';
 import {
   ScreenHeader,
@@ -57,10 +61,12 @@ const STATUS_FILTERS: { label: string; value: AnimalStatus | 'all' }[] = [
 interface AnimalCardProps {
   animal: Animal;
   telemetry?: TelemetryLatest;
+  collar: CollarStatus;
+  healthSuffix: string;
   onPress: () => void;
 }
 
-function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
+function AnimalCard({ animal, telemetry, collar, healthSuffix, onPress }: AnimalCardProps) {
   const statusColor = animalStatusColor(animal.status);
 
   const freshness = evaluateFreshness({
@@ -90,7 +96,8 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
         <View
           style={[
             styles.onlineDot,
-            { backgroundColor: freshness.deviceState === 'lost' ? '#E74C3C' : freshness.telemetryColor },
+            // A collar that is not active (lost, maintenance, retired) wins over data freshness.
+            { backgroundColor: collar.state !== 'active' && collar.state !== 'unknown' ? collar.color : freshness.telemetryColor },
           ]}
         />
       </View>
@@ -101,7 +108,7 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
           <Text style={styles.animalName} numberOfLines={1}>{animal.name}</Text>
           <View style={[styles.statusBadge, { borderColor: statusColor }]}>
             <Text style={[styles.statusText, { color: statusColor }]}>
-              {animalStatusLabel(animal.status)}
+              Animal: {animalStatusLabel(animal.status)}
             </Text>
           </View>
         </View>
@@ -111,18 +118,20 @@ function AnimalCard({ animal, telemetry, onPress }: AnimalCardProps) {
           {animal.breed ?? animal.species} · {animalSexLabel(animal.sex)} · {animalAge(animal.birth_date)}
         </Text>
 
+        {/* Collar (device) status, distinct from the animal status above */}
+        <View style={styles.collarRow}>
+          <Ionicons name="hardware-chip-outline" size={12} color={collar.color} />
+          <Text style={[styles.collarText, { color: collar.color }]}>
+            {collar.label}{animal.assigned_device ? ` · ${animal.assigned_device}` : ''}{healthSuffix}
+          </Text>
+        </View>
+
         <View style={styles.cardBottom}>
-          {/* Statut matériel prioritaire si lost */}
-          {freshness.deviceState === 'lost' ? (
-            <View style={[styles.behaviorTag, { backgroundColor: '#E74C3C20' }]}>
-              <Ionicons name="warning-outline" size={12} color="#E74C3C" />
-              <Text style={[styles.behaviorText, { color: '#E74C3C' }]}>Collar Lost</Text>
-            </View>
-          ) : freshness.telemetryFreshness === 'recent' && activityState ? (
+          {freshness.telemetryFreshness === 'recent' && activityState ? (
             <View style={[styles.behaviorTag, { backgroundColor: behaviorColor + '20' }]}>
               <View style={[styles.behaviorDot, { backgroundColor: behaviorColor }]} />
               <Text style={[styles.behaviorText, { color: behaviorColor }]}>
-                {activityStateLabel(activityState as any)}
+                Behaviour: {activityStateLabel(activityState as any)}
               </Text>
             </View>
           ) : (
@@ -184,6 +193,7 @@ export default function AnimalsListScreen() {
   });
 
   const { data: telemetryData } = useTelemetryLatest({ limit: 100 });
+  const { data: devices } = useFarmDevices();
   const telemetryMap = useMemo(
     () => new Map((telemetryData ?? []).map((t) => [t.animal_id, t])),
     [telemetryData],
@@ -281,6 +291,8 @@ export default function AnimalsListScreen() {
           <AnimalCard
             animal={item}
             telemetry={telemetryMap.get(item.id)}
+            collar={animalCollarStatus(item.assigned_device, devices, telemetryMap.get(item.id)?.device_status)}
+            healthSuffix={collarHealthSuffix(devices?.find((device) => device.id === item.assigned_device)?.health)}
             onPress={() => handleAnimalPress(item.id)}
           />
         )}
@@ -389,6 +401,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text.primary,
   },
+  collarRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  collarText: { fontSize: Typography.xs, fontWeight: '600' },
   statusBadge: {
     paddingHorizontal: 7,
     paddingVertical: 2,

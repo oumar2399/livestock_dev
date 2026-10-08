@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import DrawerScreenBase from './DrawerScreenBase';
 import { Colors, Spacing, Typography, Radius } from '../../constants/config';
+import { useAuthStore } from '../../store/authStore';
 import { useFarmStore } from '../../store/farmStore';
 import { useFarm } from '../../hooks/useFarms';
 import { useAnimals } from '../../hooks/useAnimals';
@@ -37,6 +38,7 @@ export default function FarmOnboardingScreen() {
   const navigation = useNavigation<any>();
   const { currentFarmId, farms, loadFarms } = useFarmStore();
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const canCreateFarm = useAuthStore((state) => state.role) === 'admin';
 
   // Queries for live server state
   const { data: farm, isLoading: farmLoading, refetch: refetchFarm } = useFarm(currentFarmId);
@@ -97,7 +99,8 @@ export default function FarmOnboardingScreen() {
       actionLabel: hasFarm ? 'Modifier' : 'Créer ma ferme',
       actionIcon: hasFarm ? 'create-outline' : 'add-circle-outline',
       onPress: () => {
-        if (hasFarm) {
+        if (hasFarm || !canCreateFarm) {
+          // Only the admin creates farms; others open the farm screen (which explains it).
           navigation.navigate('Farm');
         } else {
           setCreateModalVisible(true);

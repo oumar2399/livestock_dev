@@ -92,6 +92,16 @@ Update `project_master_handoff.md`, `project_architecture.md`,
 2. Flash the four firmware files (`main.py`, `b4_runtime.py`, `b4_protocol.py`,
    `untimed_store.py`) to `/flash`; delete stale copies in `/flash/tests` and `/flash/gps-code`.
 3. Hash check with `firmware_identity.py` against `backend/scripts/firmware_manifest.py`.
-4. Smoke test: LCD `FW: v2.0 (B.4) | v3: OFF`, battery `BAT xx%` or `BAT ?`,
+4. Smoke test: LCD `FW v2.0 B.4 | v3: OFF`, battery `BAT xx%` or `BAT ?`,
    `HTTP_STATUS: 201`, `battery_level` stored (or NULL), no `tests` in `sys.path`.
 5. Endurance test (≥ 100 cycles / 1–2 h, battery, network cuts, new HTTP client).
+6. Accelerometer filter check: copy `m5stack/tests/bench_accel_dlpf.py`, M5 lying still,
+   `exec(open('bench_accel_dlpf.py').read())`. Expected std at rest: about 1.5 mg with
+   `A_DLPF_CFG=0`, about 0.3 mg with `A_DLPF_CFG=6` (ratio about 0.2; "Filter active").
+
+**Data boundary — accelerometer low-pass filter.** Firmware from 2026-10-05 sets
+ACCEL_CONFIG2 (0x1D) `A_DLPF_CFG=6` (5.1 Hz bandwidth; [to verify] against the
+MPU-6886 datasheet table). Before it, the accelerometer ran at the chip reset value
+(`A_DLPF_CFG=0`, 218.1 Hz). Telemetry received before the flash is unfiltered, after it
+filtered. Flash date and time (UTC): **[to fill in when flashed]** · device: **[id]** ·
+`main.py` / `b4_runtime.py` SHA-256 as in the firmware manifest at that commit.

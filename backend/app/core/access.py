@@ -70,7 +70,7 @@ def require_farm(
     if not farm:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Ferme {farm_id} introuvable",
+            detail="Farm not found",
         )
     if is_platform_admin(user):
         return farm
@@ -78,12 +78,12 @@ def require_farm(
     if not membership:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accès à cette ferme refusé",
+            detail="Access to this farm denied",
         )
     if permission and not role_has_permission(membership.role, permission):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permission refusée : {permission}",
+            detail=f"Permission denied: {permission}",
         )
     return farm
 
@@ -98,7 +98,7 @@ def require_animal_access(
     if not animal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Animal {animal_id} introuvable",
+            detail="Animal not found",
         )
     require_farm(user, animal.farm_id, permission, db)
     return animal
@@ -124,7 +124,7 @@ def require_device_farm_patch(
         if new_farm_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accès refusé",
+                detail="Access denied",
             )
         require_farm(user, new_farm_id, "manage_devices", db)
         return
@@ -155,7 +155,7 @@ def resolve_farm_scope(
         if farm_id not in accessible:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accès à cette ferme refusé",
+                detail="Access to this farm denied",
             )
         return [farm_id]
     return accessible
@@ -166,22 +166,24 @@ def assert_device_visible(user: User, device: Device, db: Session) -> None:
         if not is_platform_admin(user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accès refusé",
+                detail="Access denied",
             )
         return
     accessible = get_accessible_farm_ids(user, db)
     if device.farm_id not in accessible:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accès refusé",
+            detail="Access denied",
         )
 
 
 def effective_permissions(user: User, farm_id: int, db: Session) -> list[str]:
-    from app.core.role_defaults import permissions_for_role
+    from app.core.role_defaults import ROLE_DEFAULT_PERMISSIONS, permissions_for_role
 
     if is_platform_admin(user):
-        return permissions_for_role("owner")
+        # The admin passes every check (has_permission), so the app must show every
+        # action too: the union of all farm roles, in a stable order.
+        return sorted({perm for perms in ROLE_DEFAULT_PERMISSIONS.values() for perm in perms})
     membership = get_active_membership(user, farm_id, db)
     if not membership:
         return []

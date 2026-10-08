@@ -1,6 +1,8 @@
 # scripts/simulate_telemetry.py
 """Send 24 h of synthetic JSON telemetry for one provisioned device.
 
+Packets cover the last 24 hours, every 10 minutes, oldest first, and are never dated
+later than the moment they are sent (the server refuses more than 300 s ahead).
 JSON ingestion accepts only provisioned devices with a valid X-Device-Secret:
 
     python scripts/simulate_telemetry.py --device-id M5-001 --device-secret <64 hex>
@@ -28,6 +30,13 @@ ACTIVITY_MAP = {
     "walking":  (0.40, 0.80),
     "running":  (1.00, 1.50),
 }
+
+def packet_times(now):
+    """144 times, 10 minutes apart, oldest first; the last one is the latest 10-minute
+    mark at or before `now`, so no packet is ever dated in the future."""
+    end = now.replace(second=0, microsecond=0) - timedelta(minutes=now.minute % 10)
+    return [end - timedelta(minutes=10 * step) for step in range(143, -1, -1)]
+
 
 def send(state, timestamp):
     lo, hi   = ACTIVITY_MAP[state]
@@ -64,13 +73,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     API, DEVICE, SECRET = args.api, args.device_id, args.device_secret
 
-    base = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    for ts in packet_times(datetime.utcnow()):
+        send(HOURLY_PATTERN[ts.hour], ts)
+        time.sleep(0.1)
 
-    for hour in range(24):
-        state = HOURLY_PATTERN[hour]
-        for minute in [0, 10, 20, 30, 40, 50]:
-            ts = base + timedelta(hours=hour, minutes=minute)
-            send(state, ts)
-            time.sleep(0.1)
-
-    print("\nDone — 144 records inserted across 24 hours")
+    print("\nDone — 144 packets sent, covering the last 24 hours (UTC)")

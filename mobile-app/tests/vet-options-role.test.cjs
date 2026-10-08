@@ -36,7 +36,10 @@ const DETAIL = {
   }],
 };
 
-async function render({ accountRole = 'vet', currentFarmId }) {
+async function render({ accountRole = 'vet', currentFarmId, caseFarmId = currentFarmId }) {
+  // The case belongs to the viewed farm unless a test says otherwise (Phase 3 transfer).
+  const caseRow = { ...CASE, farm_id: caseFarmId };
+  const detailRow = { ...DETAIL, farm_id: caseFarmId };
   const native = Object.fromEntries(
     ['View', 'Text', 'TouchableOpacity', 'ScrollView', 'TextInput', 'ActivityIndicator'].map((name) => [name, name])
   );
@@ -46,10 +49,11 @@ async function render({ accountRole = 'vet', currentFarmId }) {
 
   const farmState = { farms: FARMS, currentFarmId, isLoading: false, error: null };
   // Flip saves.fail to make the next save reject (the screen then shows an error popup).
-  const saves = { fail: false };
+  const saves = { fail: false, calls: [] };
   const mutation = () => ({
     isPending: false,
-    mutateAsync: async () => {
+    mutateAsync: async (variables) => {
+      saves.calls.push(variables);
       if (saves.fail) throw new Error('Network down');
       return {};
     },
@@ -60,7 +64,7 @@ async function render({ accountRole = 'vet', currentFarmId }) {
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     './DrawerScreenBase': {
       __esModule: true,
-      default: ({ children, title }) => React.createElement('Screen', { title }, children),
+      default: ({ children, title, subtitle }) => React.createElement('Screen', { title, subtitle }, children),
     },
     '../../store/authStore': {
       useAuthStore: (selector) => selector({ role: accountRole }),
@@ -69,8 +73,8 @@ async function render({ accountRole = 'vet', currentFarmId }) {
       useFarmStore: (selector) => (typeof selector === 'function' ? selector(farmState) : farmState),
     },
     '../../hooks/useVeterinary': {
-      useFarmVeterinaryCases: () => ({ data: { total: 1, cases: [CASE] }, isLoading: false, refetch: () => {} }),
-      useVeterinaryCaseDetail: (id) => ({ data: id ? DETAIL : undefined, isLoading: false }),
+      useFarmVeterinaryCases: () => ({ data: { total: 1, cases: [caseRow] }, isLoading: false, refetch: () => {} }),
+      useVeterinaryCaseDetail: (id) => ({ data: id ? detailRow : undefined, isLoading: false }),
       useCreateVeterinaryCase: mutation,
       useUpdateVeterinaryCase: mutation,
       useAddCaseEntry: mutation,
@@ -101,7 +105,8 @@ async function render({ accountRole = 'vet', currentFarmId }) {
     await act(async () => input(placeholder).props.onChangeText(value));
   };
   const modalOpen = () => renderer.root.findAllByType('Modal').length > 0;
-  return { text, openCase, press, input, type, modalOpen, saves, alert: native.Alert.alert };
+  const subtitle = () => renderer.root.findByType('Screen').props.subtitle;
+  return { text, subtitle, openCase, press, input, type, modalOpen, saves, alert: native.Alert.alert };
 }
 
 test('vet in farm A sees the write actions in farm A', async () => {
@@ -122,10 +127,14 @@ test('the same account sees no write action in farm B where it is owner', async 
   assert.doesNotMatch(h.text(), /Change status:/);
 });
 
-test('the same account is restricted in farm C where it is farmer', async () => {
+// Phase 3: farmers read the cases and add observation notes only.
+test('in farm C where it is farmer, the same account reads cases and only adds observations', async () => {
   const h = await render({ currentFarmId: 3 });
-  assert.match(h.text(), /Restricted access/);
+  assert.doesNotMatch(h.text(), /Restricted access/);
   assert.doesNotMatch(h.text(), /New case/);
+  await h.openCase();
+  assert.match(h.text(), /Add observation/);
+  assert.doesNotMatch(h.text(), /Change status:/);
 });
 
 test('platform admin keeps write actions whatever the farm membership', async () => {
@@ -165,7 +174,7 @@ test('New case form keeps the text after a failed save and is empty after a succ
   await h.type(INITIAL, 'Limping on left foreleg');
   h.saves.fail = true;
   await h.press('Create case');
-  assert.equal(h.alert.mock.calls.at(-1).arguments[0], 'Error');
+  assert.equal(h.alert.mock.calls.at(-1).arguments[0], 'Could not create case');
   assert.equal(h.modalOpen(), true);
   assert.equal(h.input(TITLE).props.value, 'Lameness check');
   assert.equal(h.input(INITIAL).props.value, 'Limping on left foreleg');
@@ -195,7 +204,7 @@ test('Add note form keeps the text after a failed save and is empty after a succ
   await h.type(NOTE, 'Hoof cleaned');
   h.saves.fail = true;
   await h.press('Save');
-  assert.equal(h.alert.mock.calls.at(-1).arguments[0], 'Error');
+  assert.equal(h.alert.mock.calls.at(-1).arguments[0], 'Could not add note');
   assert.equal(h.input(NOTE).props.value, 'Hoof cleaned');
 
   h.saves.fail = false;
@@ -203,4 +212,35 @@ test('Add note form keeps the text after a failed save and is empty after a succ
   assert.equal(h.input(NOTE), undefined);
   await h.press('Add note');
   assert.equal(h.input(NOTE).props.value, '');
+});
+
+// Phase 2 (A2): an invited vet has account role "farmer" and farm role "vet".
+test('an invited vet (account role farmer) gets the write actions and sees its role', async () => {
+  const h = await render({ accountRole: 'farmer', currentFarmId: 1 });
+  assert.match(h.text(), /New case/);
+  assert.match(h.subtitle(), /Your role in Farm A: Veterinarian/);
+  await h.openCase();
+  assert.match(h.text(), /Add note/);
+  assert.match(h.text(), /Change status:/);
+});
+
+// Phase 3: owner and farmer add observation notes only; no entry-type picker.
+test('a farmer adds an observation: no type picker, always sent as observation', async () => {
+  const h = await render({ accountRole: 'farmer', currentFarmId: 3 });
+  await h.openCase();
+  await h.press('Add observation');
+  assert.match(h.text(), /Add an Observation/);
+  assert.doesNotMatch(h.text(), /Entry type/);
+  await h.type(NOTE, 'Gave the morning dose');
+  await h.press('Save');
+  assert.deepEqual(h.saves.calls.at(-1).payload, { entry_type: 'observation', content: 'Gave the morning dose' });
+});
+
+// Phase 3: after a transfer, a case opened by the previous farm is read-only here.
+test('a case opened by a previous farm is read-only, even for the vet', async () => {
+  const h = await render({ currentFarmId: 1, caseFarmId: 2 });
+  await h.openCase();
+  assert.match(h.text(), /Opened by a previous farm — read only/);
+  assert.doesNotMatch(h.text(), /Add note|Add observation/);
+  assert.doesNotMatch(h.text(), /Change status:/);
 });

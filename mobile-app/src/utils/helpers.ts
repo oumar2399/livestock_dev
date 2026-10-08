@@ -65,6 +65,56 @@ export type TelemetryFreshness = 'recent' | 'stale' | 'silent';
 export type GpsFixStatus = 'fix' | 'weak_fix' | 'stale_fix' | 'no_fix';
 export type DeviceState = 'active' | 'lost' | 'maintenance' | 'retired' | 'revoked' | 'unknown';
 
+export interface CollarStatus {
+  state: DeviceState;
+  label: string;
+  color: string;
+}
+
+/** Status of the collar (device), never of the animal. */
+export function collarStatus(deviceStatus?: string | null): CollarStatus {
+  const raw = (deviceStatus ?? 'unknown').toLowerCase();
+  if (raw === 'active') return { state: 'active', label: 'Collar active', color: '#27AE60' };
+  if (raw === 'lost') return { state: 'lost', label: 'Collar lost', color: '#E74C3C' };
+  if (raw === 'maintenance') return { state: 'maintenance', label: 'Collar in maintenance', color: '#9B59B6' };
+  if (raw === 'retired' || raw === 'revoked') return { state: 'retired', label: 'Collar retired', color: '#7F8C8D' };
+  return { state: 'unknown', label: 'Collar unknown', color: '#95A5A6' };
+}
+
+/**
+ * Collar status of an animal: the farm's device list is the source of truth (it knows
+ * the status even before any telemetry); telemetry's device_status is the fallback.
+ */
+export function animalCollarStatus(
+  assignedDevice: string | null | undefined,
+  devices: { id: string; status: string }[] | undefined,
+  telemetryStatus?: string | null,
+): CollarStatus {
+  if (!assignedDevice) return { state: 'unknown', label: 'No collar', color: '#95A5A6' };
+  const device = devices?.find((item) => item.id === assignedDevice);
+  return collarStatus(device?.status ?? telemetryStatus);
+}
+
+export interface CollarMarkerStyle {
+  color: string;
+  dashed: boolean;
+  badge: 'maintenance' | 'lost' | null;
+  opacity: number;
+}
+
+/** Map marker look from the collar (device) status; an active collar keeps the behaviour colour. */
+export function collarMarkerStyle(state: DeviceState, baseColor: string): CollarMarkerStyle {
+  if (state === 'lost') return { color: '#E74C3C', dashed: true, badge: 'lost', opacity: 1 };
+  if (state === 'maintenance') return { color: '#7F8C8D', dashed: false, badge: 'maintenance', opacity: 1 };
+  if (state === 'retired' || state === 'revoked') return { color: '#7F8C8D', dashed: false, badge: null, opacity: 0.5 };
+  return { color: baseColor, dashed: false, badge: null, opacity: 1 };
+}
+
+/** Label of a collar shown on its own on the map (its position is not the animal's). */
+export function collarMarkerLabel(deviceId: string, deviceStatus?: string | null): string {
+  return deviceStatus === 'lost' ? `Collar ${deviceId} — lost` : `Collar ${deviceId} — equipment only`;
+}
+
 export interface FreshnessAssessment {
   telemetryFreshness: TelemetryFreshness;
   telemetryLabel: string;
@@ -168,28 +218,7 @@ export function evaluateFreshness(params: {
   }
 
   // 3. Statut Matériel
-  const rawStatus = (deviceStatus ?? 'unknown').toLowerCase();
-  let deviceState: DeviceState = 'unknown';
-  let deviceLabel = 'Collar unknown';
-  let deviceColor = '#95A5A6';
-
-  if (rawStatus === 'active') {
-    deviceState = 'active';
-    deviceLabel = 'Collar active';
-    deviceColor = '#27AE60';
-  } else if (rawStatus === 'lost') {
-    deviceState = 'lost';
-    deviceLabel = 'Collar lost';
-    deviceColor = '#E74C3C'; // Rouge
-  } else if (rawStatus === 'maintenance') {
-    deviceState = 'maintenance';
-    deviceLabel = 'In maintenance';
-    deviceColor = '#9B59B6'; // Violet
-  } else if (rawStatus === 'retired' || rawStatus === 'revoked') {
-    deviceState = 'retired';
-    deviceLabel = 'Collar retired';
-    deviceColor = '#7F8C8D';
-  }
+  const { state: deviceState, label: deviceLabel, color: deviceColor } = collarStatus(deviceStatus);
 
   // Batterie
   const batteryLabel = formatBattery(battery);

@@ -46,9 +46,9 @@ En cas de contradiction entre deux descriptions datées, **la plus récente est 
 
 # 0.2 État de validation courant
 
-- **624 tests backend réussis, 0 échec, 0 ignoré** — commit `bc03c42` + modifications B2–B4 non commitées ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-04 11:39 +0900 ;
-- **98 tests mobile réussis, 0 échec** — commit `62badba` + modifications B5 non commitées ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-04 13:06 +0900 ;
-- TypeScript sans erreur (`tsc --noEmit`, même commit, 2026-10-04 13:06 +0900) ;
+- **703 tests backend réussis, 0 échec, 0 ignoré** — commit `6c5f786` + modifications Phase 2 et 3 non commitées ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-08 13:02 +0900 ;
+- **130 tests mobile réussis, 0 échec** — commit `6c5f786` + modifications Phase 2 et 3 non commitées ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-08 13:00 +0900 ;
+- TypeScript sans erreur (`tsc --noEmit`, même commit, 2026-10-08 13:00 +0900) ;
 - Alembic / schéma réconcilié depuis B1 (`bc03c42`), `alembic check` propre.
 
 ---
@@ -165,7 +165,7 @@ Le système reste volontairement simple :
 - GPS UART ;
 - batterie / alimentation M5Stack.
 
-Versions : MicroPython / UIFlow [to verify] ; driver `mpu6886` [to verify] (non présent dans le dépôt).
+Versions : MicroPython 1.12.0 (M5Stack ESP32 firmware, build 02357a94d, 2026-02-06), read with os.uname() on 2026-10-05.
 
 ### IMU
 
@@ -390,7 +390,7 @@ unknown device → reject before measurement processing
 
 ### JSON
 
-Le chemin JSON n’accepte que les devices provisionnés, avec les mêmes règles de replay que le binaire.
+Le chemin JSON n’accepte que les devices provisionnés, avec les mêmes règles de replay que le binaire, et la même limite d’horloge : horodatage > réception + 300 s → 422 « Timestamp exceeds the allowed clock skew ».
 
 ### Device sans animal
 
@@ -584,8 +584,24 @@ new farm sees old farm's historical data
 
 - un filtre de provenance commun (périodes de suivi) est appliqué à l’historique, à `latest`, à la timeline et aux exports recherche ;
 - la télémétrie antérieure à la période de la ferme est masquée, mais conservée en base et dans les exports admin ;
-- les résumés du jour de transfert n’apparaissent dans aucune des deux fermes ;
+- les résumés du jour de transfert n’apparaissent dans aucune des deux fermes **dans les exports et rapports** ; dans l’appli ils vont désormais à la ferme qui reçoit (Phase 3) ;
 - le filtre ferme des exports utilise la ferme au moment de la mesure.
+
+### Règle Phase 3 après un transfert (remplace une partie de B2)
+
+| Donnée | Ferme qui détient l’animal | Ferme précédente |
+|---|---|---|
+| Télémétrie, positions GPS, tracés | ses propres périodes seulement (inchangé) | ses propres périodes |
+| Alertes geofence, batterie, hors ligne | seulement celles levées chez elle (`Alert.farm_id`) | les siennes |
+| **Alertes santé / anomalie** (`activity_deviation_*`, `health`) | **toutes**, y compris des fermes précédentes | les siennes |
+| **Dossiers et entrées vétérinaires** | **tous** ; ceux d’une autre ferme en **lecture seule** | les siens |
+| **Résumés d’activité journaliers** | **tous les jours** (le jour du transfert lui revient) | ses jours prouvés |
+| Feedbacks de prédiction / d’alerte | ses propres périodes | ses propres périodes |
+
+Règle centralisée dans `provenance_service.py` (`alert_visible_to_farms`, `vet_case_visible_to_farms`, `summary_visible_to_farm`) et appliquée à `GET /alerts` (qui filtrait jusque-là par la ferme *actuelle* de l’animal), à la timeline et aux dossiers vétérinaires. Les exports CSV et les rapports de ferme gardent la règle stricte des périodes.
+
+Transfert : `POST /animals/{id}/transfer` (admin seulement), en une transaction — période fermée / nouvelle période `farm_transfer`, collier déplacé avec l’animal, alertes ouvertes de l’ancienne ferme résolues avec `resolved_reason: "animal_transferred"`.
+
 
 ### Pourquoi
 
@@ -636,7 +652,21 @@ vet
 ```
 
 - le rôle éventuellement envoyé à l’inscription est ignoré (rôle par défaut uniquement) ;
-- le déclenchement du dispatch des notifications est réservé à `admin`.
+- le déclenchement du dispatch des notifications est réservé à `admin` ;
+- un membre ne change pas son propre rôle : `PATCH /farms/{id}/members/{id}` sur sa propre adhésion → 403 « You cannot change your own role. » (admin plateforme non concerné).
+
+### Permissions par rôle (Phase 3, `role_defaults.py`)
+
+| Permission | owner | farmer | vet |
+|---|---|---|---|
+| `view_animals` | ✓ | ✓ | ✓ |
+| `edit_animals`, `manage_devices`, `manage_geofences`, `manage_alerts`, `give_feedback` | ✓ | ✓ | — |
+| `view_veterinary` | ✓ | ✓ | ✓ |
+| `add_vet_observation` (notes de type observation) | ✓ | ✓ | — |
+| `manage_veterinary` (dossiers, tous types d’entrées, statut) | — | — | ✓ |
+| `invite_members`, `manage_farm`, `view_farm_reports` | ✓ | — | — |
+
+L’admin plateforme a l’union de toutes les permissions. Création de ferme : admin seulement (`owner_id` vide, l’admin n’est pas membre ; il invite ensuite le propriétaire). Inscription publique fermée (`PUBLIC_REGISTRATION_ENABLED=false` par défaut, ouverture en développement seulement) ; premier admin par `scripts/create_admin.py` (mot de passe demandé sans écho, jamais en argument).
 
 ---
 
@@ -652,6 +682,21 @@ vet
 - React Navigation.
 
 ---
+
+## 12.1b Ferme sélectionnée et données d’écran (Phase 2)
+
+- ferme mémorisée par utilisateur (`@livestock/current_farm_id:<userId>`), restaurée seulement si elle est encore dans la liste de l’utilisateur ; l’ancienne clé commune au téléphone est supprimée ;
+- admin sans ferme mémorisée : aucune ferme sélectionnée, les onglets dépendant d’une ferme affichent « No farm selected » ;
+- requêtes : pas de nouvel essai sur 4xx ; rafraîchissement arrêté sur 403/404 (`api/queryPolicy.ts`) ;
+- pile Troupeau remontée à la liste au changement de ferme et en quittant l’onglet ;
+- erreurs : dialogues titrés par type (`utils/apiErrors.ts`) avec le motif du serveur.
+
+## 12.1c Colliers (Phase 3)
+
+- `POST /devices` (owner, farmer, admin) : identifiant 3–50 caractères `A–Z 0–9 - _` (unicité sans tenir compte de la casse), transport ID = plus petit libre à partir de 100, secret généré et **renvoyé une seule fois** ; seule son empreinte SHA-256 est stockée. L’appli l’affiche en texte et QR code avec les lignes `device_config.py` (copie manuelle tant que l’appairage LoRaWAN n’existe pas).
+- `GET /devices` et `GET /devices/{id}` ajoutent `assigned_animal`, `last_position` et `health` ; position et fixes lus seulement dans les périodes de la ferme actuelle du collier.
+- Indicateurs (`config.py`) : hors ligne si rien reçu depuis > 30 min ; batterie ≤ 25 % (la puce d’alimentation du M5 ne donne que 0/25/50/75/100 %) ; pas de fix GPS > 60 min ; batterie illisible > 60 min. **Indicateurs seulement** : « lost » reste confirmé par une personne (géofencing et qualité des données en dépendent). Le seuil hors ligne est à revoir pour les intervalles d’émission LoRaWAN.
+- Écran Détail du collier (statut, vu pour la dernière fois, batterie, dernière position avec « Show on map », animal) ; sélection du collier dans le formulaire animal limitée aux colliers libres de la ferme.
 
 ## 12.2 Écrans / domaines existants
 
@@ -1330,7 +1375,7 @@ Le choix dépendra de :
 - **Geofence engine** : implémenté.
 - **Création de ferme** : idempotence durable PostgreSQL ; les anciens caches mémoire sont historiques.
 - **Alembic / schéma** : réconcilié depuis B1 (`bc03c42`).
-- **Tests mobile courants** : **98** (commit `62badba` + B5 non commité, `node --test tests/*.test.cjs`, 2026-10-04 13:06 +0900).
+- **Tests mobile courants** : **130** (commit `6c5f786` + modifications Phase 2 et 3 non commitées, `node --test tests/*.test.cjs`, 2026-10-08 13:00 +0900).
 - **Lots B, C, D, E** : réalisés ; les anciennes mentions “prochain”, “futur” ou “pas encore codé” sont obsolètes.
 - **LoRaWAN Côte d’Ivoire** : bande 868–870 MHz / profil EU868 documentés ; les anciennes mentions “plan à confirmer” sont historiques.
 

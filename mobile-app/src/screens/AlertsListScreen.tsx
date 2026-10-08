@@ -21,6 +21,7 @@ import { fr } from 'date-fns/locale';
 
 import { useAlerts, useAcknowledgeAlert, useResolveAlert } from '../hooks/useAlerts';
 import { useSubmitAlertFeedback } from '../hooks/useFeedback';
+import { useFarmStore } from '../store/farmStore';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import { Alert, AlertSeverity, AlertType, AlertFeedbackVerdict } from '../types';
 import {
@@ -65,9 +66,11 @@ interface AlertCardProps {
   onAcknowledge: (id: number) => void;
   onResolve: (id: number) => void;
   isProcessing: boolean;
+  canManage: boolean;    // manage_alerts: owner, farmer, admin
+  canFeedback: boolean;  // give_feedback: owner, farmer, admin (not the vet)
 }
 
-function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardProps) {
+function AlertCard({ alert, onAcknowledge, onResolve, isProcessing, canManage, canFeedback }: AlertCardProps) {
   const severityColor = alertSeverityColor(alert.severity);
   const isActive = isAlertActive(alert);
   const isAcked = isAlertAcknowledged(alert);
@@ -151,7 +154,7 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
           </View>
 
           {/* Section Feedback pour alertes de déviation ou santé */}
-          {(alert.type === 'activity_deviation_low' || alert.type === 'activity_deviation_high' || alert.type === 'health') && (
+          {canFeedback && (alert.type === 'activity_deviation_low' || alert.type === 'activity_deviation_high' || alert.type === 'health') && (
             <View style={styles.feedbackSection}>
               <Text style={styles.feedbackSectionTitle}>Field Feedback :</Text>
               {feedbackVerdict ? (
@@ -199,8 +202,8 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing }: AlertCardP
             </View>
           )}
 
-          {/* Actions - seulement si alerte active */}
-          {isActive && (
+          {/* Actions - seulement si alerte active, pour qui gère les alertes */}
+          {isActive && canManage && (
             <View style={styles.alertActions}>
               {!isAcked && (
                 <TouchableOpacity
@@ -235,6 +238,11 @@ export default function AlertsListScreen() {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | 'all'>('all');
+
+  const permissions = useFarmStore((state) =>
+    state.farms.find((farm) => farm.id === state.currentFarmId)?.permissions ?? []);
+  const canManageAlerts = permissions.includes('manage_alerts');
+  const canGiveFeedback = permissions.includes('give_feedback');
 
   const { mutate: acknowledge, isPending: isAcking } = useAcknowledgeAlert();
   const { mutate: resolve, isPending: isResolving } = useResolveAlert();
@@ -342,6 +350,8 @@ export default function AlertsListScreen() {
             onAcknowledge={handleAcknowledge}
             onResolve={handleResolve}
             isProcessing={isProcessing}
+            canManage={canManageAlerts}
+            canFeedback={canGiveFeedback}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}

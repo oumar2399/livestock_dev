@@ -230,6 +230,10 @@ def update_member(
     if not membership:
         raise HTTPException(status_code=404, detail="Membership not found")
 
+    # Nobody changes their own farm role (the platform admin has no such limit).
+    if (payload.role is not None and membership.user_id == current_user.id
+            and not is_platform_admin(current_user)):
+        raise HTTPException(status_code=403, detail="You cannot change your own role.")
     # Last owner guard
     if membership.role == "owner" and membership.status == "active":
         # If changing role away from owner, or revoking

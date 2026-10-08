@@ -58,6 +58,8 @@ function harness() {
   const load = (file) => loadTypeScript(path.resolve(__dirname, '../src', file), overrides, cache);
   h.auth = load('store/authStore.ts').useAuthStore;
   h.farms = load('store/farmStore.ts').useFarmStore;
+  h.farmKey = load('store/farmStore.ts').farmKeyFor;
+  h.policy = load('api/queryPolicy.ts');
   const api = load('api/client.ts');
   h.api = api.default;
   h.ApiError = api.ApiError;
@@ -88,7 +90,7 @@ test('all direct logouts immediately clear auth, farm state and the shared query
   const h = harness();
   await h.login();
   h.farms.setState({ farms: [{ id: 17 }], currentFarmId: 17 });
-  h.saved.set('@livestock/current_farm_id', '17');
+  h.saved.set(h.farmKey(1), '17');
   h.queryClient.setQueryData(['animals', 17], [{ id: 1 }]);
   const logout = h.auth.getState().logout();
   assert.equal(h.auth.getState().isAuthenticated, false);
@@ -96,7 +98,8 @@ test('all direct logouts immediately clear auth, farm state and the shared query
   assert.deepEqual(h.farms.getState().farms, []);
   assert.equal(h.queryClient.getQueryData(['animals', 17]), undefined);
   await logout;
-  assert.equal(h.saved.size, 0);
+  // Credentials are gone; only this user's remembered farm stays (checked on next login).
+  assert.deepEqual([...h.saved.keys()], [h.farmKey(1)]);
 });
 
 test('a refresh response arriving after logout cannot restore credentials', async () => {
@@ -188,7 +191,7 @@ test('an expired access token plus a refresh network failure is not treated as i
   await h.auth.getState().hydrate();
   assert.equal(h.saved.get(h.keys.REFRESH_TOKEN), 'refresh-A');
   assert.equal(h.auth.getState().isAuthenticated, false);
-  assert.match(h.auth.getState().error, /serveur/);
+  assert.match(h.auth.getState().error, /server/);
 });
 
 test('a confirmed invalid refresh token clears session and farm data', async () => {
@@ -307,14 +310,15 @@ test('late farm responses cannot restore the previous account farms', async () =
   pending.resolve();
   await oldLoad;
   assert.deepEqual(h.farms.getState().farms, [{ id: 25, name: 'Farm B' }]);
-  assert.equal(h.saved.get('@livestock/current_farm_id'), '25');
+  assert.equal(h.saved.get(h.farmKey(2)), '25');
+  assert.equal(h.saved.has(h.farmKey(1)), false);
 });
 
 test('farm selection supports multiple assigned farms and rejects unassigned ids', async () => {
   const h = harness();
   await h.login();
   h.onRequest = async (config) => response(config, [{ id: 17 }, { id: 25 }]);
-  h.saved.set('@livestock/current_farm_id', '999');
+  h.saved.set(h.farmKey(1), '999');
   await h.farms.getState().loadFarms();
   assert.equal(h.farms.getState().currentFarmId, 17);
   assert.equal(await h.farms.getState().selectFarm(999), false);
@@ -339,7 +343,7 @@ test('changing farm clears the query cache and the offline cache of the previous
   assert.equal(h.farms.getState().currentFarmId, 25);
   assert.equal(h.queryClient.getQueryCache().getAll().length, 0);
   assert.equal([...h.saved.keys()].some((key) => key.startsWith('@offline_cache:')), false);
-  assert.equal(h.saved.get('@livestock/current_farm_id'), '25');
+  assert.equal(h.saved.get(h.farmKey(1)), '25');
 });
 
 test('role helpers follow the selected farm, platform admin aside', async () => {
@@ -371,7 +375,7 @@ test('clearing farms invalidates a pending selection before it can restore state
   await Promise.all([blocked, clearing]);
   assert.equal(await selecting, false);
   assert.equal(h.farms.getState().currentFarmId, null);
-  assert.equal(h.saved.has('@livestock/current_farm_id'), false);
+  assert.equal(h.saved.has(h.farmKey(1)), false);
 });
 
 test('logout cancels cached queries and late success cannot repopulate them', async () => {
@@ -400,7 +404,8 @@ test('mutations do not repeat a creation after its response is lost', async () =
   const observer = new MutationObserver(h.queryClient, { mutationFn: () => h.api.post('/geofences/', { name: 'Zone' }) });
   await assert.rejects(observer.mutate(), (error) => error instanceof h.NetworkError);
   assert.equal(creations, 1);
-  assert.equal(h.queryClient.getDefaultOptions().queries.retry, 2);
+  // Queries retry network/server errors twice, never 4xx answers.
+  assert.equal(h.queryClient.getDefaultOptions().queries.retry, h.policy.retryUnlessClientError);
 });
 
 test('request cancellation and structured validation errors keep their correct types', async () => {
@@ -413,4 +418,71 @@ test('request cancellation and structured validation errors keep their correct t
   };
   await assert.rejects(h.api.put('/animals/1', { name: null }), (error) =>
     error instanceof h.ApiError && error.status === 422 && typeof error.message === 'string');
+});
+
+// ── Phase 2 (A1): last selected farm remembered per user, only among that user's farms ──
+
+function farmServer(h, farmsByAccount, role = 'owner') {
+  h.onRequest = async (config) => {
+    if (config.url === '/auth/login') {
+      const account = JSON.parse(config.data).email;
+      const data = tokens(account);
+      return response(config, { ...data, user: { ...data.user, role } });
+    }
+    const account = config.headers.Authorization === 'Bearer access-A' ? 'A' : 'B';
+    return response(config, farmsByAccount[account]);
+  };
+}
+
+test('each user gets back their own last farm; login never wipes it', async () => {
+  const h = harness();
+  farmServer(h, { A: [{ id: 17 }, { id: 25 }], B: [{ id: 17 }, { id: 31 }] });
+  await h.login('A');
+  await h.farms.getState().loadFarms();
+  assert.equal(await h.farms.getState().selectFarm(25), true);
+  await h.auth.getState().logout();
+  await h.login('B');
+  await h.farms.getState().loadFarms();
+  assert.equal(h.farms.getState().currentFarmId, 17, 'B never inherits A\'s farm');
+  await h.farms.getState().selectFarm(31);
+  await h.auth.getState().logout();
+  await h.login('A');
+  await h.farms.getState().loadFarms();
+  assert.equal(h.farms.getState().currentFarmId, 25);
+  assert.equal(h.saved.get(h.farmKey(1)), '25');
+  assert.equal(h.saved.get(h.farmKey(2)), '31');
+});
+
+test('a remembered farm no longer in the user\'s list is never selected', async () => {
+  const h = harness();
+  farmServer(h, { A: [{ id: 17 }] });
+  h.saved.set(h.farmKey(1), '99');
+  await h.login('A');
+  await h.farms.getState().loadFarms();
+  assert.equal(h.farms.getState().currentFarmId, 17);
+  assert.equal(h.saved.get(h.farmKey(1)), '17');
+});
+
+test('admin with no remembered farm starts with no farm selected', async () => {
+  const h = harness();
+  farmServer(h, { A: [{ id: 3, name: 'Dcube' }, { id: 17, name: 'Test Farm A' }] }, 'admin');
+  await h.login('A');
+  await h.farms.getState().loadFarms();
+  assert.equal(h.farms.getState().currentFarmId, null);
+  assert.equal(h.saved.has(h.farmKey(1)), false);
+  await h.farms.getState().selectFarm(17);
+  await h.auth.getState().logout();
+  await h.login('A');
+  await h.farms.getState().loadFarms();
+  assert.equal(h.farms.getState().currentFarmId, 17, 'admin gets back the farm chosen last time');
+});
+
+test('the old phone-wide farm key is removed and never used', async () => {
+  const h = harness();
+  farmServer(h, { A: [{ id: 17 }, { id: 25 }] });
+  h.saved.set('@livestock/current_farm_id', '25');
+  await h.login('A');
+  await h.farms.getState().loadFarms();
+  assert.equal(h.farms.getState().currentFarmId, 17);
+  assert.equal(h.saved.has('@livestock/current_farm_id'), false);
 });

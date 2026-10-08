@@ -75,6 +75,12 @@ async function persistTokens(data: TokenResponse, epoch: number): Promise<boolea
   });
 }
 
+// The farm store remembers the selected farm per user; tell it who is signed in
+// before the app screens (and their farm loading) appear.
+function setFarmUser(user: UserProfile) {
+  useFarmStore.getState().setUser({ id: user.id, isAdmin: user.role === 'admin' });
+}
+
 const tokenState = (data: TokenResponse) => ({
   token: data.access_token, role: data.user.role, user: data.user,
   isAuthenticated: true, error: null,
@@ -150,6 +156,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           await get().logout();
           return;
         }
+        setFarmUser(profile);
         set({
           isAuthenticated: true,
           token: activeToken,
@@ -188,6 +195,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (await persistTokens(data, epoch) && epoch === getSessionEpoch()) {
+        setFarmUser(data.user);
         set({ ...tokenState(data), isLoading: false });
       }
 
@@ -215,6 +223,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           refresh_token: savedRefreshToken,
         });
         if (!(await persistTokens(data, epoch)) || epoch !== getSessionEpoch()) return false;
+        setFarmUser(data.user);
         set(tokenState(data));
         return true;
       } catch (err) {

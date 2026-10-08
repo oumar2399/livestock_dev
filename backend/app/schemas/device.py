@@ -5,8 +5,31 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from typing import Optional, Literal
 from datetime import datetime
 
+import re
+
 from app.core.binary_protocol import TRANSPORT_ID_MAX, TRANSPORT_ID_MIN
+
+_DEVICE_ID_FORMAT = re.compile(r"[A-Z0-9_-]{3,50}")
 from app.core.security import valid_device_secret
+
+
+class AssignedAnimal(BaseModel):
+    id: int
+    name: str
+
+
+class DevicePosition(BaseModel):
+    latitude: float
+    longitude: float
+    time: datetime
+
+
+class DeviceHealth(BaseModel):
+    """Indicators only; the status "lost" is still confirmed by a human."""
+    offline: bool
+    offline_since: Optional[datetime] = None   # last reception; None if never seen
+    last_fix_at: Optional[datetime] = None
+    needs_attention: list[Literal["low_battery", "no_gps_fix", "battery_unknown"]] = []
 
 
 class DeviceResponse(BaseModel):
@@ -21,8 +44,30 @@ class DeviceResponse(BaseModel):
     status:           str
     notes:            Optional[str]
     created_at:       datetime
+    assigned_animal:  Optional[AssignedAnimal] = None
+    last_position:    Optional[DevicePosition] = None
+    health:           Optional[DeviceHealth] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DeviceCreate(BaseModel):
+    """Add a collar to a farm; the server picks the transport ID and the secret."""
+    device_id: str = Field(..., min_length=3, max_length=50)
+    farm_id: int = Field(..., gt=0)
+
+    @field_validator("device_id")
+    @classmethod
+    def normalize_device_id(cls, value: str) -> str:
+        value = value.strip().upper()
+        if not _DEVICE_ID_FORMAT.fullmatch(value):
+            raise ValueError("Device ID: 3 to 50 characters, letters A-Z, digits, '-' or '_'")
+        return value
+
+
+class DeviceProvisioned(DeviceResponse):
+    """Creation answer: the only time the secret is ever returned."""
+    device_secret: str
 
 
 class DeviceUpdate(BaseModel):

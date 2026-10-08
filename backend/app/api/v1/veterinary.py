@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.access import require_farm, require_animal_access
+from app.core.access import has_permission, require_farm, require_animal_access
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.animal import Animal
@@ -171,9 +171,18 @@ def add_case_entry(
 ):
     """
     Ajoute une entrée (observation, intervention, note) dans le journal d'un dossier.
-    Permissions : manage_veterinary (vet, admin).
+    Permissions : manage_veterinary (vet, admin) for every entry type; farmers and
+    owners (add_vet_observation) may add observation notes only.
     """
-    require_farm(current_user, farm_id, "manage_veterinary", db)
+    require_farm(current_user, farm_id, None, db)
+    allowed = has_permission(current_user, farm_id, "manage_veterinary", db) or (
+        payload.entry_type == "observation"
+        and has_permission(current_user, farm_id, "add_vet_observation", db))
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: only veterinarians add this type of entry",
+        )
 
     entry = veterinary_service.add_entry_to_case(
         db=db,

@@ -15,7 +15,9 @@ from app.models.daily_summary import DailyBehaviorSummary
 from app.models.feedback import AlertFeedback, PredictionFeedback
 from app.models.veterinary import VeterinaryCase, VeterinaryEntry
 from app.schemas.timeline import TimelineEventType, TimelineItem, TimelinePage
-from app.services.provenance_service import day_proven_in_farm, proven_in_farm
+from app.services.provenance_service import (
+    alert_visible_to_farms, proven_in_farm, summary_visible_to_farm, vet_case_visible_to_farms,
+)
 
 
 @dataclass(frozen=True)
@@ -93,12 +95,9 @@ def _apply_cursor(query, time_column, id_column, event_type, cursor):
 
 
 def _alert_in_farm(farm_id):
-    """Alerts carry their own farm_id; legacy rows without it fall back to the tracking periods."""
-    return or_(
-        Alert.farm_id == farm_id,
-        and_(Alert.farm_id.is_(None),
-             proven_in_farm(Alert.animal_id, Alert.triggered_at, farm_id, naive_utc=True)),
-    )
+    """Same rule as GET /alerts (Phase 3): own alerts, legacy rows by tracking period,
+    and the health alerts of an animal the farm holds now."""
+    return alert_visible_to_farms([farm_id])
 
 
 def _alert_items(db, animal_id, farm_id, start, end, cursor, fetch_limit):
@@ -206,7 +205,7 @@ def _daily_summary_items(db, animal_id, farm_id, start, end, cursor, fetch_limit
     event_type = TimelineEventType.DAILY_SUMMARY.value
     query = db.query(DailyBehaviorSummary).filter(
         DailyBehaviorSummary.animal_id == animal_id,
-        day_proven_in_farm(DailyBehaviorSummary.animal_id, DailyBehaviorSummary.date, farm_id),
+        summary_visible_to_farm(DailyBehaviorSummary.animal_id, DailyBehaviorSummary.date, farm_id),
     )
     query = _apply_bounds(query, DailyBehaviorSummary.created_at, start, end)
     query = _apply_cursor(
@@ -245,7 +244,7 @@ def _veterinary_entry_items(db, animal_id, farm_id, start, end, cursor, fetch_li
     query = (
         db.query(VeterinaryEntry)
         .join(VeterinaryCase, VeterinaryEntry.case_id == VeterinaryCase.id)
-        .filter(VeterinaryCase.animal_id == animal_id, VeterinaryCase.farm_id == farm_id)
+        .filter(VeterinaryCase.animal_id == animal_id, vet_case_visible_to_farms([farm_id]))
     )
     query = _apply_bounds(query, VeterinaryEntry.occurred_at, start, end)
     query = _apply_cursor(

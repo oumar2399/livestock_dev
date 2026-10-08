@@ -22,6 +22,9 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { AnimalsStackParamList, ActivityState, TelemetryRecord } from '../types';
 import { useAnimal } from '../hooks/useAnimals';
+import { useFarmDevices } from '../hooks/useDevices';
+import { useAuthStore } from '../store/authStore';
+import TransferAnimalModal from '../components/TransferAnimalModal';
 import { useTelemetryHistory, useTelemetryLatest } from '../hooks/useTelemetry';
 import { useSubmitPredictionFeedback } from '../hooks/useFeedback';
 import { useActivitySummary, ActivityBudgetItem } from '../hooks/useActivity';
@@ -40,6 +43,7 @@ import {
   formatDeviceTemperature,
   formatBattery,
   evaluateFreshness,
+  animalCollarStatus,
   activityStateColor,
   activityStateLabel,
   batteryColor,
@@ -53,9 +57,12 @@ import {
   ScreenHeader,
   LoadingState,
   ErrorState,
+  EmptyState,
   InfoRow,
   StatusBadge,
 } from '../components/ui';
+import { showApiError } from '../utils/apiErrors';
+import { isGone } from '../api/queryPolicy';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -204,6 +211,13 @@ export default function AnimalDetailScreen() {
     state.farms.find((farm) => farm.id === state.currentFarmId),
   );
   const canEditAnimals = currentFarm?.permissions.includes('edit_animals') ?? false;
+  // Behaviour feedback confirms the model: owner and farmer (not the vet, whose
+  // conclusion is the case status).
+  const canGiveFeedback = currentFarm?.permissions.includes('give_feedback') ?? false;
+  // Transfers between farms are done by the platform admin only.
+  const isAdmin = useAuthStore((state) => state.role) === 'admin';
+  const allFarms = useFarmStore((state) => state.farms);
+  const [showTransfer, setShowTransfer] = useState(false);
 
   const [historyHours, setHistoryHours] = useState(24);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -227,9 +241,11 @@ export default function AnimalDetailScreen() {
             try {
               await apiClient.delete(`/animals/${animalId}`);
               queryClient.invalidateQueries({ queryKey: ['animals'] });
-              navigation.navigate('AnimalsList');
-            } catch {
-              Alert.alert('Error', 'Failed to delete the animal');
+              // Go back to the existing list: navigate() would push a new one and keep this
+              // deleted animal's screen mounted (and polling) underneath.
+              navigation.popTo('AnimalsList');
+            } catch (error) {
+              showApiError(error, 'Could not delete', 'Failed to delete the animal');
             }
           },
         },
@@ -240,6 +256,7 @@ export default function AnimalDetailScreen() {
   const animalQuery  = useAnimal(animalId);
   const historyQuery = useTelemetryHistory(animalId, historyHours);
   const positionQuery = useTelemetryLatest({ animal_id: animalId, limit: 1 });
+  const devicesQuery = useFarmDevices();
   const locationQuery = useAnimalLocation(animalId);
   const position = positionQuery.data?.[0];
   const location = locationQuery.data;
@@ -272,6 +289,17 @@ export default function AnimalDetailScreen() {
   };
 
   if (animalQuery.isLoading) return <LoadingState message="Loading animal profile…" />;
+  if (isGone(animalQuery.error)) {
+    // Deleted, transferred or no longer readable: nothing to retry, offer the way back.
+    return (
+      <EmptyState
+        icon="alert-circle-outline"
+        title="This animal no longer exists"
+        message="It may have been deleted or moved to another farm."
+        action={{ label: 'Back to the herd', onPress: () => navigation.popTo('AnimalsList') }}
+      />
+    );
+  }
   if (animalQuery.isError || !animal) {
     return <ErrorState message="Animal not found" onRetry={() => animalQuery.refetch()} />;
   }
@@ -287,6 +315,8 @@ export default function AnimalDetailScreen() {
     battery: latestRecord?.battery,
   });
   const currentState = latestRecord?.activity_state as ActivityState | null;
+  // Collar (device) status, shown separately from the animal's own status.
+  const collar = animalCollarStatus(animal.assigned_device, devicesQuery.data, position?.device_status);
 
   // Search backwards for the most recent record that has NOT been annotated yet
   const unannotatedRecord = [...records].reverse().find(
@@ -343,13 +373,14 @@ export default function AnimalDetailScreen() {
           <View style={styles.heroInfo}>
             <Text style={styles.heroName}>{animal.name}</Text>
             <View style={styles.heroBadges}>
-              <StatusBadge label={animalStatusLabel(animal.status)} color={statusColor} />
+              <StatusBadge label={`Animal: ${animalStatusLabel(animal.status)}`} color={statusColor} />
+              <StatusBadge label={collar.label} color={collar.color} />
               <StatusBadge label={freshness.telemetryLabel} color={freshness.telemetryColor} />
               {freshness.telemetryFreshness === 'recent' && currentState && (
                 <StatusBadge
                   label={latestRecord?.predicted_behavior
-                    ? `${latestRecord.predicted_behavior} (${(latestRecord.behavior_confidence! * 100).toFixed(0)}%)`
-                    : activityStateLabel(currentState)}
+                    ? `Behaviour: ${latestRecord.predicted_behavior} (${(latestRecord.behavior_confidence! * 100).toFixed(0)}%)`
+                    : `Behaviour: ${activityStateLabel(currentState)}`}
                   color={latestRecord?.behavior_confidence
                     ? confidenceColor(latestRecord.behavior_confidence)
                     : activityStateColor(currentState)}
@@ -372,7 +403,7 @@ export default function AnimalDetailScreen() {
         </View>
 
         {/* ── AI Behavior Feedback Card ─────────────── */}
-        {targetFeedbackRecord && (
+        {targetFeedbackRecord && canGiveFeedback && (
           <View style={styles.feedbackCard}>
             <View style={styles.feedbackHeader}>
               <Ionicons name="sparkles-outline" size={16} color={Colors.primary} />
@@ -526,9 +557,32 @@ export default function AnimalDetailScreen() {
           <InfoRow label="Gender"        value={animalSexLabel(animal.sex)}               icon="male-female-outline"   />
           <InfoRow label="Age"           value={animalAge(animal.birth_date)}             icon="calendar-outline"      />
           <InfoRow label="Weight"        value={formatWeight(animal.weight)}              icon="scale-outline"         />
+          <InfoRow label="Animal status" value={animalStatusLabel(animal.status)}         icon="heart-outline"         />
           <InfoRow label="Device"        value={animal.assigned_device ?? 'Not assigned'} icon="hardware-chip-outline" />
+          <InfoRow label="Collar status" value={collar.label}                             icon="pulse-outline"         />
           <InfoRow label="Registered on" value={formatDate(animal.created_at)}            icon="time-outline"          last />
         </View>
+
+        {isAdmin && (
+          <TouchableOpacity style={styles.transferBtn} onPress={() => setShowTransfer(true)}>
+            <Ionicons name="swap-horizontal-outline" size={18} color={Colors.primary} />
+            <Text style={styles.transferBtnText}>Transfer to another farm</Text>
+          </TouchableOpacity>
+        )}
+        {isAdmin && (
+          <TransferAnimalModal
+            visible={showTransfer}
+            animal={animal}
+            farms={allFarms}
+            onClose={() => setShowTransfer(false)}
+            onTransferred={() => {
+              setShowTransfer(false);
+              // Every view of this animal (herd, map, alerts, devices) changes farm.
+              void queryClient.invalidateQueries();
+              navigation.popTo('AnimalsList');
+            }}
+          />
+        )}
 
         {/* ── Activity Chart ───────────────────────── */}
         <View style={styles.card}>
@@ -690,6 +744,12 @@ export default function AnimalDetailScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  transferBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs,
+    paddingVertical: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.primary,
+    marginHorizontal: Spacing.base, marginBottom: Spacing.md,
+  },
+  transferBtnText: { color: Colors.primary, fontWeight: '700', fontSize: Typography.sm },
   screen:  { flex: 1, backgroundColor: Colors.bg.primary },
   content: { padding: Spacing.base, paddingBottom: Spacing['3xl'], gap: Spacing.md },
 

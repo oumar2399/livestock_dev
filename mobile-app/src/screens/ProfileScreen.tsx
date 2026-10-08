@@ -15,6 +15,7 @@ import { useFarmStore } from '../store/farmStore';
 import { selectedFarmRole } from '../utils/selectedFarmRole';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import apiClient from '../api/client';
+import { showApiError } from '../utils/apiErrors';
 
 // ─── Role config ──────────────────────────────────────────────────────────────
 
@@ -134,15 +135,15 @@ export default function ProfileScreen() {
     // Validate password change if requested
     if (form.newPassword) {
       if (!form.currentPassword) {
-        Alert.alert('Error', 'Enter your current password.');
+        Alert.alert('Required field', 'Enter your current password.');
         return;
       }
       if (form.newPassword.length < 6) {
-        Alert.alert('Error', 'New password must be at least 6 characters.');
+        Alert.alert('Password too short', 'New password must be at least 6 characters.');
         return;
       }
       if (form.newPassword !== form.confirmPassword) {
-        Alert.alert('Error', 'Passwords do not match.');
+        Alert.alert('Passwords do not match', 'Enter the same new password twice.');
         return;
       }
     }
@@ -174,7 +175,7 @@ export default function ProfileScreen() {
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully.');
     } catch (err: unknown) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update profile.');
+      showApiError(err, 'Could not save', 'Failed to update profile.');
     } finally {
       setSaving(false);
     }

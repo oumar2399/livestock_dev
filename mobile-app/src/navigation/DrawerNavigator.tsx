@@ -36,6 +36,7 @@ import FarmScreen from '../screens/drawer/FarmScreen';
 import FarmOnboardingScreen from '../screens/drawer/FarmOnboardingScreen';
 import UsersScreen from '../screens/drawer/UsersScreen';
 import DevicesScreen from '../screens/drawer/DevicesScreen';
+import DeviceDetailScreen from '../screens/drawer/DeviceDetailScreen';
 import GeofenceScreen from '../screens/drawer/GeofenceScreen';
 import ReportsScreen from '../screens/drawer/ReportsScreen';
 import FarmReportsScreen from '../screens/drawer/FarmReportsScreen';
@@ -62,6 +63,7 @@ function AppStackNavigator() {
       <AppStack.Screen name="FarmOnboarding" component={FarmOnboardingScreen} />
       <AppStack.Screen name="Users" component={UsersScreen} />
       <AppStack.Screen name="Devices" component={DevicesScreen} />
+      <AppStack.Screen name="DeviceDetail" component={DeviceDetailScreen} />
       <AppStack.Screen name="Geofence" component={GeofenceScreen} />
       <AppStack.Screen name="Reports" component={ReportsScreen} />
       <AppStack.Screen name="FarmReports" component={FarmReportsScreen} />
@@ -139,6 +141,8 @@ function DrawerContent(props: DrawerContentComponentProps) {
   const farmState = useFarmStore();
   const { farms, currentFarmId, selectFarm, loadFarms } = farmState;
   const currentRole = selectedFarmRole(role, farmState);
+  // Farms are created by the platform admin only, who then invites the owner.
+  const canCreateFarm = role === 'admin';
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const go = (route: string) => {
@@ -204,25 +208,34 @@ function DrawerContent(props: DrawerContentComponentProps) {
             <Text style={styles.sectionTitle}>
               {farms.length > 0 ? 'Current Farm' : 'Exploitation'}
             </Text>
-            <TouchableOpacity
-              style={styles.addFarmSmallBtn}
-              onPress={() => setShowCreateModal(true)}
-              hitSlop={8}
-            >
-              <Ionicons name="add" size={16} color={Colors.primary} />
-              <Text style={styles.addFarmSmallText}>New</Text>
-            </TouchableOpacity>
+            {canCreateFarm && (
+              <TouchableOpacity
+                style={styles.addFarmSmallBtn}
+                onPress={() => setShowCreateModal(true)}
+                hitSlop={8}
+              >
+                <Ionicons name="add" size={16} color={Colors.primary} />
+                <Text style={styles.addFarmSmallText}>New</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {farms.length === 0 ? (
-            <TouchableOpacity
-              style={styles.noFarmCard}
-              onPress={() => setShowCreateModal(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add-circle-outline" size={20} color={Colors.primary} />
-              <Text style={styles.noFarmCardText}>+ Créer une exploitation</Text>
-            </TouchableOpacity>
+            canCreateFarm ? (
+              <TouchableOpacity
+                style={styles.noFarmCard}
+                onPress={() => setShowCreateModal(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle-outline" size={20} color={Colors.primary} />
+                <Text style={styles.noFarmCardText}>+ Create a farm</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.noFarmCard}>
+                <Ionicons name="mail-outline" size={20} color={Colors.text.muted} />
+                <Text style={styles.noFarmCardText}>No farm yet: ask your administrator to invite you.</Text>
+              </View>
+            )
           ) : (
             farms.map((farm) => {
               const active = farm.id === currentFarmId;
@@ -290,7 +303,8 @@ function DrawerContent(props: DrawerContentComponentProps) {
         onSuccess={async (newFarm) => {
           await loadFarms();
           await selectFarm(newFarm.id);
-          go('FarmOnboarding');
+          // Next step for the admin: invite the farm's owner.
+          go('Users');
         }}
       />
     </View>

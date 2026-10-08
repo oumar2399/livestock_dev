@@ -16,6 +16,7 @@ from app.models.animal import Animal
 from app.models.farm import Farm
 from app.models.user import User
 from app.models.veterinary import VeterinaryCase, VeterinaryEntry
+from app.services.provenance_service import vet_case_visible_to_farms
 from app.schemas.veterinary import (
     VeterinaryCaseCreate,
     VeterinaryCaseUpdate,
@@ -105,22 +106,28 @@ def get_veterinary_case(
     db: Session,
     farm_id: int,
     case_id: int,
+    *,
+    writable: bool = False,
 ) -> VeterinaryCase:
     """
-    Récupère un dossier clinique et ses entrées dans le cadre de la ferme.
+    Récupère un dossier clinique visible par la ferme : ses propres dossiers, et ceux
+    d'un animal qu'elle détient maintenant (Phase 3). Un dossier ouvert par une ferme
+    précédente reste en lecture seule (writable=True le refuse).
     """
     case = (
         db.query(VeterinaryCase)
-        .filter(
-            VeterinaryCase.id == case_id,
-            VeterinaryCase.farm_id == farm_id,
-        )
+        .filter(VeterinaryCase.id == case_id, vet_case_visible_to_farms([farm_id]))
         .first()
     )
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Dossier vétérinaire #{case_id} introuvable dans cette ferme",
+            detail=f"Veterinary case #{case_id} not found in this farm",
+        )
+    if writable and case.farm_id != farm_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This case was opened by a previous farm and is read-only here; open a new case.",
         )
     return case
 
@@ -137,7 +144,7 @@ def update_veterinary_case(
     Chaque changement de statut ajoute une entrée 'status_change' au journal, dans
     la même transaction ; closed_at reflète l'état courant, le journal garde l'historique.
     """
-    case = get_veterinary_case(db, farm_id, case_id)
+    case = get_veterinary_case(db, farm_id, case_id, writable=True)
     now = datetime.utcnow()
 
     if data.title is not None:
@@ -175,7 +182,7 @@ def add_entry_to_case(
     """
     Ajoute une entrée (append-only) au dossier vétérinaire.
     """
-    case = get_veterinary_case(db, farm_id, case_id)
+    case = get_veterinary_case(db, farm_id, case_id, writable=True)
     now = datetime.utcnow()
     occurred_at = data.occurred_at or now
 
@@ -205,7 +212,7 @@ def list_veterinary_cases(
     """
     Liste les dossiers d'une ferme avec filtres optionnels.
     """
-    query = db.query(VeterinaryCase).filter(VeterinaryCase.farm_id == farm_id)
+    query = db.query(VeterinaryCase).filter(vet_case_visible_to_farms([farm_id]))
 
     if animal_id is not None:
         query = query.filter(VeterinaryCase.animal_id == animal_id)

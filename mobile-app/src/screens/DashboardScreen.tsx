@@ -24,6 +24,7 @@ import { Colors, Spacing, Radius, Typography } from '../constants/config';
 import { useAnimals } from '../hooks/useAnimals';
 import { useActiveAlerts, useAcknowledgeAlert } from '../hooks/useAlerts';
 import { useTelemetryLatest } from '../hooks/useTelemetry';
+import { useFarmDevices } from '../hooks/useDevices';
 import {
   StatCard,
   SectionTitle,
@@ -39,6 +40,9 @@ import {
   timeAgo,
   animalStatusColor,
   evaluateFreshness,
+  animalCollarStatus,
+  animalStatusLabel,
+  CollarStatus,
   isRecentUpdate,
   formatBattery,
 } from '../utils/helpers';
@@ -158,7 +162,7 @@ function AttentionCard({
 
 // ─── Sous-composant : Ligne animal dans la liste rapide ───────────────────────
 
-function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: TelemetryLatest }) {
+function AnimalRow({ animal, telemetry, collar }: { animal: Animal; telemetry?: TelemetryLatest; collar: CollarStatus }) {
   const navigation = useNavigation<any>();
   const statusColor = animalStatusColor(animal.status);
 
@@ -196,6 +200,9 @@ function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: Telemetr
         <Text style={styles.animalMeta}>
           {animal.official_id ?? '–'} · {animal.breed ?? animal.species}
         </Text>
+        <Text style={styles.animalMeta}>
+          Animal: {animalStatusLabel(animal.status)} · <Text style={{ color: collar.color }}>{collar.label}</Text>
+        </Text>
       </View>
 
       <View style={styles.animalRight}>
@@ -207,7 +214,7 @@ function AnimalRow({ animal, telemetry }: { animal: Animal; telemetry?: Telemetr
 
         {activityState && (
           <Text style={[styles.behaviorMini, { color: behaviorColor }]}>
-            {activityStateLabel(activityState as any)}
+            Behaviour: {activityStateLabel(activityState as any)}
           </Text>
         )}
       </View>
@@ -231,6 +238,7 @@ export default function DashboardScreen() {
   const animalsQuery = useAnimals({ page_size: 100 }, undefined, true);
   const alertsQuery = useActiveAlerts();
   const telemetryQuery = useTelemetryLatest({ limit: 100 }, undefined, true);
+  const { data: devices } = useFarmDevices();
   const acknowledgeMutation = useAcknowledgeAlert();
 
   const isRefreshing =
@@ -289,20 +297,14 @@ export default function DashboardScreen() {
       });
     }
 
-    // 2. Colliers silencieux (> 30 min) pour animaux actifs avec collier assigné
+    // 2. Silent collars: the server's "offline" indicator (same rule as Devices / Herd),
+    //    for active animals with an assigned collar.
     for (const animal of animals) {
       if (animal.status === 'active' && animal.assigned_device) {
         const telem = telemetryMap.get(animal.id);
-        const freshness = evaluateFreshness({
-          telemetryTime: telem?.last_update,
-          positionTime: telem?.position_time,
-          latitude: telem?.latitude,
-          longitude: telem?.longitude,
-          deviceStatus: telem?.device_status,
-          battery: telem?.battery,
-        });
+        const device = devices?.find((item) => item.id === animal.assigned_device);
 
-        if (freshness.telemetryFreshness === 'silent') {
+        if (device?.health?.offline) {
           const hasExistingSilentAlert = items.some(
             (it) => it.animalId === animal.id && it.category === 'silent'
           );
@@ -327,10 +329,11 @@ export default function DashboardScreen() {
       }
     }
 
-    // 3. Batteries critiques (< 15%) non encore alertées
+    // 3. Low battery: the server's indicator (≤ 25 %, the M5 reports 0/25/50/75/100 %).
     for (const animal of animals) {
       const telem = telemetryMap.get(animal.id);
-      if (telem && typeof telem.battery === 'number' && telem.battery >= 0 && telem.battery < 15) {
+      const device = animal.assigned_device ? devices?.find((item) => item.id === animal.assigned_device) : undefined;
+      if (device?.health?.needs_attention.includes('low_battery')) {
         const alreadyCovered = items.some(
           (it) => it.animalId === animal.id && it.category === 'battery'
         );
@@ -340,13 +343,13 @@ export default function DashboardScreen() {
             id: `bat-${animal.id}`,
             category: 'battery',
             severity: 'warning',
-            title: `Critical Battery (${formatBattery(telem.battery)})`,
+            title: `Low Battery (${formatBattery(device.battery_capacity)})`,
             description: `${animal.name}'s collar (${animal.assigned_device ?? 'unknown'}) needs recharging.`,
             animalId: animal.id,
             animalName: animal.name,
             deviceId: animal.assigned_device ?? undefined,
             hasGpsLocation: hasGps,
-            timeLabel: formatBattery(telem.battery),
+            timeLabel: formatBattery(device.battery_capacity),
           });
         }
       }
@@ -357,7 +360,7 @@ export default function DashboardScreen() {
       const order = { critical: 0, warning: 1, info: 2 };
       return order[a.severity] - order[b.severity];
     });
-  }, [alerts, animals, telemetryMap, clockTick]);
+  }, [alerts, animals, telemetryMap, devices, clockTick]);
 
   const activeBreachesCount = useMemo(
     () => alerts.filter((a) => a.type === 'geofence').length,
@@ -534,6 +537,7 @@ export default function DashboardScreen() {
                   key={animal.id}
                   animal={animal}
                   telemetry={telemetryMap.get(animal.id)}
+                  collar={animalCollarStatus(animal.assigned_device, devices, telemetryMap.get(animal.id)?.device_status)}
                 />
               ))}
             </View>

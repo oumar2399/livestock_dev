@@ -56,7 +56,7 @@ export default function GeofenceScreen() {
   }
   // Remount so drafts, locations and selections cannot cross farm boundaries.
   return <GeofenceWorkspace key={currentFarm.id} farm={currentFarm}
-    canManage={role === 'admin' || currentFarm.permissions.includes('manage_farm')} />;
+    canManage={role === 'admin' || currentFarm.permissions.includes('manage_geofences')} />;
 }
 
 function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: boolean }) {

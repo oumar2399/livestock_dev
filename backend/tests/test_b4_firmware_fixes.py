@@ -44,19 +44,30 @@ def _window(sample=(0.0, 0.0, 1.0)):
 
 # ── 4.1 / 4.3 main.py on the PC ─────────────────────────────────────────────
 
-def _run_main(monkeypatch, config):
-    printed, seen = [], {}
+def _run_main(monkeypatch, config, events=(), stop=None, seen=None):
+    # seen["ops"] records every LCD call in order; seen["module"] is the loaded main.py.
+    # stop: exception raised by the fake runtime (default: Ctrl+C, which ends main()).
+    printed = []
+    seen = {} if seen is None else seen
+    seen.update(ops=[], runs=0)
 
     class Lcd:
         def __getattr__(self, name):
-            return lambda *args: printed.append(args[0]) if name == "print" else None
+            def call(*args):
+                seen["ops"].append((name,) + args)
+                if name == "print":
+                    printed.append(args[0])
+            return call
 
     def unreadable_battery():
         raise OSError("battery gauge unavailable")
 
     def run(cfg, max_cycles=None, on_status=None):
         seen["archive"] = cfg.UNTIMED_ARCHIVE_ENABLED
-        raise KeyboardInterrupt  # main() stops cleanly on Ctrl+C
+        seen["runs"] += 1
+        for event, data in events:
+            on_status(event, data)
+        raise stop or KeyboardInterrupt()  # main() stops cleanly on Ctrl+C
 
     monkeypatch.setitem(sys.modules, "device_config", config)
     monkeypatch.setitem(sys.modules, "b4_runtime", SimpleNamespace(run=run))
@@ -66,7 +77,8 @@ def _run_main(monkeypatch, config):
     monkeypatch.setattr(sys, "path", list(sys.path))
     before = list(sys.path)
     spec = importlib.util.spec_from_file_location("m5_main_under_test", FIRMWARE_DIR / "main.py")
-    spec.loader.exec_module(importlib.util.module_from_spec(spec))
+    seen["module"] = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(seen["module"])
     return seen, printed, [entry for entry in sys.path if entry not in before]
 
 
@@ -95,6 +107,93 @@ def test_main_never_puts_tests_on_sys_path_and_shows_unknown_battery(monkeypatch
     assert not any("tests" in entry for entry in added), added
     assert any(line.startswith("BAT ?") for line in printed)
     assert not any("85%" in line for line in printed)
+
+
+# ── LCD layout (320 x 240, default font about 12 px per character) ─────────
+
+LCD_EVENTS = [
+    ("collecting", {"cycle": 1234}), ("collected", {}),
+    ("transmitting", {"attempt": 1, "retry_count": 3, "version": 2}),
+    ("no_clock", {"counters": {}, "archived": False}),
+    ("cycle_done", {"counters": {"sent": 12345, "send_dropped": 12}, "success": True}),
+]
+
+
+def _drawn_texts(ops):
+    """(x, y, text, cleared_width) for each normal-screen print, checking it was cleared first."""
+    drawn, rect, cursor = [], None, None
+    for op in ops:
+        if op[0] == "rect":
+            rect = op[1:5]
+        elif op[0] == "setCursor":
+            cursor = op[1:3]
+        elif op[0] == "print":
+            assert rect is not None and rect[:2] == cursor, f"{op[1]!r} drawn without clearing its area"
+            drawn.append((cursor[0], cursor[1], op[1], rect[2]))
+            rect = None
+    return drawn
+
+
+def test_lcd_texts_fit_their_area_and_never_overlap(monkeypatch):
+    seen, _, _ = _run_main(monkeypatch, _config(DEVICE_ID="M5-TEST3-BENCH-WITH-A-VERY-LONG-NAME"),
+                           events=LCD_EVENTS)
+    drawn = _drawn_texts(seen["ops"])
+    assert drawn
+    for x, y, text, width in drawn:
+        assert len(text) * 12 <= width and x + width <= 316, (text, x, width)
+    header = [(x, text, width) for x, y, text, width in drawn if y == 10]
+    title = next(item for item in header if item[1] == "KIC LIVESTOCK")
+    battery = next(item for item in header if item[1].startswith("BAT"))
+    assert title[0] + title[2] <= battery[0]
+    device_line = next(text for _, y, text, _ in drawn if y == 32)
+    assert device_line.endswith("| TID 7")
+    assert any(text == "FW v2.0 B.4 | v3: OFF" for *_, text, _ in drawn)
+
+
+class _StopLoop(BaseException):
+    """Breaks main()'s endless blocked loop in tests."""
+
+
+@pytest.mark.parametrize("code", ["401", "403"])
+def test_access_denied_stops_collection_and_stays_blocked(monkeypatch, code):
+    import time
+    sleeps = []
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        if len(sleeps) >= 5:
+            raise _StopLoop()
+    monkeypatch.setattr(time, "sleep", sleep)
+    seen = {}
+    error = RuntimeError("Device access denied (%s); intervention required" % code)
+    with pytest.raises(_StopLoop):
+        _run_main(monkeypatch, _config(), stop=error, seen=seen)
+    assert seen["runs"] == 1  # never collects or sends again
+    texts = [op[1] for op in seen["ops"] if op[0] == "print"]
+    blocked = texts[texts.index("ACCES REFUSE (HTTP %s)" % code):]
+    assert blocked[:4] == ["ACCES REFUSE (HTTP %s)" % code, "Reprovisioning requis",
+                           "Collecte/envoi arretes", "Redemarrer le M5 apres"]
+    assert all(len(text) <= 25 for text in texts)
+
+
+def test_fatal_error_screen_fits_25_characters(monkeypatch):
+    seen, _, _ = _run_main(monkeypatch, _config())
+    seen["ops"].clear()
+    seen["module"].display.show_fatal_error("MPU6886 accel DLPF not applied after reset")
+    texts = [op[1] for op in seen["ops"] if op[0] == "print"]
+    assert texts == ["ERREUR MATERIELLE", "MPU6886 accel DLPF not ap", "plied after reset",
+                     "Redemarrage dans 15s"]
+    assert all(len(text) <= 25 for text in texts)
+
+
+def test_lcd_shorter_text_clears_the_whole_area_first(monkeypatch):
+    seen, _, _ = _run_main(monkeypatch, _config())
+    display = seen["module"].display
+    for level in (100, None):
+        seen["ops"].clear()
+        display.update_battery(level)
+        assert seen["ops"][0][:5] == ("rect", 214, 10, 102, 22)
+    assert [op[1] for op in seen["ops"] if op[0] == "print"] == ["BAT ?"]
 
 
 # ── 4.2 Battery sentinel ────────────────────────────────────────────────────

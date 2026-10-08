@@ -74,7 +74,8 @@ def test_duplicate_transport_id_rolls_back(binary_case, binary_client):
     assert db.execute(text("SELECT 1")).scalar_one() == 1
 
 
-@pytest.mark.parametrize("role", ["farmer", "vet"])
+# Phase 3: farmers manage devices; only the vet keeps a view-only role.
+@pytest.mark.parametrize("role", ["vet"])
 @pytest.mark.parametrize("same_farm", [False, True])
 def test_view_permission_does_not_allow_provisioning(binary_case, binary_client, role, same_farm):
     case = binary_case
@@ -85,6 +86,14 @@ def test_view_permission_does_not_allow_provisioning(binary_case, binary_client,
     if same_farm:
         data["farm_id"] = case.farm.id
     assert binary_client.patch(URL, json=data).status_code == 403
+
+
+def test_farmer_can_rotate_the_secret_of_a_farm_device(binary_case, binary_client):
+    case = binary_case
+    case.user.role = "farmer"
+    case.db.add(FarmMembership(user_id=case.user.id, farm_id=case.farm.id, role="farmer", status="active"))
+    case.db.commit()
+    assert binary_client.patch(URL, json={"device_secret": generate_device_secret()}).status_code == 200
 
 
 def test_farm_owner_can_rotate_but_cannot_transfer_assigned_device(binary_case, binary_client):

@@ -4,39 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import DrawerScreenBase, { ComingSoonPlaceholder } from './DrawerScreenBase';
 import { Colors, Spacing, Typography, Radius } from '../../constants/config';
 
-// ─── VetOptionsScreen ─────────────────────────────────────────────────────────
-
-export function VetOptionsScreen() {
-  const options = [
-    { icon: 'thermometer-outline',   title: 'Temperature Tracking',     desc: 'History and fever alerts' },
-    { icon: 'pulse-outline',          title: 'Health Alerts',           desc: 'Inactivity, abnormal behavior' },
-    { icon: 'document-text-outline', title: 'Medical Records',        desc: 'Notes and treatments per animal' },
-    { icon: 'calendar-outline',      title: 'Post-Treatment Follow-up',   desc: 'Reminders and treatment tracking' },
-    { icon: 'analytics-outline',     title: 'Health Trends',         desc: 'Behavioral analysis with ML' },
-  ];
-
-  return (
-    <DrawerScreenBase title="Veterinary Options">
-      <ScrollView contentContainerStyle={styles.content}>
-        {options.map((opt) => (
-          <View key={opt.title} style={styles.card}>
-            <View style={styles.optIcon}>
-              <Ionicons name={opt.icon as any} size={24} color={Colors.primary} />
-            </View>
-            <View style={styles.optInfo}>
-              <Text style={styles.optTitle}>{opt.title}</Text>
-              <Text style={styles.optDesc}>{opt.desc}</Text>
-            </View>
-            <View style={styles.soonBadge}>
-              <Text style={styles.soonText}>Soon</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-    </DrawerScreenBase>
-  );
-}
-
 // ─── GeofenceScreen ───────────────────────────────────────────────────────────
 export function GeofenceScreen() {
   return (

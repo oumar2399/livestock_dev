@@ -62,7 +62,7 @@ def create_geofence(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_farm(current_user, payload.farm_id, "manage_farm", db)
+    require_farm(current_user, payload.farm_id, "manage_geofences", db)
     try:
         polygon = build_polygon(db, payload.points)
     except ValueError as exc:
@@ -89,7 +89,7 @@ def update_geofence(
     current_user: User = Depends(get_current_user),
 ):
     geofence, _ = _get_geofence_row(db, geofence_id)
-    require_farm(current_user, geofence.farm_id, "manage_farm", db)
+    require_farm(current_user, geofence.farm_id, "manage_geofences", db)
     values = payload.model_dump(exclude_unset=True)
 
     if "points" in values:
@@ -116,7 +116,7 @@ def delete_geofence(
     current_user: User = Depends(get_current_user),
 ):
     geofence, _ = _get_geofence_row(db, geofence_id)
-    require_farm(current_user, geofence.farm_id, "manage_farm", db)
+    require_farm(current_user, geofence.farm_id, "manage_geofences", db)
     db.delete(geofence)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -162,7 +162,8 @@ def test_concurrent_farm_creation_uses_one_durable_receipt(binary_engine):
         db.add(user)
         db.commit()
         user_id = user.id
-    payload = FarmCreate(name='Concurrent farm', client_request_id=uuid4().hex)
+    farm_name = f'Concurrent farm {uuid4().hex[:8]}'
+    payload = FarmCreate(name=farm_name, client_request_id=uuid4().hex)
     barrier = Barrier(2)
 
     def submit(_):
@@ -175,7 +176,8 @@ def test_concurrent_farm_creation_uses_one_durable_receipt(binary_engine):
         ids = list(pool.map(submit, range(2)))
     assert ids[0] == ids[1]
     with Session(binary_engine) as db:
-        assert db.query(Farm).filter(Farm.owner_id == user_id).count() == 1
+        # Admin-created farms have no owner_id (Phase 3): count the farm by its name.
+        assert db.query(Farm).filter(Farm.name == farm_name).count() == 1
 
 
 def test_real_postgis_geofence_ignores_old_confirmation_and_late_packets(tracked, monkeypatch):

@@ -14,14 +14,17 @@ import { useNavigation } from '@react-navigation/native';
 import DrawerScreenBase from './DrawerScreenBase';
 import { Colors, Spacing, Typography, Radius } from '../../constants/config';
 import apiClient from '../../api/client';
+import { useAuthStore } from '../../store/authStore';
 import { useFarmStore } from '../../store/farmStore';
 import FarmCreateModal from '../../components/FarmCreateModal';
+import { showApiError } from '../../utils/apiErrors';
 
 export default function FarmScreen() {
   const navigation = useNavigation<any>();
   const { farms, currentFarmId, loadFarms, selectFarm } = useFarmStore();
   const currentFarm = farms.find((item) => item.id === currentFarmId) ?? null;
   const canManageFarm = currentFarm?.permissions.includes('manage_farm') ?? false;
+  const canCreateFarm = useAuthStore((state) => state.role) === 'admin';
 
   const [farm, setFarm] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -66,8 +69,8 @@ export default function FarmScreen() {
       const { data } = await apiClient.get(`/farms/${currentFarmId}`);
       setFarm(data);
       await loadFarms();
-    } catch {
-      Alert.alert('Erreur', 'Impossible de modifier la ferme');
+    } catch (error) {
+      showApiError(error, 'Could not save', 'Unable to update the farm');
     } finally {
       setSaving(false);
     }
@@ -83,9 +86,11 @@ export default function FarmScreen() {
               <Ionicons name="create-outline" size={20} color={Colors.primary} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => setShowCreateModal(true)} style={styles.addBtn}>
-            <Ionicons name="add" size={20} color="#fff" />
-          </TouchableOpacity>
+          {canCreateFarm && (
+            <TouchableOpacity onPress={() => setShowCreateModal(true)} style={styles.addBtn}>
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
       }
     >
@@ -98,18 +103,22 @@ export default function FarmScreen() {
           <View style={styles.emptyIconCircle}>
             <Ionicons name="business-outline" size={48} color={Colors.primary} />
           </View>
-          <Text style={styles.emptyTitle}>Aucune ferme associée</Text>
+          <Text style={styles.emptyTitle}>No farm</Text>
           <Text style={styles.emptySub}>
-            Créez votre première exploitation pour commencer à enregistrer vos animaux et colliers.
+            {canCreateFarm
+              ? 'Create a farm, then invite its owner from Users.'
+              : 'Farms are created by the administrator. Ask to be invited.'}
           </Text>
-          <TouchableOpacity
-            style={styles.createFarmBtn}
-            onPress={() => setShowCreateModal(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add-circle-outline" size={20} color="#fff" />
-            <Text style={styles.createFarmBtnText}>Créer une exploitation</Text>
-          </TouchableOpacity>
+          {canCreateFarm && (
+            <TouchableOpacity
+              style={styles.createFarmBtn}
+              onPress={() => setShowCreateModal(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#fff" />
+              <Text style={styles.createFarmBtnText}>Create a farm</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>

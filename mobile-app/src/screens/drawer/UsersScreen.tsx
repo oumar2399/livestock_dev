@@ -9,6 +9,7 @@ import { Colors, Spacing, Typography, Radius } from '../../constants/config';
 import { useAuthStore } from '../../store/authStore';
 import { useFarmStore } from '../../store/farmStore';
 import apiClient from '../../api/client';
+import { showApiError } from '../../utils/apiErrors';
 import { FarmMembership, FarmMembershipList } from '../../types';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -18,7 +19,7 @@ const ROLE_COLORS: Record<string, string> = {
   farmer: Colors.primary, owner: '#3498DB', vet: '#9B59B6', admin: '#E74C3C',
 };
 export default function UsersScreen() {
-  const { isAdmin } = useAuthStore();
+  const { isAdmin, user } = useAuthStore();
   const { farms, currentFarmId } = useFarmStore();
   const currentFarm = farms.find((farm) => farm.id === currentFarmId) ?? null;
   const canManage = isAdmin() || (currentFarm?.permissions.includes('invite_members') ?? false);
@@ -38,7 +39,7 @@ export default function UsersScreen() {
       const { data } = await apiClient.get<FarmMembershipList>(`/farms/${currentFarmId}/members`);
       setUsers(data.members);
     } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Unable to load members');
+      showApiError(error, 'Could not load members', 'Unable to load members');
     } finally {
       setLoading(false);
     }
@@ -55,14 +56,14 @@ export default function UsersScreen() {
             await apiClient.patch(`/farms/${currentFarmId}/members/${membershipId}`, { role: newRole });
             load();
           } catch (error) {
-            Alert.alert('Error', error instanceof Error ? error.message : 'Unable to change role');
+            showApiError(error, 'Could not change role', 'Unable to change role');
           }
         },
       },
     ]);
   };
 
-  const handleInvite = async () => {
+  const sendInvite = async () => {
     if (!currentFarmId) return;
     try {
       await apiClient.post(`/farms/${currentFarmId}/members`, {
@@ -76,8 +77,26 @@ export default function UsersScreen() {
       load();
       Alert.alert('Success', `${inviteForm.email} was added to ${currentFarm?.name ?? 'the farm'}`);
     } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Error inviting member');
+      showApiError(error, 'Could not invite', 'Unable to invite this member');
     }
+  };
+
+  // The invitation targets the selected farm: say which one before anything is sent.
+  const handleInvite = () => {
+    if (!currentFarmId || !currentFarm) return;
+    const email = inviteForm.email.trim();
+    if (!email) {
+      Alert.alert('Required field', 'Enter the email address to invite.');
+      return;
+    }
+    Alert.alert(
+      'Confirm invitation',
+      `Invite ${email} as ${ROLE_LABELS[inviteForm.role]} into ${currentFarm.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Invite', onPress: () => { void sendInvite(); } },
+      ],
+    );
   };
 
   const handleRevoke = (membership: FarmMembership) => {
@@ -92,7 +111,7 @@ export default function UsersScreen() {
             await apiClient.delete(`/farms/${currentFarmId}/members/${membership.id}`);
             load();
           } catch (error) {
-            Alert.alert('Error', error instanceof Error ? error.message : 'Unable to revoke access');
+            showApiError(error, 'Could not revoke access', 'Unable to revoke access');
           }
         },
       },
@@ -102,7 +121,7 @@ export default function UsersScreen() {
   return (
     <DrawerScreenBase
       title="Users"
-      subtitle={`${users.length} member${users.length > 1 ? 's' : ''}`}
+      subtitle={`${currentFarm?.name ?? 'No farm selected'} · ${users.length} member${users.length === 1 ? '' : 's'}`}
       rightAction={
         canManage ? (
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowInvite(true)}>
@@ -134,27 +153,34 @@ export default function UsersScreen() {
                   </Text>
                 </View>
               </View>
-              {canManage && item.status !== 'revoked' && (
-                <TouchableOpacity
-                  onPress={() => {
-                    const roles = ['farmer', 'owner', 'vet'];
-                    Alert.alert(
-                      'Manage Member',
-                      `Choose an action for ${item.user_name ?? item.user_email}:`,
-                      [
-                        ...roles.map(r => ({
-                          text: ROLE_LABELS[r],
-                          onPress: () => handleChangeRole(item.id, r),
-                        })),
-                        { text: 'Revoke access', style: 'destructive' as const, onPress: () => handleRevoke(item) },
-                        { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
-                      ]
-                    );
-                  }}
-                >
-                  <Ionicons name="chevron-forward" size={18} color={Colors.text.muted} />
-                </TouchableOpacity>
-              )}
+              {item.user_id === user?.id ? (
+                // Nobody changes or revokes their own membership (the server refuses it too).
+                <Text style={styles.youText}>You</Text>
+              ) : canManage && item.status !== 'revoked' ? (
+                <View style={styles.memberActions}>
+                  <TouchableOpacity
+                    style={styles.memberActionBtn}
+                    onPress={() => {
+                      Alert.alert(
+                        'Change role',
+                        `New role for ${item.user_name ?? item.user_email}:`,
+                        [
+                          ...['farmer', 'owner', 'vet'].filter(r => r !== item.role).map(r => ({
+                            text: ROLE_LABELS[r],
+                            onPress: () => handleChangeRole(item.id, r),
+                          })),
+                          { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.memberActionText}>Change role</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.memberActionBtn, styles.memberActionDanger]} onPress={() => handleRevoke(item)}>
+                    <Text style={[styles.memberActionText, styles.memberActionDangerText]}>Revoke</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           )}
         />
@@ -164,6 +190,7 @@ export default function UsersScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Invite Member</Text>
+            <Text style={styles.fieldLabel}>Into farm: {currentFarm?.name ?? '—'}</Text>
             {[
               { label: 'Email', key: 'email', placeholder: 'email@exemple.com' },
               { label: 'Name', key: 'name', placeholder: 'First Last' },
@@ -211,6 +238,15 @@ export default function UsersScreen() {
 }
 
 const styles = StyleSheet.create({
+  memberActions: { gap: Spacing.xs, alignItems: 'flex-end' },
+  memberActionBtn: {
+    paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.border.default, backgroundColor: Colors.bg.elevated,
+  },
+  memberActionText: { fontSize: Typography.xs, fontWeight: '600', color: Colors.text.secondary },
+  memberActionDanger: { borderColor: Colors.severity.critical },
+  memberActionDangerText: { color: Colors.severity.critical },
+  youText: { fontSize: Typography.xs, fontWeight: '700', color: Colors.text.muted },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list:   { padding: Spacing.base, gap: Spacing.sm },
   addBtn: { width: 36, height: 36, borderRadius: Radius.full, backgroundColor: Colors.primary + '20', alignItems: 'center', justifyContent: 'center' },

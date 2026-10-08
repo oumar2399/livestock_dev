@@ -36,6 +36,21 @@ HTTP_MAX_HEADER_BYTES = 2048
 HTTP_MAX_BODY_BYTES = 4096
 HTTP_READ_CHUNK = 256
 HTTP_WDT_MARGIN_MS = 5000
+# MPU-6886 ACCEL_CONFIG2 (0x1D): ACCEL_FCHOICE_B=0, A_DLPF_CFG=6 -> 5.1 Hz 3-dB bandwidth,
+# 7.8 Hz noise bandwidth (DS-000193 v1.1 table, [to verify] against the PDF).
+IMU_ADDR = 0x68
+ACCEL_CONFIG2 = 0x1D
+A_DLPF_CFG_5HZ = 6
+
+
+def apply_accel_dlpf(i2c, cfg=A_DLPF_CFG_5HZ):
+    """Set the accelerometer low-pass filter, read it back, and fail loudly on mismatch."""
+    old = i2c.readfrom_mem(IMU_ADDR, ACCEL_CONFIG2, 1)[0]
+    value = (old & 0xF0) | cfg  # keep FIFO/DEC2 bits, clear ACCEL_FCHOICE_B (bit 3)
+    i2c.writeto_mem(IMU_ADDR, ACCEL_CONFIG2, bytes([value]))
+    if i2c.readfrom_mem(IMU_ADDR, ACCEL_CONFIG2, 1)[0] != value:
+        raise ValueError("MPU6886 accel DLPF not applied")
+    return old, value
 
 
 def _observe(observer, event, values):
@@ -158,7 +173,7 @@ def _read_response(sock, deadline, metrics):
     code, length = _response_headers(bytes(buffer[:end]))
     metrics["status"] = code
     # Authentication failure must not wait for an arbitrary error body.
-    if code == 401:
+    if code in (401, 403):
         return _Response(code, b"", None)
     body = bytearray(buffer[end + 4:])
     del buffer
@@ -282,12 +297,14 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None, on_transport=
             max_gap_ms + HTTP_WDT_MARGIN_MS >= 60000 or
             prepare_delay * 1000 + HTTP_WDT_MARGIN_MS >= 60000):
         raise ValueError("Transport and wait budgets exceed autonomous watchdog margin")
-    imu = MPU6886(I2C(0, scl=22, sda=21, freq=400000))
+    i2c = I2C(0, scl=22, sda=21, freq=400000)
+    imu = MPU6886(i2c)
     scale = imu._accel_fs(0x08)
     if scale is not None:
         imu._accel_so = scale
     if imu._accel_so != 8192:
         raise ValueError("MPU6886 driver did not apply the 4g scale")
+    apply_accel_dlpf(i2c)
     gravity = imu._accel_sf
     uart = UART(1, tx=17, rx=16)
     uart.init(115200, bits=8, parity=None, stop=1)
@@ -420,13 +437,13 @@ def run(config, max_cycles=None, bench_clock=None, on_status=None, on_transport=
                                 body.get("time_reliable") is not False or not body.get("id")):
                             raise ValueError("Invalid archive acknowledgement")
                     return code
-                if code == 401:
+                if code in (401, 403):
                     try:
                         if journal:
                             journal.bump("auth_blocked")
                             journal.checkpoint()
                     finally:
-                        raise RuntimeError("Device access denied; intervention required")
+                        raise RuntimeError("Device access denied (%d); intervention required" % code)
                 if code in (400, 404, 409, 413, 415, 422):
                     return code
             except (OSError, ValueError, AttributeError) as e:

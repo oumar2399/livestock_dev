@@ -12,7 +12,7 @@ Il orchestre :
   3. L'execution continue de la boucle B.4 (15s IMU Welford 10Hz, GPS temps reel).
   4. L'archive v3 flash (fenetres sans heure UTC fiable) : OPTIONNELLE et desactivee
      par defaut ; active seulement si device_config.UNTIMED_ARCHIVE_ENABLED = True.
-  5. Le superviseur de resilience (gestion du 401 basse consommation, reboot sur panne).
+  5. Le superviseur de resilience (401/403 : arret jusqu'au reboot, reboot sur panne).
 """
 
 import gc
@@ -61,6 +61,8 @@ COLOR_CYAN = 0x06B6D4     # Accent KIC / Primaire
 COLOR_GREEN = 0x10B981    # Succes / Batterie OK
 COLOR_YELLOW = 0xF59E0B   # Avertissement / Recherche GPS
 COLOR_RED = 0xEF4444      # Alerte critique / Erreur 401
+LCD_BG = 0x000000         # Screen background, also used to clear text areas
+CHAR_W = 12               # Default font width measured on the device (px)
 
 
 class DisplayManager:
@@ -72,20 +74,28 @@ class DisplayManager:
             return
         try:
             try:
-                lcd.clear()
+                lcd.clear(LCD_BG)
             except Exception:
                 pass
             self._draw_header()
         except Exception as e:
             print("[WARN LCD init]:", e)
 
+    def _text(self, x, y, w, h, text, color):
+        """Clear the area, then draw text cut to fit: no wrap, no leftovers."""
+        try:
+            lcd.rect(x, y, w, h, LCD_BG, LCD_BG)
+        except Exception:
+            pass
+        lcd.setTextColor(color)
+        lcd.setCursor(x, y)
+        lcd.print(str(text)[:w // CHAR_W])
+
     def _draw_header(self):
         if not self.enabled:
             return
         try:
-            lcd.setTextColor(COLOR_CYAN)
-            lcd.setCursor(10, 10)
-            lcd.print("[KIC] LIVESTOCK MONITOR")
+            self._text(10, 10, 196, 22, "KIC LIVESTOCK", COLOR_CYAN)
             self.update_battery(self.get_battery_level())
         except Exception:
             pass
@@ -106,18 +116,13 @@ class DisplayManager:
             return
         try:
             if level is None:
-                lcd.setTextColor(COLOR_YELLOW)
-                lcd.setCursor(220, 10)
-                lcd.print("BAT ?   ")
+                txt, col = "BAT ?", COLOR_YELLOW
             elif isinstance(level, int) and level > 0:
+                txt = "BAT " + str(level) + "%"
                 col = COLOR_GREEN if level > 50 else (COLOR_YELLOW if level > 20 else COLOR_RED)
-                lcd.setTextColor(col)
-                lcd.setCursor(220, 10)
-                lcd.print("BAT " + str(level) + "% ")
             else:
-                lcd.setTextColor(COLOR_GREEN)
-                lcd.setCursor(220, 10)
-                lcd.print("USB PWR ")
+                txt, col = "USB PWR", COLOR_GREEN
+            self._text(214, 10, 102, 22, txt, col)
         except Exception:
             pass
 
@@ -125,12 +130,10 @@ class DisplayManager:
         if not self.enabled:
             return
         try:
-            lcd.setTextColor(COLOR_WHITE)
-            lcd.setCursor(10, 32)
-            lcd.print("Dev: " + str(dev_id) + " | TID: " + str(transport_id) + "     ")
-            lcd.setTextColor(COLOR_GRAY)
-            lcd.setCursor(10, 52)
-            lcd.print(startup_firmware_text(archive_enabled))
+            tid = " | TID " + str(transport_id)
+            # Only the device id is shortened, so the TID always stays visible.
+            self._text(10, 32, 306, 20, str(dev_id)[:max(0, 25 - len(tid))] + tid, COLOR_WHITE)
+            self._text(10, 52, 306, 20, startup_firmware_text(archive_enabled), COLOR_GRAY)
         except Exception:
             pass
 
@@ -138,13 +141,8 @@ class DisplayManager:
         if not self.enabled:
             return
         try:
-            lcd.setTextColor(color)
-            lcd.setCursor(10, 80)
-            lcd.print(str(main_text) + "                    ")
-            if sub_text:
-                lcd.setTextColor(COLOR_GRAY)
-                lcd.setCursor(10, 105)
-                lcd.print(str(sub_text) + "                    ")
+            self._text(10, 80, 306, 25, main_text, color)
+            self._text(10, 105, 306, 25, sub_text, COLOR_GRAY)
         except Exception:
             pass
 
@@ -156,66 +154,43 @@ class DisplayManager:
             dropped = counters.get("send_dropped", 0)
             no_gps = counters.get("no_gps", 0)
             no_clock = counters.get("no_clock", 0)
-            lcd.setTextColor(COLOR_WHITE)
-            lcd.setCursor(10, 135)
-            lcd.print("Sent:%d Drop:%d Arch:%d   " % (sent, dropped, no_clock))
+            self._text(10, 135, 306, 25, "Sent:%d Drop:%d Arch:%d" % (sent, dropped, no_clock), COLOR_WHITE)
 
-            lcd.setTextColor(COLOR_GRAY)
-            lcd.setCursor(10, 160)
-            lcd.print("NoFix:%d | Cycle:#%d       " % (no_gps, cycle_num))
+            self._text(10, 160, 306, 25, "NoFix:%d | Cycle:#%d" % (no_gps, cycle_num), COLOR_GRAY)
 
-            lcd.setTextColor(COLOR_CYAN)
-            lcd.setCursor(10, 185)
             mem_kb = mem_free // 1024 if mem_free else 0
-            lcd.print("RAM:%d KB | WDT:OK        " % mem_kb)
+            self._text(10, 185, 306, 25, "RAM:%d KB | WDT:OK" % mem_kb, COLOR_CYAN)
         except Exception:
             pass
 
-    def show_401_alert(self, minutes_left):
+    def _screen(self, lines):
+        """Full-screen message: clear, then one line of 25 characters max per entry."""
         if not self.enabled:
             return
         try:
-            lcd.clear()
-            lcd.setTextColor(COLOR_RED)
-            lcd.setCursor(10, 20)
-            lcd.print("ACCES 401 : SECRET REVOQUE")
-            lcd.setTextColor(COLOR_WHITE)
-            lcd.setCursor(10, 60)
-            lcd.print("Secret refuse par le serveur.")
-            lcd.setTextColor(COLOR_YELLOW)
-            lcd.setCursor(10, 90)
-            lcd.print("Mode veille basse conso.")
-            lcd.setTextColor(COLOR_CYAN)
-            lcd.setCursor(10, 135)
-            lcd.print("Reprise dans: %d min" % minutes_left)
-            lcd.setTextColor(COLOR_GRAY)
-            lcd.setCursor(10, 200)
-            lcd.print("Kobe Institute of Computing")
+            lcd.clear(LCD_BG)
+            for y, text, color in lines:
+                self._text(10, y, 306, 25, text, color)
         except Exception:
             pass
+
+    def show_access_denied(self, code, dev_id):
+        self._screen(((20, "ACCES REFUSE (HTTP %s)" % code, COLOR_RED),
+                      (60, "Reprovisioning requis", COLOR_WHITE),
+                      (90, "Collecte/envoi arretes", COLOR_YELLOW),
+                      (135, "Redemarrer le M5 apres", COLOR_CYAN),
+                      (200, dev_id, COLOR_GRAY)))
 
     def show_fatal_error(self, message):
-        if not self.enabled:
-            return
-        try:
-            lcd.clear()
-            lcd.setTextColor(COLOR_RED)
-            lcd.setCursor(10, 20)
-            lcd.print("ERREUR MATERIELLE")
-            lcd.setTextColor(COLOR_WHITE)
-            lcd.setCursor(10, 60)
-            lcd.print(str(message)[:26])
-            lcd.setCursor(10, 85)
-            lcd.print(str(message)[26:52])
-            lcd.setTextColor(COLOR_YELLOW)
-            lcd.setCursor(10, 130)
-            lcd.print("Redemarrage dans 10s...")
-        except Exception:
-            pass
+        message = str(message)
+        self._screen(((20, "ERREUR MATERIELLE", COLOR_RED),
+                      (60, message[:25], COLOR_WHITE),
+                      (85, message[25:50], COLOR_WHITE),
+                      (130, "Redemarrage dans 15s", COLOR_YELLOW)))
 
 
 def startup_firmware_text(archive_enabled):
-    return "FW: v2.0 (B.4) | v3: " + ("ON " if archive_enabled else "OFF") + "   "
+    return "FW v2.0 B.4 | v3: " + ("ON" if archive_enabled else "OFF")
 
 
 display = DisplayManager()
@@ -285,10 +260,10 @@ def main():
             display.update_status(
                 "COLLECTE IMU (10 Hz)...",
                 COLOR_CYAN,
-                "Cycle #" + str(cycle_counter) + " | 150 echantillons"
+                "Cycle #" + str(cycle_counter) + " | 150 echant."
             )
         elif event == "collected":
-            display.update_status("TRAITEMENT WELFORD...", COLOR_WHITE, "Calcul variance & moyennes")
+            display.update_status("TRAITEMENT WELFORD...", COLOR_WHITE, "Calcul moyenne/variance")
         elif event == "transmitting":
             attempt = data.get("attempt", 1)
             retry_count = data.get("retry_count", 3)
@@ -305,7 +280,7 @@ def main():
             display.update_status(
                 msg,
                 COLOR_YELLOW,
-                "Canopee / Pas d'heure fiable"
+                "Pas d'heure UTC fiable"
             )
             display.update_counters(counters, cycle_counter, gc.mem_free() if hasattr(gc, "mem_free") else 0)
         elif event == "cycle_done":
@@ -332,21 +307,19 @@ def main():
 
         except RuntimeError as e:
             err_msg = str(e)
-            if "Device access denied" in err_msg or "401" in err_msg:
-                # HTTP 401 : Cle refusee ou revoquee
-                print("\n[CRITICAL 401] Acces refuse par le serveur. Mise en veille 30 min...")
-                # Veille de 30 minutes sans decharger la batterie sur l'animal
-                for remaining in range(30, 0, -1):
-                    display.show_401_alert(remaining)
-                    for _ in range(60):
-                        if wdt:
-                            try:
-                                wdt.feed()
-                            except Exception:
-                                pass
-                        time.sleep(1)
-                # Apres 30 minutes, on recree l'ecran et on retente
-                display._draw_header()
+            if "Device access denied" in err_msg:
+                # HTTP 401/403: secret refused or device revoked. Stop collecting and
+                # sending; stay here, screen on, until the device is rebooted.
+                code = "403" if "403" in err_msg else "401"
+                print("\n[CRITICAL " + code + "] Acces refuse. Reprovisioning requis, arret.")
+                display.show_access_denied(code, dev_id)
+                while True:
+                    if wdt:
+                        try:
+                            wdt.feed()
+                        except Exception:
+                            pass
+                    time.sleep(1)
             else:
                 print("\n[SUPERVISOR] Erreur Runtime :", e)
                 try:

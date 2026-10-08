@@ -16,7 +16,8 @@ class FinishedCycle(BaseException):
 def runtime(monkeypatch):
     monkeypatch.setitem(sys.modules, "b4_protocol", fw)
     module = load_firmware("b4_runtime")
-    state = SimpleNamespace(tick=0, packets=[], codes=[201], outputs=[], clock=True, delay_sample=False)
+    state = SimpleNamespace(tick=0, packets=[], codes=[201], outputs=[], clock=True, delay_sample=False,
+                            imu_regs={0x1D: 0x00}, ignore_i2c_writes=False)
     modulus = 1 << 30
     def sleep_ms(ms):
         state.tick += ms
@@ -65,7 +66,15 @@ def runtime(monkeypatch):
         state.outputs.append(args)
         if args and str(args[0]).startswith("B4"):
             raise FinishedCycle()
-    monkeypatch.setitem(sys.modules, "machine", SimpleNamespace(I2C=lambda *a, **k: None, UART=UART))
+    class Bus:  # MPU6886 register file at I2C address 0x68
+        def readfrom_mem(self, addr, reg, n):
+            assert addr == 0x68 and n == 1
+            return bytes([state.imu_regs.get(reg, 0)])
+        def writeto_mem(self, addr, reg, data):
+            assert addr == 0x68
+            if not state.ignore_i2c_writes:
+                state.imu_regs[reg] = data[0]
+    monkeypatch.setitem(sys.modules, "machine", SimpleNamespace(I2C=lambda *a, **k: Bus(), UART=UART))
     monkeypatch.setitem(sys.modules, "mpu6886", SimpleNamespace(MPU6886=IMU))
     monkeypatch.setitem(sys.modules, "network", network)
     monkeypatch.setitem(sys.modules, "usocket", SimpleNamespace())
@@ -130,6 +139,32 @@ def test_401_stops_instead_of_falling_back_to_json(runtime):
     with pytest.raises(RuntimeError, match="access denied"):
         module.run(config)
     assert len(state.packets) == 1
+
+
+def test_403_stops_like_401_without_retry(runtime):
+    module, state, config = runtime
+    state.codes = [403, 201, 201]
+    with pytest.raises(RuntimeError, match=r"access denied \(403\)"):
+        module.run(config)
+    assert len(state.packets) == 1
+
+
+def test_accel_low_pass_filter_is_set_to_5hz_and_read_back(runtime):
+    module, state, config = runtime
+    state.imu_regs[0x1D] = 0b11001001  # FIFO/DEC2 bits set, ACCEL_FCHOICE_B=1, A_DLPF_CFG=1
+    with pytest.raises(FinishedCycle):
+        module.run(config)
+    # Upper bits kept, bypass bit cleared, A_DLPF_CFG = 6 (5.1 Hz).
+    assert state.imu_regs[0x1D] == 0b11000110
+    assert state.packets
+
+
+def test_wrong_low_pass_filter_readback_fails_before_any_packet(runtime):
+    module, state, config = runtime
+    state.ignore_i2c_writes = True
+    with pytest.raises(ValueError, match="DLPF not applied"):
+        module.run(config)
+    assert not state.packets
 
 
 def test_retry_count_is_bounded(runtime):
