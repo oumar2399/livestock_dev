@@ -6,6 +6,7 @@ Verifies:
   2. AlertFeedback creation and upsert on (user_id, alert_id).
   3. 404 error handling for non-existent alerts or animals.
   4. Global feedback stats calculations.
+  5. Correction values: the codes and the old stored values only, anything else 422.
 """
 
 import sys
@@ -21,7 +22,19 @@ from app.models.animal import Animal
 from app.models.telemetry import Telemetry
 from app.models.alert import Alert
 from app.models.feedback import PredictionFeedback, AlertFeedback
-from app.schemas.feedback import PredictionFeedbackCreate, AlertFeedbackCreate
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from app.api.v1 import feedback as feedback_api
+from app.core.dependencies import get_current_user
+from app.db.database import get_db
+from app.schemas.feedback import (
+    CORRECTION_CODES,
+    LEGACY_CORRECTIONS,
+    PredictionFeedbackCreate,
+    AlertFeedbackCreate,
+)
 from app.api.v1.feedback import (
     submit_prediction_feedback,
     submit_alert_feedback,
@@ -123,6 +136,65 @@ def test_feedback_stats(db, test_user):
     assert stats.total_prediction_feedbacks >= 0
     assert stats.total_alert_feedbacks >= 0
 
+
+
+# ─── Correction values (Phase 4): codes, old stored values, anything else 422 ──
+
+@pytest.fixture
+def feedback_client(db, test_user):
+    app = FastAPI()
+    app.include_router(feedback_api.router)
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_current_user] = lambda: test_user
+    with TestClient(app) as client:
+        yield client
+
+
+@pytest.fixture
+def feedback_telemetry_time(db, test_animal):
+    telemetry_time = utc_now().replace(microsecond=0)
+    db.add(Telemetry(time=telemetry_time, animal_id=test_animal.id, device_id="M5-TEST-CORR",
+                     predicted_behavior="Active", behavior_confidence=0.9))
+    db.commit()
+    return telemetry_time
+
+
+def _post_correction(client, animal_id, telemetry_time, correction):
+    return client.post("/feedback/predictions", json={
+        "animal_id": animal_id,
+        "telemetry_time": telemetry_time.isoformat(),
+        "verdict": "incorrect",
+        "correction": correction,
+    })
+
+
+@pytest.mark.parametrize("correction", list(CORRECTION_CODES) + list(LEGACY_CORRECTIONS))
+def test_correction_codes_and_old_stored_values_are_accepted(
+    feedback_client, test_animal, feedback_telemetry_time, correction,
+):
+    response = _post_correction(feedback_client, test_animal.id, feedback_telemetry_time, correction)
+    assert response.status_code == 201, response.text
+    assert response.json()["correction"] == correction
+
+
+@pytest.mark.parametrize("correction", ["standing", "Grazing", "GRAZING", "grazing ", "Pâturage", ""])
+def test_unknown_correction_is_refused_with_422_and_nothing_is_stored(
+    db, feedback_client, test_animal, feedback_telemetry_time, correction,
+):
+    response = _post_correction(feedback_client, test_animal.id, feedback_telemetry_time, correction)
+    assert response.status_code == 422
+    assert "correction must be one of" in response.text
+    assert db.query(PredictionFeedback).filter_by(animal_id=test_animal.id).count() == 0
+
+
+def test_feedback_without_correction_is_still_accepted(feedback_client, test_animal, feedback_telemetry_time):
+    response = feedback_client.post("/feedback/predictions", json={
+        "animal_id": test_animal.id,
+        "telemetry_time": feedback_telemetry_time.isoformat(),
+        "verdict": "correct",
+    })
+    assert response.status_code == 201, response.text
+    assert response.json()["correction"] is None
 
 if __name__ == "__main__":
     session = SessionLocal()

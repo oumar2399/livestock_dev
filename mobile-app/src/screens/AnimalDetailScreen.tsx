@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LineChart, PieChart } from 'react-native-gifted-charts';
 import { format, parseISO } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
@@ -205,7 +204,6 @@ type RouteProps = RouteProp<AnimalsStackParamList, 'AnimalDetail'>;
 export default function AnimalDetailScreen() {
   const route      = useRoute<RouteProps>();
   const navigation = useNavigation<any>();
-  const insets     = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { animalId } = route.params;
   const currentFarm = useFarmStore((state) =>
@@ -360,7 +358,8 @@ export default function AnimalDetailScreen() {
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    // ScreenHeader already adds the top safe area: no second inset here.
+    <View style={styles.screen}>
       <ScreenHeader
         title={animal.name}
         subtitle={`${animal.official_id ? `#${animal.official_id} · ` : ''}${animal.breed ?? animal.species}`}

@@ -311,3 +311,153 @@ test('values stored before Phase 4 are read through the documented mapping, unkn
   assert.equal(labels.correctionLabel('standing'), 'standing', 'an unknown value is shown as stored');
   assert.equal(labels.correctionLabel(null), '');
 });
+
+// ── 4.7 Report table: columns sized from their content ────────────────────
+
+function loadTable() {
+  const { native } = nativeMock();
+  native.useWindowDimensions = () => ({ width: 390, height: 844 });
+  const cache = new Map();
+  return { native, table: loadTypeScript(path.join(SRC, 'components/ReportPreviewTable.tsx'),
+    { 'react-native': native, '@expo/vector-icons': { Ionicons: 'Ionicons' } }, cache) };
+}
+
+test('a column is as wide as its header or longest value, between 72 and 220', () => {
+  const { table } = loadTable();
+  const widths = table.estimateColumnWidths(
+    ['id', 'animal_name', 'message'],
+    [['1', 'Bella', 'x'.repeat(80)], ['12', 'Hanako', 'short']],
+  );
+  assert.equal(widths[0], table.MIN_COLUMN_WIDTH, 'a short column keeps a usable minimum');
+  assert.equal(widths[1], 97, 'animal_name: the header is the widest text (11 × 7 + 20)');
+  assert.equal(widths[2], table.MAX_COLUMN_WIDTH, 'a long value is capped and wraps instead');
+  assert.deepEqual(table.estimateColumnWidths(['date'], []), [table.MIN_COLUMN_WIDTH], 'no rows: header only');
+});
+
+test('a table narrower than the screen is stretched to its width, a wider one scrolls', () => {
+  const { table } = loadTable();
+  const stretched = table.fitToWidth([72, 128], 336);
+  assert.ok(stretched[0] > 72 && stretched[1] > 128);
+  assert.ok(table.INDEX_WIDTH + stretched[0] + stretched[1] <= 336, 'never wider than the space');
+  assert.ok(table.INDEX_WIDTH + stretched[0] + stretched[1] >= 335, 'fills it (rounding aside)');
+  assert.deepEqual(table.fitToWidth([200, 220, 180], 336), [200, 220, 180], 'too wide: unchanged, scrolls');
+  assert.deepEqual(table.fitToWidth([100], 0), [100], 'before the first layout: unchanged');
+});
+
+test('the table uses the measured widths, wraps headers on two lines and opens a cell in full', async () => {
+  const { table } = loadTable();
+  const preview = { columns: ['animal_name', 'notes'], rows: [['Bella', 'Limping on the left foreleg since Monday']] };
+  const renderer = await mount(React.createElement(table.default, { preview }));
+  const headers = renderer.root.findAll((n) => n.type === 'Text' && n.props.numberOfLines === 2
+    && ['animal_name', 'notes'].includes(n.props.children));
+  assert.equal(headers.length, 2, 'headers wrap to two lines');
+  const widths = table.estimateColumnWidths(preview.columns, preview.rows);
+  assert.equal(headers[0].props.style[1].width, widths[0]);
+  await act(async () => renderer.root.find((n) => n.type === 'View' && n.props.onLayout)
+    .props.onLayout({ nativeEvent: { layout: { width: 600 } } }));
+  const stretched = renderer.root.findAll((n) => n.type === 'Text' && n.props.children === 'animal_name')[0];
+  assert.ok(stretched.props.style[1].width > widths[0], 'stretched once the available width is known');
+  await act(async () => renderer.root.find((n) => n.type === 'Pressable' && /Row 1, notes/.test(n.props.accessibilityLabel)).props.onPress());
+  assert.match(textOf(renderer.root.findByType('Modal')), /Limping on the left foreleg since Monday/);
+});
+
+// ── 4.5 Herd list ──────────────────────────────────────────────────────────
+
+async function renderHerd() {
+  const { native } = nativeMock();
+  native.TouchableOpacity = 'TouchableOpacity';
+  native.RefreshControl = 'RefreshControl';
+  const animals = [
+    { id: 1, farm_id: 17, name: 'Hanako', official_id: 'JP-001', species: 'bovine', breed: 'Wagyu', sex: 'F',
+      birth_date: null, assigned_device: null, status: 'active', last_update: null },
+    { id: 2, farm_id: 17, name: 'Bella', official_id: 'CI-002', species: 'bovine', breed: null, sex: 'F',
+      birth_date: null, assigned_device: null, status: 'sick', last_update: null },
+  ];
+  const Component = loadTypeScript(path.join(SRC, 'screens/AnimalsListScreen.tsx'), {
+    'react-native': native,
+    '@expo/vector-icons': { Ionicons: 'Ionicons' },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 30, bottom: 0 }) },
+    '@react-navigation/native': { useNavigation: () => ({ navigate() {}, dispatch() {} }), DrawerActions: { openDrawer: () => ({}) } },
+    '../hooks/useAnimals': { useAnimals: () => ({ data: { total: 2, animals }, isLoading: false, isError: false,
+      refetch() {}, isRefetching: false }) },
+    '../hooks/useTelemetry': { useTelemetryLatest: () => ({ data: [] }) },
+    '../hooks/useDevices': { useFarmDevices: () => ({ data: [] }) },
+    '../utils/deviceStatus': { collarHealthSuffix: () => '' },
+    '../store/farmStore': { useFarmStore: (selector) => selector({ currentFarmId: 17,
+      farms: [{ id: 17, name: 'Test Farm A', permissions: ['edit_animals'] }] }) },
+  }).default;
+  const renderer = await mount(React.createElement(Component));
+  const names = () => textOf(renderer.root).match(/Hanako|Bella/g) ?? [];
+  const press = async (label) => act(async () => renderer.root.find((n) => n.props.accessibilityLabel === label
+    && typeof n.props.onPress === 'function').props.onPress());
+  return { renderer, names, press };
+}
+
+test('herd list: search sits behind an icon in the header; closing it clears the search', async () => {
+  const h = await renderHerd();
+  // The count is nested in the title Text: one line, not a second line under it.
+  const title = h.renderer.root.find((n) => n.type === 'Text' && [].concat(n.props.children).includes('Herd'));
+  assert.match(textOf(title), /·\s+2 animals/, 'count on the title line');
+  assert.equal(h.renderer.root.findAll((n) => n.type === 'TextInput').length, 0, 'no search bar until asked');
+  await h.press('Search animals');
+  const input = () => h.renderer.root.find((n) => n.type === 'TextInput');
+  assert.equal(input().props.autoFocus, true);
+  await act(async () => input().props.onChangeText('ci-002'));
+  assert.deepEqual(h.names(), ['Bella']);
+  await h.press('Close search');
+  assert.equal(h.renderer.root.findAll((n) => n.type === 'TextInput').length, 0);
+  assert.deepEqual(h.names(), ['Hanako', 'Bella'], 'a closed search never filters the list');
+});
+
+test('herd list: one top safe area (from the header) and status filters on one scrolling row', async () => {
+  const h = await renderHerd();
+  const screen = h.renderer.root.findAll((n) => n.type === 'View')[0];
+  assert.ok(![].concat(screen.props.style).some((style) => style && style.paddingTop), 'no second top inset');
+  const filterRow = h.renderer.root.find((n) => n.type === 'ScrollView' && n.props.horizontal);
+  assert.match(textOf(filterRow), /All Active Sick Sold Deceased/);
+});
+
+// ── A21 App & Server stays read-only ───────────────────────────────────────
+
+async function renderAppServer(role) {
+  const { native } = nativeMock();
+  native.TouchableOpacity = 'TouchableOpacity';
+  native.Linking = { openURL() {} };
+  const query = { data: undefined, isLoading: true, isError: false, refetch() {} };
+  const Component = loadTypeScript(path.join(SRC, 'screens/drawer/AppServSettings.tsx'), {
+    'react-native': native,
+    '@expo/vector-icons': { Ionicons: 'Ionicons' },
+    './DrawerScreenBase': { __esModule: true, default: ({ children }) => React.createElement('Screen', null, children) },
+    '../../hooks/useSystemStatus': { useSystemStatus: () => query, useDailyJobRuns: () => query,
+      useRunDailyJobs: () => ({ mutateAsync: async () => {}, isPending: false }) },
+    '../../store/authStore': { useAuthStore: (selector) => selector({ role, user: { email: 'a@example.com' }, logout() {} }) },
+    '../../components/dialog': { showDialog() {} },
+  }).default;
+  return mount(React.createElement(Component));
+}
+
+test('App & Server says it is read-only; the admin is pointed to the admin actions', async () => {
+  const admin = textOf((await renderAppServer('admin')).root);
+  assert.match(admin, /Settings are read-only\. Admin actions below\./);
+  assert.match(admin, /DAILY PIPELINE/);
+  const farmer = textOf((await renderAppServer('farmer')).root);
+  assert.match(farmer, /Settings are read-only\./);
+  assert.doesNotMatch(farmer, /Admin actions|DAILY PIPELINE/);
+});
+
+test('no screen adds the top safe area again on top of ScreenHeader (which already adds it)', () => {
+  const fs = require('node:fs');
+  const files = [];
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (entry.name.endsWith('.tsx')) files.push(full);
+  });
+  walk(path.join(SRC, 'screens'));
+  const offenders = files.filter((file) => {
+    const source = fs.readFileSync(file, 'utf8');
+    return source.includes('<ScreenHeader') && /paddingTop:\s*insets\.top\b/.test(source);
+  }).map((file) => path.relative(SRC, file));
+  assert.deepEqual(offenders, []);
+  assert.ok(files.some((file) => fs.readFileSync(file, 'utf8').includes('<ScreenHeader')), 'the scan found ScreenHeader screens');
+});

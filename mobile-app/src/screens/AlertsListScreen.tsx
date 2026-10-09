@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -234,7 +233,6 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing, canManage, c
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AlertsListScreen() {
-  const insets = useSafeAreaInsets();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | 'all'>('all');
@@ -282,7 +280,8 @@ export default function AlertsListScreen() {
   if (isError && !data) return <ErrorState message="Can't load alerts" onRetry={refetch} />;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    // ScreenHeader already adds the top safe area: no second inset here.
+    <View style={styles.screen}>
       <ScreenHeader
         title="Alerts"
         subtitle={unresolvedCount > 0 ? `${unresolvedCount} unresolved${unresolvedCount > 1 ? 's' : ''}` : 'All clear'}

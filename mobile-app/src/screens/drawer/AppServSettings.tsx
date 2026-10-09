@@ -85,6 +85,15 @@ export default function AppServSettings() {
       ) : undefined}
     >
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Nothing on this screen changes a setting: values come from the app build and the
+            server configuration. Only the admin actions (daily pipeline) do something. */}
+        <View style={styles.readOnlyNotice} accessibilityRole="text">
+          <Ionicons name="lock-closed-outline" size={18} color={Colors.text.secondary} />
+          <Text style={styles.readOnlyText}>
+            {isAdmin ? 'Settings are read-only. Admin actions below.' : 'Settings are read-only.'}
+          </Text>
+        </View>
+
         {isAdmin && (
           <>
             <Text style={styles.sectionLabel}>SYSTEM STATUS</Text>
@@ -181,6 +190,11 @@ export default function AppServSettings() {
 
 const styles = StyleSheet.create({
   content: { padding: Spacing.base, paddingBottom: Spacing['3xl'] },
+  readOnlyNotice: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md,
+    borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border.default, backgroundColor: Colors.bg.elevated,
+  },
+  readOnlyText: { flex: 1, color: Colors.text.secondary, fontSize: Typography.sm, fontWeight: '600' },
   sectionLabel: { fontSize: Typography.xs, fontWeight: '700', color: Colors.text.muted, marginTop: Spacing.lg, marginBottom: Spacing.sm },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.lg },
   group: { borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border.default, backgroundColor: Colors.bg.card, overflow: 'hidden' },

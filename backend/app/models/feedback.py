@@ -1,7 +1,7 @@
 """
-Modèles Feedback - Retours utilisateurs (bergers/vétérinaires)
-- PredictionFeedback : validation/correction des prédictions comportementales ML (Active/Resting)
-- AlertFeedback      : confirmation/infirmation des alertes de déviation comportementale
+Feedback models - user feedback (herders / veterinarians)
+- PredictionFeedback : confirms or corrects ML behaviour predictions (Active/Resting)
+- AlertFeedback      : confirms or rejects behavioural deviation alerts
 """
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
@@ -22,7 +22,7 @@ class PredictionFeedback(Base):
     predicted_behavior  = Column(String, nullable=True)
     confidence          = Column(Float, nullable=True)
     verdict             = Column(String(20), nullable=False)  # 'correct' | 'incorrect'
-    correction          = Column(String(50), nullable=True)   # Vrai comportement si connu ('Active' | 'Resting')
+    correction          = Column(String(50), nullable=True)   # True behaviour if known; allowed values: app.schemas.feedback.ALLOWED_CORRECTIONS
     created_at          = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relations

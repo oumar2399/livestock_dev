@@ -89,6 +89,8 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
   const [name, setName] = useState('');
   const [type, setType] = useState<GeofenceType>('pasture');
   const [points, setPoints] = useState<GeoPoint[]>([]);
+  // Index of the point tapped on the map (shown in another color), or null.
+  const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now);
   const zones = useMemo(() => (geofencesQuery.data ?? []).filter((zone) => zone.farm_id === farm.id), [geofencesQuery.data, farm.id]);
   const animals = useMemo(() => mapAnimals(telemetryQuery.data ?? []), [telemetryQuery.data]);
@@ -148,7 +150,26 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
     setName('');
     setType('pasture');
     setPoints([]);
+    setSelectedPoint(null);
   }, []);
+
+  const removeSelectedPoint = () => {
+    if (selectedPoint === null || saving) return;
+    setPoints((current) => current.filter((_, index) => index !== selectedPoint));
+    setSelectedPoint(null);
+  };
+
+  const undoLastPoint = () => {
+    setPoints((current) => current.slice(0, -1));
+    setSelectedPoint((current) => (current !== null && current >= points.length - 1 ? null : current));
+  };
+
+  const confirmClearPoints = () => {
+    showDialog('Clear all points', `Remove all ${points.length} points of this zone?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: () => { setPoints([]); setSelectedPoint(null); } },
+    ]);
+  };
 
   useEffect(() => { if (!canManage) resetEditor(); }, [canManage, resetEditor]);
 
@@ -285,8 +306,13 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
             {drawing && points.length === 2 && <Polyline coordinates={points} strokeColor={Colors.severity.info} strokeWidth={3} />}
             {drawing && points.map((point, index) => (
               <Marker key={'vertex-' + index} coordinate={point} title={'Point ' + (index + 1)} zIndex={4}
-                pinColor={Colors.severity.info} draggable={canManage && !saving} stopPropagation
-                onPress={(event) => event.stopPropagation()}
+                pinColor={selectedPoint === index ? Colors.severity.warning : Colors.severity.info}
+                draggable={canManage && !saving} stopPropagation
+                onPress={(event) => {
+                  // Tapping a point selects it (tap again to unselect); it never adds a vertex.
+                  event.stopPropagation();
+                  if (canManage && !saving) setSelectedPoint((current) => (current === index ? null : index));
+                }}
                 onDragEnd={(event) => {
                   const coordinate = event.nativeEvent.coordinate;
                   if (canManage && !saving && isMapPoint(coordinate)) {
@@ -311,8 +337,10 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
               onPress={() => setMapType((value) => value === 'hybrid' ? 'standard' : 'hybrid')} />
           </View>
           {drawing && <View style={styles.drawingToolbar}>
-            <MapTool icon="arrow-undo" label="Undo last point" disabled={!points.length || saving} onPress={() => setPoints((current) => current.slice(0, -1))} />
-            <MapTool icon="trash-bin-outline" label="Clear drawn points" disabled={!points.length || saving} onPress={() => setPoints([])} />
+            <MapTool icon="remove-circle-outline" label="Remove selected point"
+              disabled={selectedPoint === null || saving} onPress={removeSelectedPoint} />
+            <MapTool icon="arrow-undo" label="Undo last point" disabled={!points.length || saving} onPress={undoLastPoint} />
+            <MapTool icon="trash-bin-outline" label="Clear drawn points" disabled={!points.length || saving} onPress={confirmClearPoints} />
           </View>}
         </View>
 
@@ -321,7 +349,11 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
             <FormScroll frameStyle={styles.editorFrame} contentContainerStyle={styles.editor}>
               <View style={styles.editorHeading}>
                 <Text style={styles.panelTitle}>{editingId === null ? 'New zone' : 'Edit zone'}</Text>
-                <Text style={styles.meta}>{points.length} points</Text>
+                <Text style={styles.meta}>
+                  {selectedPoint !== null
+                    ? `Point ${selectedPoint + 1} of ${points.length} selected`
+                    : points.length > 0 ? `${points.length} points · tap a point to select it` : '0 points'}
+                </Text>
               </View>
               <TextInput value={name} onChangeText={setName} placeholder="Zone name" editable={!saving}
                 accessibilityLabel="Zone name" placeholderTextColor={Colors.text.muted} style={styles.input} />

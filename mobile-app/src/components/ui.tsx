@@ -1,6 +1,6 @@
 /**
- * Composants UI réutilisables
- * ScreenHeader, StatusBadge, StatCard, EmptyState, LoadingOverlay, ErrorState
+ * Reusable UI components
+ * ScreenHeader, StatusBadge, StatCard, EmptyState, LoadingState, ErrorState
  */
 import React from 'react';
 import {
@@ -22,11 +22,15 @@ interface ScreenHeaderProps {
   title: string;
   subtitle?: string;
   onBack?: () => void;
-  backIcon?: 'chevron-back' | 'menu-outline'; // ← par défaut, ☰ si menu
+  backIcon?: 'chevron-back' | 'menu-outline'; // ← by default, ☰ for the menu
   rightAction?: React.ReactNode;
+  /** Subtitle on the title line ("Herd · 12 animals") to save a line. */
+  inlineSubtitle?: boolean;
 }
 
-export function ScreenHeader({ title, subtitle, onBack, backIcon = 'chevron-back', rightAction }: ScreenHeaderProps) {
+export function ScreenHeader({
+  title, subtitle, onBack, backIcon = 'chevron-back', rightAction, inlineSubtitle = false,
+}: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -37,10 +41,17 @@ export function ScreenHeader({ title, subtitle, onBack, backIcon = 'chevron-back
             <Ionicons name={backIcon} size={24} color={Colors.text.primary} />
           </TouchableOpacity>
         )}
-        <View>
-          <Text style={styles.headerTitle}>{title}</Text>
-          {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
-        </View>
+        {inlineSubtitle ? (
+          <Text style={[styles.headerTitle, styles.headerTitleInline]} numberOfLines={1}>
+            {title}
+            {subtitle ? <Text style={styles.headerInlineSubtitle}>{'  ·  ' + subtitle}</Text> : null}
+          </Text>
+        ) : (
+          <View>
+            <Text style={styles.headerTitle}>{title}</Text>
+            {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
+          </View>
+        )}
       </View>
       {rightAction && <View style={styles.headerRight}>{rightAction}</View>}
     </View>
@@ -134,7 +145,7 @@ export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
 
 // ─── LoadingState ─────────────────────────────────────────────────────────────
 
-export function LoadingState({ message = 'Chargement…' }: { message?: string }) {
+export function LoadingState({ message = 'Loading…' }: { message?: string }) {
   return (
     <View style={styles.loading}>
       <ActivityIndicator size="large" color={Colors.primary} />
@@ -154,12 +165,12 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
     <View style={styles.error}>
       <Ionicons name="alert-circle-outline" size={40} color={Colors.severity.critical} />
-      <Text style={styles.errorTitle}>Erreur</Text>
+      <Text style={styles.errorTitle}>Something went wrong</Text>
       <Text style={styles.errorMsg}>{message}</Text>
       {onRetry && (
         <TouchableOpacity style={styles.retryBtn} onPress={onRetry}>
           <Ionicons name="refresh-outline" size={16} color={Colors.primary} />
-          <Text style={styles.retryText}>Réessayer</Text>
+          <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -216,6 +227,13 @@ const styles = StyleSheet.create({
     fontSize: Typography.sm,
     color: Colors.text.secondary,
     marginTop: 1,
+  },
+  headerTitleInline: { flexShrink: 1 },
+  headerInlineSubtitle: {
+    fontSize: Typography.sm,
+    fontWeight: '500',
+    color: Colors.text.secondary,
+    letterSpacing: 0,
   },
 
   // Badge

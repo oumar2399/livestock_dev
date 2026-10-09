@@ -1,8 +1,8 @@
 /**
- * AnimalsListScreen - Liste complète du troupeau
- * Filtres : statut (active/sick/sold/deceased)
- * Recherche locale par nom / official_id
- * Navigation vers AnimalDetail
+ * AnimalsListScreen - the whole herd
+ * Filters: status (active/sick/sold/deceased), one scrolling row
+ * Local search by name / official_id, opened from the search icon in the header
+ * Navigation to AnimalDetail
  */
 import React, { useState, useMemo } from 'react';
 import {
@@ -13,9 +13,9 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAnimals } from '../hooks/useAnimals';
@@ -46,7 +46,7 @@ import {
   EmptyState,
 } from '../components/ui';
 
-// ─── Filtres statut ───────────────────────────────────────────────────────────
+// ─── Status filters ───────────────────────────────────────────────────────────
 
 const STATUS_FILTERS: { label: string; value: AnimalStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -56,7 +56,7 @@ const STATUS_FILTERS: { label: string; value: AnimalStatus | 'all' }[] = [
   { label: 'Deceased', value: 'deceased' },
 ];
 
-// ─── Carte animal ─────────────────────────────────────────────────────────────
+// ─── Animal card ─────────────────────────────────────────────────────────────
 
 interface AnimalCardProps {
   animal: Animal;
@@ -92,7 +92,7 @@ function AnimalCard({ animal, telemetry, collar, healthSuffix, onPress }: Animal
         <Text style={[styles.avatarText, { color: statusColor }]}>
           {animal.name[0].toUpperCase()}
         </Text>
-        {/* Indicateur de fraîcheur ou alerte matériel */}
+        {/* Data freshness, or collar alert */}
         <View
           style={[
             styles.onlineDot,
@@ -102,7 +102,7 @@ function AnimalCard({ animal, telemetry, collar, healthSuffix, onPress }: Animal
         />
       </View>
 
-      {/* Infos principales */}
+      {/* Main information */}
       <View style={styles.cardBody}>
         <View style={styles.cardTop}>
           <Text style={styles.animalName} numberOfLines={1}>{animal.name}</Text>
@@ -118,15 +118,15 @@ function AnimalCard({ animal, telemetry, collar, healthSuffix, onPress }: Animal
           {animal.breed ?? animal.species} · {animalSexLabel(animal.sex)} · {animalAge(animal.birth_date)}
         </Text>
 
-        {/* Collar (device) status, distinct from the animal status above */}
-        <View style={styles.collarRow}>
-          <Ionicons name="hardware-chip-outline" size={12} color={collar.color} />
-          <Text style={[styles.collarText, { color: collar.color }]}>
-            {collar.label}{animal.assigned_device ? ` · ${animal.assigned_device}` : ''}{healthSuffix}
-          </Text>
-        </View>
-
         <View style={styles.cardBottom}>
+          {/* Collar (device) status, distinct from the animal status above */}
+          <View style={styles.collarRow}>
+            <Ionicons name="hardware-chip-outline" size={12} color={collar.color} />
+            <Text style={[styles.collarText, { color: collar.color }]}>
+              {collar.label}{animal.assigned_device ? ` · ${animal.assigned_device}` : ''}{healthSuffix}
+            </Text>
+          </View>
+
           {freshness.telemetryFreshness === 'recent' && activityState ? (
             <View style={[styles.behaviorTag, { backgroundColor: behaviorColor + '20' }]}>
               <View style={[styles.behaviorDot, { backgroundColor: behaviorColor }]} />
@@ -140,7 +140,7 @@ function AnimalCard({ animal, telemetry, collar, healthSuffix, onPress }: Animal
             </Text>
           )}
 
-          {/* Indicateur GPS séparé */}
+          {/* GPS indicator */}
           <View style={styles.gpsRow}>
             <Ionicons
               name={freshness.gpsStatus === 'fix' ? 'navigate-circle-outline' : 'navigate-outline'}
@@ -152,7 +152,7 @@ function AnimalCard({ animal, telemetry, collar, healthSuffix, onPress }: Animal
             </Text>
           </View>
 
-          {/* Batterie avec mention Unknown si non fiable */}
+          {/* Battery, "Unknown" when unreadable */}
           {telemetry && (
             <View style={styles.batteryRow}>
               <Ionicons
@@ -176,7 +176,6 @@ function AnimalCard({ animal, telemetry, collar, healthSuffix, onPress }: Animal
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AnimalsListScreen() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const currentFarm = useFarmStore((state) =>
     state.farms.find((farm) => farm.id === state.currentFarmId),
@@ -184,9 +183,10 @@ export default function AnimalsListScreen() {
   const canEditAnimals = currentFarm?.permissions.includes('edit_animals') ?? false;
 
   const [search, setSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<AnimalStatus | 'all'>('all');
 
-  // Charger liste avec filtre statut
+  // Load the list with the status filter
   const { data, isLoading, isError, refetch, isRefetching } = useAnimals({
     status: statusFilter !== 'all' ? statusFilter : undefined,
     page_size: 100,
@@ -199,7 +199,7 @@ export default function AnimalsListScreen() {
     [telemetryData],
   );
 
-  // Recherche locale (nom ou official_id)
+  // Local search (name or official_id)
   const filteredAnimals = useMemo(() => {
     const animals = data?.animals ?? [];
     if (!search.trim()) return animals;
@@ -215,44 +215,75 @@ export default function AnimalsListScreen() {
     navigation.navigate('AnimalDetail', { animalId });
   };
 
+  // Closing the search also clears it, so a hidden query never filters the list.
+  const toggleSearch = () => {
+    if (searchOpen) setSearch('');
+    setSearchOpen(!searchOpen);
+  };
+
   if (isLoading && !data) return <LoadingState message="Loading..." />;
   if (isError && !data) return <ErrorState message="Can't load the animals" onRetry={refetch} />;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    // ScreenHeader already adds the top safe area: no second inset here.
+    <View style={styles.screen}>
       <ScreenHeader
         title="Herd"
         subtitle={`${data?.total ?? 0} animals`}
+        inlineSubtitle
         onBack={() => navigation.dispatch(DrawerActions.openDrawer())}
         backIcon="menu-outline"
-        rightAction={canEditAnimals ? (
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => navigation.navigate('AnimalForm')}
-          >
-            <Ionicons name="add" size={22} color={Colors.primary} />
-          </TouchableOpacity>
-        ) : undefined}
+        rightAction={(
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.headerBtn, searchOpen && styles.headerBtnActive]}
+              onPress={toggleSearch}
+              accessibilityRole="button"
+              accessibilityLabel={searchOpen ? 'Close search' : 'Search animals'}
+            >
+              <Ionicons name={searchOpen ? 'close' : 'search-outline'} size={20} color={Colors.primary} />
+            </TouchableOpacity>
+            {canEditAnimals && (
+              <TouchableOpacity
+                style={styles.headerBtn}
+                onPress={() => navigation.navigate('AnimalForm')}
+                accessibilityRole="button"
+                accessibilityLabel="Add animal"
+              >
+                <Ionicons name="add" size={22} color={Colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       />
 
-      {/* Recherche */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={Colors.text.muted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by name or ID"
-            placeholderTextColor={Colors.text.muted}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-          />
+      {/* Search, opened from the header icon */}
+      {searchOpen && (
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search-outline" size={18} color={Colors.text.muted} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by name or ID"
+              placeholderTextColor={Colors.text.muted}
+              value={search}
+              onChangeText={setSearch}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+              autoFocus
+              accessibilityLabel="Search by name or ID"
+            />
+          </View>
         </View>
-      </View>
+      )}
 
-      {/* Filtres statut */}
-      <View style={styles.filtersScroll}>
+      {/* Status filters: one scrolling row */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterBar}
+        contentContainerStyle={styles.filtersScroll}
+      >
         {STATUS_FILTERS.map((f) => {
           const active = statusFilter === f.value;
           const color = f.value !== 'all' ? animalStatusColor(f.value as AnimalStatus) : Colors.primary;
@@ -269,9 +300,9 @@ export default function AnimalsListScreen() {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
 
-      {/* Liste */}
+      {/* List */}
       <FlatList
         data={filteredAnimals}
         keyExtractor={(item) => String(item.id)}
@@ -318,6 +349,14 @@ export default function AnimalsListScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.bg.primary },
 
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  headerBtn: {
+    width: 36, height: 36, borderRadius: Radius.full,
+    backgroundColor: Colors.primary + '20',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.primary + '50',
+  },
+  headerBtnActive: { backgroundColor: Colors.primary + '40' },
   searchContainer: {
     paddingHorizontal: Spacing.base,
     marginBottom: Spacing.sm,
@@ -339,16 +378,15 @@ const styles = StyleSheet.create({
     fontSize: Typography.base,
   },
 
+  // A horizontal ScrollView grows to fill the column unless told not to.
+  filterBar: { flexGrow: 0, flexShrink: 0, marginBottom: Spacing.sm },
   filtersScroll: {
-    flexDirection: 'row',
     paddingHorizontal: Spacing.base,
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
-    flexWrap: 'wrap',
   },
   filterChip: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Colors.border.default,
@@ -361,7 +399,7 @@ const styles = StyleSheet.create({
 
   list: { paddingHorizontal: Spacing.base, paddingBottom: Spacing['2xl'] },
   listEmpty: { flex: 1 },
-  separator: { height: Spacing.sm },
+  separator: { height: 6 },
 
   // Card
   card: {
@@ -369,39 +407,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.bg.card,
     borderRadius: Radius.lg,
-    padding: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border.default,
     gap: Spacing.md,
   },
   avatar: {
-    width: 52,
-    height: 52,
+    width: 40,
+    height: 40,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontWeight: '700', fontSize: Typography.lg },
+  avatarText: { fontWeight: '700', fontSize: Typography.md },
   onlineDot: {
     position: 'absolute',
-    bottom: 1,
-    right: 1,
-    width: 12,
-    height: 12,
+    bottom: 0,
+    right: 0,
+    width: 11,
+    height: 11,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: Colors.bg.card,
   },
 
   cardBody: { flex: 1 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 3 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 2 },
   animalName: {
     flex: 1,
     fontSize: Typography.base,
     fontWeight: '700',
     color: Colors.text.primary,
   },
-  collarRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  collarRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   collarText: { fontSize: Typography.xs, fontWeight: '600' },
   statusBadge: {
     paddingHorizontal: 7,
@@ -413,9 +452,9 @@ const styles = StyleSheet.create({
   animalMeta: {
     fontSize: Typography.xs,
     color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
+    marginBottom: 3,
   },
-  cardBottom: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  cardBottom: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: Spacing.sm, rowGap: 2 },
   behaviorTag: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -431,10 +470,4 @@ const styles = StyleSheet.create({
   gpsText: { fontSize: Typography.xs, fontWeight: '600' },
   batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   batteryText: { fontSize: Typography.xs, fontWeight: '600' },
-  addBtn: {
-    width: 36, height: 36, borderRadius: Radius.full,
-    backgroundColor: Colors.primary + '20',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: Colors.primary + '50',
-  },
 });

@@ -115,7 +115,7 @@ const SECTIONS = [
     items: [
       { label: 'AI Assistant', icon: 'chatbubble-ellipses-outline', route: 'Chatbot', preview: true },
       { label: 'Marketplace', icon: 'storefront-outline', route: 'Marketplace', preview: true },
-      { label: 'App & Serveur', icon: 'server-outline', route: 'AppServSettings' },
+      { label: 'App & Server', icon: 'server-outline', route: 'AppServSettings' },
     ],
   },
 ];

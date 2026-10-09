@@ -258,3 +258,67 @@ test('while drawing, Save is also at the top right and stays disabled until the 
   assert.deepEqual(h.createZone.mock.calls[0].arguments[0],
     { farm_id: 1, name: 'North pasture', type: 'pasture', points: [ring[0], ring[1], ring[2]] });
 });
+
+// ── 4.6 Remove an individual point ──────────────────────────────────────────
+
+const square = [
+  { latitude: 5, longitude: -4 }, { latitude: 5.1, longitude: -4 },
+  { latitude: 5.1, longitude: -3.9 }, { latitude: 5, longitude: -3.9 },
+];
+
+async function drawSquare(h) {
+  await h.ready();
+  await h.press('Create zone');
+  for (const point of square) await h.tap(point);
+  const vertices = () => h.host('Marker').filter((marker) => marker.props.title.startsWith('Point '));
+  const meta = () => h.host('Text').map((node) => [].concat(node.props.children).join('')).find((text) => /point/i.test(text) && /\d/.test(text));
+  return { vertices, meta };
+}
+
+test('tapping a point selects it, and "Remove selected point" removes only that point', async () => {
+  const h = await harness();
+  const { vertices, meta } = await drawSquare(h);
+  assert.equal(h.button('Remove selected point').props.disabled, true, 'nothing selected yet');
+  assert.match(meta(), /4 points · tap a point to select it/);
+
+  await act(async () => vertices()[1].props.onPress({ stopPropagation() {} }));
+  assert.equal(vertices().length, 4, 'a tap on a point never adds one');
+  assert.notEqual(vertices()[1].props.pinColor, vertices()[0].props.pinColor, 'the selected point stands out');
+  assert.match(meta(), /Point 2 of 4 selected/);
+
+  await h.press('Remove selected point');
+  assert.equal(vertices().length, 3);
+  assert.equal(h.button('Remove selected point').props.disabled, true, 'the selection is cleared');
+  await act(async () => h.host('TextInput')[0].props.onChangeText('Square'));
+  await h.press('Save');
+  assert.deepEqual(h.createZone.mock.calls[0].arguments[0].points, [square[0], square[2], square[3]]);
+});
+
+test('tapping the selected point again unselects it', async () => {
+  const h = await harness();
+  const { vertices } = await drawSquare(h);
+  await act(async () => vertices()[2].props.onPress({ stopPropagation() {} }));
+  await act(async () => vertices()[2].props.onPress({ stopPropagation() {} }));
+  assert.equal(h.button('Remove selected point').props.disabled, true);
+});
+
+test('undo of the selected last point clears the selection', async () => {
+  const h = await harness();
+  const { vertices } = await drawSquare(h);
+  await act(async () => vertices()[3].props.onPress({ stopPropagation() {} }));
+  await h.press('Undo last point');
+  assert.equal(vertices().length, 3);
+  assert.equal(h.button('Remove selected point').props.disabled, true);
+});
+
+test('Clear all asks first and removes the points only after confirmation', async () => {
+  const h = await harness();
+  const { vertices } = await drawSquare(h);
+  await h.press('Clear drawn points');
+  const [title, message, buttons] = h.alerts.mock.calls.at(-1).arguments;
+  assert.equal(title, 'Clear all points');
+  assert.equal(message, 'Remove all 4 points of this zone?');
+  assert.equal(vertices().length, 4, 'nothing removed before confirmation');
+  await act(async () => buttons.find((b) => b.text === 'Clear').onPress());
+  assert.equal(vertices().length, 0);
+});
