@@ -1,9 +1,9 @@
-import { Alert } from 'react-native';
-
+import type { PickerOption } from '../components/SearchablePicker';
 import apiClient from '../api/client';
 import type { DeviceHealth } from '../hooks/useDevices';
 import { showApiError } from './apiErrors';
 import { timeAgo } from './helpers';
+import { showDialog } from '../components/dialog';
 
 export const DEVICE_STATUS_LABELS: Record<string, string> = {
   active: 'Active',
@@ -54,12 +54,12 @@ export function changeDeviceStatus(deviceId: string, currentStatus: string, onDo
       showApiError(error, 'Could not update', failure);
     }
   };
-  Alert.alert('Change Device Status', `Update status for ${deviceId}:`, [
+  showDialog('Change Device Status', `Update status for ${deviceId}:`, [
     ...Object.keys(DEVICE_STATUS_LABELS).filter((s) => s !== currentStatus).map((s) => ({
       text: DEVICE_STATUS_LABELS[s],
       onPress: () => {
         if (currentStatus === 'lost' && s === 'active') {
-          Alert.alert('Collar recovered', 'Is this collar secured on the correct animal again?', [
+          showDialog('Collar recovered', 'Is this collar secured on the correct animal again?', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Confirm remounted', onPress: () => { void patch({ status: s, confirm_remounted: true }, 'Unable to confirm collar recovery.'); } },
           ]);
@@ -80,6 +80,19 @@ export function assignableDevices<T extends { id: string; assigned_animal?: { id
   devices: T[] | undefined, animalId?: number,
 ): T[] {
   return (devices ?? []).filter((device) => !device.assigned_animal || device.assigned_animal.id === animalId);
+}
+
+/** Collar as a picker option: its ID, then status and health ("Active · offline 2 h"). */
+export function deviceOption(device: {
+  id: string; status: string; transport_id?: number | null; health?: DeviceHealth | null;
+}): PickerOption {
+  const status = DEVICE_STATUS_LABELS[device.status] ?? device.status;
+  return {
+    value: device.id,
+    label: device.id,
+    detail: status + collarHealthSuffix(device.health),
+    keywords: device.transport_id != null ? [String(device.transport_id)] : [],
+  };
 }
 
 /** Lines to copy into m5stack/device_config.py (manual until LoRaWAN pairing). */

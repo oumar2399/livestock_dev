@@ -12,7 +12,6 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  Alert as RNAlert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +40,7 @@ import {
   ErrorState,
   EmptyState,
 } from '../components/ui';
+import { showDialog } from '../components/dialog';
 
 // ─── Filtres ──────────────────────────────────────────────────────────────────
 
@@ -264,7 +264,7 @@ export default function AlertsListScreen() {
   };
 
   const handleResolve = (id: number) => {
-    RNAlert.alert(
+    showDialog(
       'Resolve Alert',
       'Confirm that this issue is resolved?',
       [

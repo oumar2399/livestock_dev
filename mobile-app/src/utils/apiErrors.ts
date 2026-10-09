@@ -1,6 +1,5 @@
-import { Alert } from 'react-native';
-
 import { ApiError, NetworkError } from '../api/client';
+import { showDialog } from '../components/dialog';
 
 /**
  * Error dialogs: a title saying what kind of failure it is, and the server's reason
@@ -25,5 +24,5 @@ export function apiErrorMessage(error: unknown, fallbackMessage: string): string
 }
 
 export function showApiError(error: unknown, fallbackTitle: string, fallbackMessage: string): void {
-  Alert.alert(apiErrorTitle(error, fallbackTitle), apiErrorMessage(error, fallbackMessage));
+  showDialog(apiErrorTitle(error, fallbackTitle), apiErrorMessage(error, fallbackMessage));
 }

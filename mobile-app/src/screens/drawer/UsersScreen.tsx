@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, ActivityIndicator, Modal, TextInput,
+  ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DrawerScreenBase from './DrawerScreenBase';
@@ -11,6 +11,8 @@ import { useFarmStore } from '../../store/farmStore';
 import apiClient from '../../api/client';
 import { showApiError } from '../../utils/apiErrors';
 import { FarmMembership, FarmMembershipList } from '../../types';
+import { showDialog } from '../../components/dialog';
+import AppModal, { ModalButton } from '../../components/AppModal';
 
 const ROLE_LABELS: Record<string, string> = {
   farmer: 'Farmer', owner: 'Owner', vet: 'Veterinarian', admin: 'Admin',
@@ -48,7 +50,7 @@ export default function UsersScreen() {
   useEffect(() => { load(); }, [load]);
   const handleChangeRole = (membershipId: number, newRole: string) => {
     if (!currentFarmId) return;
-    Alert.alert('Change Role', `Assign role "${ROLE_LABELS[newRole]}" ?`, [
+    showDialog('Change Role', `Assign role "${ROLE_LABELS[newRole]}" ?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Confirm', onPress: async () => {
@@ -75,7 +77,7 @@ export default function UsersScreen() {
       setShowInvite(false);
       setInviteForm({ email: '', name: '', role: 'vet', password: '' });
       load();
-      Alert.alert('Success', `${inviteForm.email} was added to ${currentFarm?.name ?? 'the farm'}`);
+      showDialog('Success', `${inviteForm.email} was added to ${currentFarm?.name ?? 'the farm'}`);
     } catch (error) {
       showApiError(error, 'Could not invite', 'Unable to invite this member');
     }
@@ -86,10 +88,10 @@ export default function UsersScreen() {
     if (!currentFarmId || !currentFarm) return;
     const email = inviteForm.email.trim();
     if (!email) {
-      Alert.alert('Required field', 'Enter the email address to invite.');
+      showDialog('Required field', 'Enter the email address to invite.');
       return;
     }
-    Alert.alert(
+    showDialog(
       'Confirm invitation',
       `Invite ${email} as ${ROLE_LABELS[inviteForm.role]} into ${currentFarm.name}?`,
       [
@@ -101,7 +103,7 @@ export default function UsersScreen() {
 
   const handleRevoke = (membership: FarmMembership) => {
     if (!currentFarmId) return;
-    Alert.alert('Revoke access', `Remove ${membership.user_name ?? membership.user_email} from this farm?`, [
+    showDialog('Revoke access', `Remove ${membership.user_name ?? membership.user_email} from this farm?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Revoke',
@@ -161,7 +163,7 @@ export default function UsersScreen() {
                   <TouchableOpacity
                     style={styles.memberActionBtn}
                     onPress={() => {
-                      Alert.alert(
+                      showDialog(
                         'Change role',
                         `New role for ${item.user_name ?? item.user_email}:`,
                         [
@@ -185,54 +187,52 @@ export default function UsersScreen() {
           )}
         />
       )}
-      {/* Modal invitation */}
-      <Modal visible={showInvite} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Invite Member</Text>
-            <Text style={styles.fieldLabel}>Into farm: {currentFarm?.name ?? '—'}</Text>
-            {[
-              { label: 'Email', key: 'email', placeholder: 'email@exemple.com' },
-              { label: 'Name', key: 'name', placeholder: 'First Last' },
-              { label: 'Password', key: 'password', placeholder: 'Min 8 characters' },
-            ].map(({ label, key, placeholder }) => (
-              <View key={key} style={styles.field}>
-                <Text style={styles.fieldLabel}>{label}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={inviteForm[key as keyof typeof inviteForm]}
-                  onChangeText={v => setInviteForm(p => ({ ...p, [key]: v }))}
-                  placeholder={placeholder}
-                  placeholderTextColor={Colors.text.muted}
-                  secureTextEntry={key === 'password'}
-                />
-              </View>
-            ))}
-            <Text style={styles.fieldLabel}>Role</Text>
-            <View style={styles.roleRow}>
-              {['farmer', 'owner', 'vet'].map(r => (
-                <TouchableOpacity
-                  key={r}
-                  style={[styles.roleBtn, inviteForm.role === r && { backgroundColor: (ROLE_COLORS[r]) + '20', borderColor: ROLE_COLORS[r] }]}
-                  onPress={() => setInviteForm(p => ({ ...p, role: r }))}
-                >
-                  <Text style={[styles.roleBtnText, inviteForm.role === r && { color: ROLE_COLORS[r] }]}>
-                    {ROLE_LABELS[r]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowInvite(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleInvite}>
-                <Text style={styles.confirmText}>Invite</Text>
-              </TouchableOpacity>
-            </View>
+      {/* Invitation */}
+      <AppModal
+        visible={showInvite}
+        title="Invite Member"
+        subtitle={`Into farm: ${currentFarm?.name ?? '—'}`}
+        onClose={() => setShowInvite(false)}
+        primaryAction={{ label: 'Invite', onPress: handleInvite }}
+        footer={(
+          <>
+            <ModalButton label="Cancel" kind="secondary" onPress={() => setShowInvite(false)} />
+            <ModalButton label="Invite" onPress={handleInvite} />
+          </>
+        )}
+      >
+        {[
+          { label: 'Email', key: 'email', placeholder: 'email@example.com' },
+          { label: 'Name', key: 'name', placeholder: 'First Last' },
+          { label: 'Password', key: 'password', placeholder: 'Min 8 characters' },
+        ].map(({ label, key, placeholder }) => (
+          <View key={key} style={styles.field}>
+            <Text style={styles.fieldLabel}>{label}</Text>
+            <TextInput
+              style={styles.input}
+              value={inviteForm[key as keyof typeof inviteForm]}
+              onChangeText={v => setInviteForm(p => ({ ...p, [key]: v }))}
+              placeholder={placeholder}
+              placeholderTextColor={Colors.text.muted}
+              secureTextEntry={key === 'password'}
+            />
           </View>
+        ))}
+        <Text style={styles.fieldLabel}>Role</Text>
+        <View style={styles.roleRow}>
+          {['farmer', 'owner', 'vet'].map(r => (
+            <TouchableOpacity
+              key={r}
+              style={[styles.roleBtn, inviteForm.role === r && { backgroundColor: (ROLE_COLORS[r]) + '20', borderColor: ROLE_COLORS[r] }]}
+              onPress={() => setInviteForm(p => ({ ...p, role: r }))}
+            >
+              <Text style={[styles.roleBtnText, inviteForm.role === r && { color: ROLE_COLORS[r] }]}>
+                {ROLE_LABELS[r]}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      </Modal>
+      </AppModal>
     </DrawerScreenBase>
   );
 }
@@ -258,18 +258,10 @@ const styles = StyleSheet.create({
   email: { fontSize: Typography.xs, color: Colors.text.muted, marginTop: 2 },
   roleBadge: { alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full },
   roleText: { fontSize: Typography.xs, fontWeight: '700' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: Colors.bg.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.base, paddingBottom: 40 },
-  modalTitle: { fontSize: Typography.lg, fontWeight: '700', color: Colors.text.primary, marginBottom: Spacing.base },
   field: { marginBottom: Spacing.md },
   fieldLabel: { fontSize: Typography.sm, color: Colors.text.secondary, marginBottom: 4 },
   input: { backgroundColor: Colors.bg.input, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border.default, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, color: Colors.text.primary },
-  roleRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: 4, marginBottom: Spacing.base },
+  roleRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: 4 },
   roleBtn: { flex: 1, paddingVertical: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border.default, alignItems: 'center' },
   roleBtnText: { fontSize: Typography.sm, color: Colors.text.secondary },
-  modalActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
-  cancelBtn: { flex: 1, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border.default, alignItems: 'center' },
-  cancelText: { color: Colors.text.secondary },
-  confirmBtn: { flex: 1, padding: Spacing.md, borderRadius: Radius.md, backgroundColor: Colors.primary, alignItems: 'center' },
-  confirmText: { color: '#fff', fontWeight: '700' },
 });

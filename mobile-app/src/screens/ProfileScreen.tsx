@@ -2,20 +2,24 @@
  * ProfileScreen - User profile management
  * Displays user info, allows editing name/phone/password
  * Displays the selected farm role; membership changes belong to Users.
+ * While editing, Save is in the header (top right) and at the bottom.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform,
+  View, Text, StyleSheet, TextInput,
+  TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import { useFarmStore } from '../store/farmStore';
 import { selectedFarmRole } from '../utils/selectedFarmRole';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import apiClient from '../api/client';
 import { showApiError } from '../utils/apiErrors';
+import { showDialog } from '../components/dialog';
+import { HeaderAction } from '../components/AppModal';
+import KeyboardAwareForm from '../components/KeyboardAwareForm';
 
 // ─── Role config ──────────────────────────────────────────────────────────────
 
@@ -93,6 +97,7 @@ function EditableField({
 
 export default function ProfileScreen() {
   const { role, logout } = useAuthStore();
+  const navigation = useNavigation();
   const farmState = useFarmStore();
   const currentRole = selectedFarmRole(role, farmState);
   const currentFarm = farmState.farms.find(farm => farm.id === farmState.currentFarmId);
@@ -135,15 +140,15 @@ export default function ProfileScreen() {
     // Validate password change if requested
     if (form.newPassword) {
       if (!form.currentPassword) {
-        Alert.alert('Required field', 'Enter your current password.');
+        showDialog('Required field', 'Enter your current password.');
         return;
       }
       if (form.newPassword.length < 6) {
-        Alert.alert('Password too short', 'New password must be at least 6 characters.');
+        showDialog('Password too short', 'New password must be at least 6 characters.');
         return;
       }
       if (form.newPassword !== form.confirmPassword) {
-        Alert.alert('Passwords do not match', 'Enter the same new password twice.');
+        showDialog('Passwords do not match', 'Enter the same new password twice.');
         return;
       }
     }
@@ -173,7 +178,7 @@ export default function ProfileScreen() {
       }));
 
       setEditing(false);
-      Alert.alert('Success', 'Profile updated successfully.');
+      showDialog('Success', 'Profile updated successfully.');
     } catch (err: unknown) {
       showApiError(err, 'Could not save', 'Failed to update profile.');
     } finally {
@@ -182,7 +187,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+    showDialog('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: logout },
     ]);
@@ -216,6 +221,21 @@ export default function ProfileScreen() {
     .toUpperCase()
     .slice(0, 2);
 
+  // The tab header shows Save while the form is open; it always runs the latest handleSave.
+  const saveRef = useRef(handleSave);
+  saveRef.current = handleSave;
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: editing
+        ? () => (
+          <View style={styles.headerAction}>
+            <HeaderAction action={{ label: 'Save', onPress: () => { void saveRef.current(); }, busy: saving }} />
+          </View>
+        )
+        : undefined,
+    });
+  }, [navigation, editing, saving]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -225,14 +245,10 @@ export default function ProfileScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
+    <View style={styles.screen}>
+      <KeyboardAwareForm
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
 
         {/* ── Avatar + role badge ──────────────────────────────────── */}
@@ -360,8 +376,8 @@ export default function ProfileScreen() {
           <Text style={styles.logoutBtnText}>Sign Out</Text>
         </TouchableOpacity>
 
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareForm>
+    </View>
   );
 }
 
@@ -369,6 +385,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: Colors.bg.primary },
+  headerAction: { marginRight: Spacing.base },
   center:  { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg.primary },
   content: { padding: Spacing.base, paddingBottom: 60 },
 

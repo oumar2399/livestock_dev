@@ -5,6 +5,7 @@ const { afterEach, mock, test } = require('node:test');
 const React = require('react');
 const { act, create } = require('react-test-renderer');
 const { loadTypeScript } = require('./helpers/load-typescript.cjs');
+const { buttonsLabelled, sharedUiOverrides } = require('./helpers/shared-ui.cjs');
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const mounted = [];
@@ -51,7 +52,7 @@ async function harness(options = {}) {
   const mutation = (fn) => ({ isPending: false, mutateAsync: fn, mutate: fn });
   const query = (data) => ({ data, isLoading: false, isError: false, isFetching: false, refetch: mock.fn(async () => {}) });
   const Component = loadTypeScript(path.resolve(__dirname, '../src/screens/drawer/GeofenceScreen.tsx'), {
-    'react-native': native,
+    ...sharedUiOverrides(native),
     'react-native-maps': { __esModule: true, default: Map, Marker: 'Marker', Polygon: 'Polygon', Polyline: 'Polyline', PROVIDER_DEFAULT: null },
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     '@react-navigation/native': { useIsFocused: () => state.focused },
@@ -240,4 +241,20 @@ test('coincident animals use a usable zoom instead of a zero-area bounding box',
   assert.equal(h.host('Marker').length, 2);
   assert.equal(h.camera.fitToCoordinates.mock.callCount(), 0);
   assert.equal(h.camera.animateToRegion.mock.calls[0].arguments[0].latitudeDelta, 0.008);
+});
+
+test('while drawing, Save is also at the top right and stays disabled until the zone is complete', async () => {
+  const h = await harness();
+  await h.ready();
+  await h.press('Create zone');
+  assert.equal(h.button('Create zone'), undefined, 'the header shows Save instead of Create while drawing');
+  assert.equal(h.button('Save').props.disabled, true, 'no points and no name yet');
+  await h.tap(ring[0]);
+  await h.tap(ring[1]);
+  await h.tap(ring[2]);
+  await act(async () => h.host('TextInput')[0].props.onChangeText('North pasture'));
+  assert.equal(h.button('Save').props.disabled, false);
+  await h.press('Save');
+  assert.deepEqual(h.createZone.mock.calls[0].arguments[0],
+    { farm_id: 1, name: 'North pasture', type: 'pasture', points: [ring[0], ring[1], ring[2]] });
 });

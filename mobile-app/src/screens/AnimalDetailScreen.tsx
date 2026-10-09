@@ -10,8 +10,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
-  Alert,
-  Modal,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,6 +61,9 @@ import {
 } from '../components/ui';
 import { showApiError } from '../utils/apiErrors';
 import { isGone } from '../api/queryPolicy';
+import { showDialog } from '../components/dialog';
+import AppModal, { ModalButton } from '../components/AppModal';
+import { BEHAVIOR_CORRECTIONS, CorrectionCode, correctionLabel } from '../utils/feedbackLabels';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ export default function AnimalDetailScreen() {
 
   const [historyHours, setHistoryHours] = useState(24);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
-  const [selectedCorrection, setSelectedCorrection] = useState('Resting');
+  const [selectedCorrection, setSelectedCorrection] = useState<CorrectionCode>('resting');
   const [submittedVerdict, setSubmittedVerdict] = useState<'correct' | 'incorrect' | null>(null);
   const [submittedCorrection, setSubmittedCorrection] = useState<string | null>(null);
   const [submittedTime, setSubmittedTime] = useState<string | null>(null);
@@ -229,7 +230,7 @@ export default function AnimalDetailScreen() {
   const submitFeedbackMutation = useSubmitPredictionFeedback();
 
   const handleDelete = (animalName: string) => {
-    Alert.alert(
+    showDialog(
       'Delete Animal',
       `Delete ${animalName}? All its data (telemetry, alerts) will be permanently deleted.`,
       [
@@ -336,6 +337,28 @@ export default function AnimalDetailScreen() {
     ? format(parseISO(targetFeedbackRecord.time), 'dd/MM/yyyy HH:mm:ss')
     : '–';
 
+  // Sends the stable code (e.g. "grazing"), never the displayed label.
+  const submitCorrection = () => {
+    if (!targetFeedbackRecord) return;
+    submitFeedbackMutation.mutate(
+      {
+        animal_id: animal.id,
+        telemetry_time: targetFeedbackRecord.time,
+        verdict: 'incorrect',
+        correction: selectedCorrection,
+      },
+      {
+        onSuccess: () => {
+          setSubmittedVerdict('incorrect');
+          setSubmittedCorrection(selectedCorrection);
+          setSubmittedTime(targetFeedbackRecord.time);
+          setShowCorrectionModal(false);
+          queryClient.invalidateQueries({ queryKey: ['telemetry'] });
+        },
+      }
+    );
+  };
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScreenHeader
@@ -421,7 +444,7 @@ export default function AnimalDetailScreen() {
                 <View style={styles.feedbackConfirmed}>
                   <Ionicons name="checkmark-circle" size={18} color="#27AE60" />
                   <Text style={styles.feedbackConfirmedText}>
-                    Feedback saved ({activeVerdict === 'correct' ? 'Confirmed 👍' : `Correction: ${activeCorrection}`})
+                    Feedback saved ({activeVerdict === 'correct' ? 'Confirmed 👍' : `Correction: ${correctionLabel(activeCorrection)}`})
                   </Text>
                 </View>
                 <Text style={styles.feedbackWaitText}>
@@ -662,81 +685,46 @@ export default function AnimalDetailScreen() {
       </ScrollView>
 
       {/* ── Behavior Correction Modal ───────────────── */}
-      <Modal
+      <AppModal
         visible={showCorrectionModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCorrectionModal(false)}
+        title="Specify Real Behavior"
+        subtitle={`What was ${animal.name} actually doing?`}
+        onClose={() => setShowCorrectionModal(false)}
+        primaryAction={{ label: 'Submit', onPress: submitCorrection, busy: submitFeedbackMutation.isPending }}
+        footer={(
+          <>
+            <ModalButton label="Cancel" kind="secondary" onPress={() => setShowCorrectionModal(false)} />
+            <ModalButton label="Submit" onPress={submitCorrection} busy={submitFeedbackMutation.isPending} />
+          </>
+        )}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Specify Real Behavior</Text>
-            <Text style={styles.modalSub}>
-              What was <Text style={{ fontWeight: '700' }}>{animal.name}</Text> actually doing?
+        {BEHAVIOR_CORRECTIONS.map((opt) => (
+          <TouchableOpacity
+            key={opt.code}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selectedCorrection === opt.code }}
+            style={[
+              styles.optionRow,
+              selectedCorrection === opt.code && styles.optionRowSelected,
+            ]}
+            onPress={() => setSelectedCorrection(opt.code)}
+          >
+            <Ionicons
+              name={selectedCorrection === opt.code ? 'radio-button-on' : 'radio-button-off'}
+              size={18}
+              color={selectedCorrection === opt.code ? Colors.primary : Colors.text.muted}
+            />
+            <Text
+              style={[
+                styles.optionText,
+                selectedCorrection === opt.code && styles.optionTextSelected,
+              ]}
+            >
+              {opt.label}
             </Text>
-
-            {['Active', 'Resting', 'Grazing (Pâturage)', 'Walking (Marche)', 'Lying (Couché)', 'Running (Course)'].map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                style={[
-                  styles.optionRow,
-                  selectedCorrection === opt && styles.optionRowSelected,
-                ]}
-                onPress={() => setSelectedCorrection(opt)}
-              >
-                <Ionicons
-                  name={selectedCorrection === opt ? 'radio-button-on' : 'radio-button-off'}
-                  size={18}
-                  color={selectedCorrection === opt ? Colors.primary : Colors.text.muted}
-                />
-                <Text
-                  style={[
-                    styles.optionText,
-                    selectedCorrection === opt && styles.optionTextSelected,
-                  ]}
-                >
-                  {opt}
-                </Text>
-              </TouchableOpacity>
-            ))}
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setShowCorrectionModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalSubmitBtn}
-                onPress={() => {
-                  if (!targetFeedbackRecord) return;
-                  submitFeedbackMutation.mutate(
-                    {
-                      animal_id: animal.id,
-                      telemetry_time: targetFeedbackRecord.time,
-                      verdict: 'incorrect',
-                      correction: selectedCorrection,
-                    },
-                    {
-                      onSuccess: () => {
-                        setSubmittedVerdict('incorrect');
-                        setSubmittedCorrection(selectedCorrection);
-                        setSubmittedTime(targetFeedbackRecord.time);
-                        setShowCorrectionModal(false);
-                        queryClient.invalidateQueries({ queryKey: ['telemetry'] });
-                      },
-                    }
-                  );
-                }}
-              >
-                <Text style={styles.modalSubmitText}>Submit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+          </TouchableOpacity>
+        ))}
+      </AppModal>
     </View>
   );
 }
@@ -842,20 +830,11 @@ const styles = StyleSheet.create({
   feedbackConfirmedContainer: { gap: 4, marginTop: Spacing.xs },
   feedbackWaitText: { fontSize: Typography.xs, color: Colors.text.muted, fontStyle: 'italic' },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: Spacing.base },
-  modalContent: { backgroundColor: Colors.bg.card, borderRadius: Radius.xl, padding: Spacing.lg, gap: Spacing.sm },
-  modalTitle: { fontSize: Typography.lg, fontWeight: '700', color: Colors.text.primary },
-  modalSub: { fontSize: Typography.sm, color: Colors.text.secondary, marginBottom: Spacing.xs },
+  // Correction options
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm },
   optionRowSelected: { backgroundColor: Colors.primary + '10', borderRadius: Radius.md, paddingHorizontal: Spacing.xs },
   optionText: { fontSize: Typography.sm, color: Colors.text.secondary },
   optionTextSelected: { color: Colors.primary, fontWeight: '700' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.md, marginTop: Spacing.md },
-  modalCancelBtn: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md },
-  modalCancelText: { color: Colors.text.muted, fontSize: Typography.sm },
-  modalSubmitBtn: { backgroundColor: Colors.primary, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: Radius.md },
-  modalSubmitText: { color: '#fff', fontSize: Typography.sm, fontWeight: '700' },
 
   // GPS card enhancements (Lot B)
   lostCollarBanner: {

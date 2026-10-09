@@ -1,6 +1,6 @@
 /**
- * App.tsx - Point d'entrée principal
- * Providers : QueryClient, NavigationContainer, SafeArea
+ * App.tsx - main entry point
+ * Providers: QueryClient, NavigationContainer, SafeArea; the shared dialog host.
  */
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
@@ -12,18 +12,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
 
 import RootNavigator from './src/navigation/RootNavigator';
+import { DialogHost } from './src/components/dialog';
 import { useAuthStore } from './src/store/authStore';
 import { Colors } from './src/constants/config';
 import { queryClient } from './src/api/queryClient';
-
-// ─── React Query Client ───────────────────────────────────────────────────────
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const hydrate = useAuthStore((s) => s.hydrate);
 
-  // Charger token depuis AsyncStorage au démarrage
+  // Load the token from AsyncStorage at startup
   useEffect(() => {
     hydrate();
   }, []);
@@ -36,6 +35,7 @@ export default function App() {
             <StatusBar style="light" backgroundColor={Colors.bg.primary} />
             <RootNavigator />
           </NavigationContainer>
+          <DialogHost />
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

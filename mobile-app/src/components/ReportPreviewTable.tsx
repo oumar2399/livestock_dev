@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Colors, Typography } from '../constants/config';
 import { ReportPreview } from '../types';
+import AppModal from './AppModal';
 
 export default function ReportPreviewTable({ preview }: { preview: ReportPreview }) {
   const [cell, setCell] = useState<{ column: string; value: string } | null>(null);
-  const insets = useSafeAreaInsets();
   const widths = preview.columns.map((column) => /time|date|name|message|notes|metadata/.test(column) ? 200 : 156);
   const width = 44 + widths.reduce((sum, value) => sum + value, 0);
   return (
@@ -37,24 +35,10 @@ export default function ReportPreviewTable({ preview }: { preview: ReportPreview
           </ScrollView>
         </ScrollView>
       </View>
-      {cell && <Modal transparent animationType="fade" onRequestClose={() => setCell(null)}>
-        <View style={[styles.scrim, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Dismiss cell value"
-            style={StyleSheet.absoluteFillObject} onPress={() => setCell(null)} />
-          <View accessibilityViewIsModal style={styles.dialog}>
-            <View style={styles.dialogHeader}>
-              <Text style={styles.dialogTitle}>{cell.column}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Close cell value"
-                style={styles.close} onPress={() => setCell(null)}>
-                <Ionicons name="close-outline" size={24} color={Colors.text.primary} />
-              </Pressable>
-            </View>
-            <ScrollView contentContainerStyle={styles.dialogContent}>
-              <Text selectable style={styles.fullValue}>{cell.value || 'Empty value'}</Text>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>}
+      <AppModal visible={cell !== null} title={cell?.column ?? ''} onClose={() => setCell(null)}
+        closeLabel="Close cell value" closeOnBackdrop>
+        <Text selectable style={styles.fullValue}>{cell?.value || 'Empty value'}</Text>
+      </AppModal>
     </>
   );
 }
@@ -68,11 +52,5 @@ const styles = StyleSheet.create({
   alternate: { backgroundColor: Colors.bg.card },
   cell: { height: 56, justifyContent: 'center', paddingHorizontal: 10, borderLeftWidth: 1, borderLeftColor: Colors.border.default },
   value: { color: Colors.text.secondary, fontSize: Typography.xs, lineHeight: 17 },
-  scrim: { flex: 1, paddingHorizontal: 16, backgroundColor: Colors.overlay, alignItems: 'center', justifyContent: 'center' },
-  dialog: { width: '100%', maxWidth: 640, maxHeight: '90%', backgroundColor: Colors.bg.card, borderRadius: 8, overflow: 'hidden' },
-  dialogHeader: { flexDirection: 'row', alignItems: 'center', paddingLeft: 16, borderBottomWidth: 1, borderBottomColor: Colors.border.default },
-  dialogTitle: { flex: 1, fontSize: Typography.sm, fontWeight: '700', color: Colors.text.primary },
-  close: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  dialogContent: { padding: 16 },
   fullValue: { color: Colors.text.primary, fontSize: Typography.sm, lineHeight: 21 },
 });

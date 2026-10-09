@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,9 +10,11 @@ import DrawerScreenBase from './DrawerScreenBase';
 import { Colors, Radius, Spacing, Typography } from '../../constants/config';
 import { useReportExport, useReportPreview } from '../../hooks/useReports';
 import ReportPreviewTable from '../../components/ReportPreviewTable';
+import KeyboardAwareForm from '../../components/KeyboardAwareForm';
 import { useAuthStore } from '../../store/authStore';
 import { useFarmStore } from '../../store/farmStore';
 import { ReportDataset } from '../../types';
+import { showDialog } from '../../components/dialog';
 
 const DATASETS: { value: ReportDataset; label: string; icon: string }[] = [
   { value: 'telemetry', label: 'Telemetry', icon: 'pulse-outline' },
@@ -85,11 +87,11 @@ function ReportsWorkspace({ farmId, farmName }: { farmId?: number; farmName: str
 
   const validatePeriod = () => {
     if (datesRequired && (!dateFrom || !dateTo)) {
-      Alert.alert('Dates required', untimed ? 'Both reception dates are required.' : 'Telemetry exports require a start and end date.');
+      showDialog('Dates required', untimed ? 'Both reception dates are required.' : 'Telemetry exports require a start and end date.');
       return false;
     }
     if (!datesValid || (dateFrom && dateTo && dateTo < dateFrom)) {
-      Alert.alert('Invalid period', 'Use YYYY-MM-DD and ensure the end date follows the start date.');
+      showDialog('Invalid period', 'Use YYYY-MM-DD and ensure the end date follows the start date.');
       return false;
     }
     return true;
@@ -100,13 +102,13 @@ function ReportsWorkspace({ farmId, farmName }: { farmId?: number; farmName: str
     try {
       await exportReport.mutateAsync(params);
     } catch (error) {
-      Alert.alert('Export unavailable', error instanceof Error ? error.message : 'Unable to export data.');
+      showDialog('Export unavailable', error instanceof Error ? error.message : 'Unable to export data.');
     }
   };
 
   return (
     <DrawerScreenBase title="Reports & Exports" subtitle={untimed ? `Reception context: ${farmName}` : farmName}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareForm contentContainerStyle={styles.content}>
         <Text style={styles.sectionLabel}>DATASET</Text>
         <View style={styles.datasetGrid}>
           {DATASETS.map((item) => {
@@ -210,7 +212,7 @@ function ReportsWorkspace({ farmId, farmName }: { farmId?: number; farmName: str
             : <Ionicons name="download-outline" size={20} color="#fff" />}
           <Text style={styles.exportText}>{exportReport.isPending ? 'Preparing CSV...' : 'Export and share CSV'}</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareForm>
     </DrawerScreenBase>
   );
 }

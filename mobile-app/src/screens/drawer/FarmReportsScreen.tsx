@@ -3,10 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +21,9 @@ import {
   useFarmReportExport,
 } from '../../hooks/useFarmReports';
 import ReportPreviewTable from '../../components/ReportPreviewTable';
+import KeyboardAwareForm from '../../components/KeyboardAwareForm';
 import { FarmReportDataset, ReportPreview } from '../../types';
+import { showDialog } from '../../components/dialog';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -122,7 +122,7 @@ function FarmReportsWorkspace({ farmId }: { farmId: number }) {
   const handleExport = async () => {
     if (exportDisabled) return;
     if (!datesValid) {
-      Alert.alert('Invalid Dates', 'Please provide valid start and end dates (YYYY-MM-DD).');
+      showDialog('Invalid Dates', 'Please provide valid start and end dates (YYYY-MM-DD).');
       return;
     }
     try {
@@ -133,12 +133,12 @@ function FarmReportsWorkspace({ farmId }: { farmId: number }) {
         dateTo,
       });
     } catch (err: any) {
-      Alert.alert('Export Failed', err.message || 'An error occurred while downloading the report.');
+      showDialog('Export Failed', err.message || 'An error occurred while downloading the report.');
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAwareForm style={styles.container} contentContainerStyle={styles.content}>
       {/* ── Sélecteur de période ── */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Report Period</Text>
@@ -441,7 +441,7 @@ function FarmReportsWorkspace({ farmId }: { farmId: number }) {
           </View>
         </>
       )}
-    </ScrollView>
+    </KeyboardAwareForm>
   );
 }
 

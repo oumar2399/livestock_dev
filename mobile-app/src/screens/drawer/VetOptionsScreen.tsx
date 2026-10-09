@@ -5,10 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Modal,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DrawerScreenBase from './DrawerScreenBase';
@@ -27,6 +25,9 @@ import { VeterinaryCase, VeterinaryEntry } from '../../api/veterinary';
 import { selectedFarmRole } from '../../utils/selectedFarmRole';
 import { entryTypeLabel } from '../../utils/veterinaryLabels';
 import { showApiError } from '../../utils/apiErrors';
+import { showDialog } from '../../components/dialog';
+import AppModal, { ModalButton } from '../../components/AppModal';
+import SearchablePicker, { animalOption } from '../../components/SearchablePicker';
 
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Owner', farmer: 'Farmer', vet: 'Veterinarian', admin: 'Admin',
@@ -107,7 +108,7 @@ export default function VetOptionsScreen() {
 
   const handleCreateCase = async () => {
     if (!selectedAnimalId || !caseTitle.trim()) {
-      Alert.alert('Required fields', 'Please select an animal and enter a title.');
+      showDialog('Required fields', 'Please select an animal and enter a title.');
       return;
     }
 
@@ -131,7 +132,7 @@ export default function VetOptionsScreen() {
 
   const handleAddEntry = async () => {
     if (!selectedCaseId || !newContent.trim()) {
-      Alert.alert('Required field', 'Please enter the note content.');
+      showDialog('Required field', 'Please enter the note content.');
       return;
     }
 
@@ -274,266 +275,196 @@ export default function VetOptionsScreen() {
           </ScrollView>
         )}
 
-        {/* MODAL DÉTAIL DU DOSSIER */}
-        <Modal
+        {/* Case details; the add-entry modal is nested so iOS can show it on top */}
+        <AppModal
           visible={selectedCaseId !== null}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setSelectedCaseId(null)}
+          title={caseDetail?.title || 'Clinical case'}
+          onClose={() => setSelectedCaseId(null)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.detailModalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle} numberOfLines={1}>
-                  {caseDetail?.title || 'Clinical case'}
+          {isDetailLoading || !caseDetail ? (
+            <View style={styles.centerContainer}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+            </View>
+          ) : (
+            <View style={styles.detailScroll}>
+              {/* Status & actions */}
+              <View style={styles.detailInfoBox}>
+                <Text style={styles.detailAnimalName}>
+                  Animal: {caseDetail.animal_name || `#${caseDetail.animal_id}`}
                 </Text>
-                <TouchableOpacity onPress={() => setSelectedCaseId(null)}>
-                  <Ionicons name="close" size={24} color={Colors.text.primary} />
-                </TouchableOpacity>
+                <Text style={styles.detailOpener}>
+                  Opened by: {caseDetail.opener_name || `User #${caseDetail.opened_by}`}
+                </Text>
+                {caseReadOnly && (
+                  <Text style={styles.detailOpener}>Opened by a previous farm — read only. Open a new case to continue.</Text>
+                )}
+                <Text style={styles.detailDate}>
+                  Date: {new Date(caseDetail.opened_at).toLocaleDateString()}
+                </Text>
+
+                {isVetOrAdmin && !caseReadOnly && (
+                  <View style={styles.statusButtonsRow}>
+                    <Text style={styles.statusLabel}>Change status:</Text>
+                    {(['provisional', 'confirmed', 'ruled_out', 'closed'] as const).map(
+                      (st) => (
+                        <TouchableOpacity
+                          key={st}
+                          style={[
+                            styles.stButton,
+                            caseDetail.status === st && styles.stButtonActive,
+                          ]}
+                          onPress={() => handleStatusChange(st)}
+                        >
+                          <Text
+                            style={[
+                              styles.stButtonText,
+                              caseDetail.status === st && styles.stButtonTextActive,
+                            ]}
+                          >
+                            {st}
+                          </Text>
+                        </TouchableOpacity>
+                      ),
+                    )}
+                  </View>
+                )}
               </View>
 
-              {isDetailLoading || !caseDetail ? (
-                <View style={styles.centerContainer}>
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                </View>
+              {/* Case journal */}
+              <View style={styles.journalHeader}>
+                <Text style={styles.journalTitle}>Case journal</Text>
+                {(isVetOrAdmin || canObserve) && !caseReadOnly && (
+                  <TouchableOpacity
+                    style={styles.addEntryBtn}
+                    onPress={() => setShowAddEntryModal(true)}
+                  >
+                    <Ionicons name="add-circle-outline" size={16} color={Colors.primary} />
+                    <Text style={styles.addEntryBtnText}>{isVetOrAdmin ? 'Add note' : 'Add observation'}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {caseDetail.entries.length === 0 ? (
+                <Text style={styles.emptyEntries}>No notes recorded.</Text>
               ) : (
-                <ScrollView contentContainerStyle={styles.detailScroll}>
-                  {/* Statut & Actions */}
-                  <View style={styles.detailInfoBox}>
-                    <Text style={styles.detailAnimalName}>
-                      Animal: {caseDetail.animal_name || `#${caseDetail.animal_id}`}
-                    </Text>
-                    <Text style={styles.detailOpener}>
-                      Opened by: {caseDetail.opener_name || `User #${caseDetail.opened_by}`}
-                    </Text>
-                    {caseReadOnly && (
-                      <Text style={styles.detailOpener}>Opened by a previous farm — read only. Open a new case to continue.</Text>
-                    )}
-                    <Text style={styles.detailDate}>
-                      Date: {new Date(caseDetail.opened_at).toLocaleDateString()}
-                    </Text>
-
-                    {isVetOrAdmin && !caseReadOnly && (
-                      <View style={styles.statusButtonsRow}>
-                        <Text style={styles.statusLabel}>Change status:</Text>
-                        {(['provisional', 'confirmed', 'ruled_out', 'closed'] as const).map(
-                          (st) => (
-                            <TouchableOpacity
-                              key={st}
-                              style={[
-                                styles.stButton,
-                                caseDetail.status === st && styles.stButtonActive,
-                              ]}
-                              onPress={() => handleStatusChange(st)}
-                            >
-                              <Text
-                                style={[
-                                  styles.stButtonText,
-                                  caseDetail.status === st && styles.stButtonTextActive,
-                                ]}
-                              >
-                                {st}
-                              </Text>
-                            </TouchableOpacity>
-                          ),
-                        )}
-                      </View>
+                caseDetail.entries.map((entry) => (
+                  <View key={entry.id} style={styles.entryCard}>
+                    <View style={styles.entryHeader}>
+                      <Text style={styles.entryType}>
+                        {entryTypeLabel(entry.entry_type)}
+                      </Text>
+                      <Text style={styles.entryDate}>
+                        {new Date(entry.occurred_at).toLocaleString()}
+                      </Text>
+                    </View>
+                    <Text style={styles.entryContent}>{entry.content}</Text>
+                    {entry.author_name && (
+                      <Text style={styles.entryAuthor}>Dr. {entry.author_name}</Text>
                     )}
                   </View>
-
-                  {/* Journal des entrées */}
-                  <View style={styles.journalHeader}>
-                    <Text style={styles.journalTitle}>Case journal</Text>
-                    {(isVetOrAdmin || canObserve) && !caseReadOnly && (
-                      <TouchableOpacity
-                        style={styles.addEntryBtn}
-                        onPress={() => setShowAddEntryModal(true)}
-                      >
-                        <Ionicons name="add-circle-outline" size={16} color={Colors.primary} />
-                        <Text style={styles.addEntryBtnText}>{isVetOrAdmin ? 'Add note' : 'Add observation'}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {caseDetail.entries.length === 0 ? (
-                    <Text style={styles.emptyEntries}>No notes recorded.</Text>
-                  ) : (
-                    caseDetail.entries.map((entry) => (
-                      <View key={entry.id} style={styles.entryCard}>
-                        <View style={styles.entryHeader}>
-                          <Text style={styles.entryType}>
-                            {entryTypeLabel(entry.entry_type)}
-                          </Text>
-                          <Text style={styles.entryDate}>
-                            {new Date(entry.occurred_at).toLocaleString()}
-                          </Text>
-                        </View>
-                        <Text style={styles.entryContent}>{entry.content}</Text>
-                        {entry.author_name && (
-                          <Text style={styles.entryAuthor}>Dr. {entry.author_name}</Text>
-                        )}
-                      </View>
-                    ))
-                  )}
-                </ScrollView>
+                ))
               )}
             </View>
-          </View>
-        </Modal>
+          )}
 
-        {/* MODAL CRÉATION DOSSIER */}
-        <Modal
-          visible={showCreateModal}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={closeCreateModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.createModalContent}>
-              <Text style={styles.modalTitle}>New Clinical Case</Text>
-
-              <ScrollView style={styles.formScroll} contentContainerStyle={styles.formBody} keyboardShouldPersistTaps="handled">
-              {/* Sélection de l'animal */}
-              <Text style={styles.inputLabel}>Select an animal</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.animalPicker}
-                contentContainerStyle={styles.animalPickerContent}
-              >
-                {(animalsList?.animals || []).map((a) => {
-                  const isSelected = selectedAnimalId === a.id;
+          {/* Add a note / intervention */}
+          <AppModal
+            visible={showAddEntryModal}
+            title={isVetOrAdmin ? 'Add a Clinical Note' : 'Add an Observation'}
+            onClose={closeAddEntryModal}
+            primaryAction={{ label: 'Save', onPress: handleAddEntry, busy: addEntryMutation.isPending }}
+            footer={(
+              <>
+                <ModalButton label="Cancel" kind="secondary" onPress={closeAddEntryModal} />
+                <ModalButton label="Save" onPress={handleAddEntry} busy={addEntryMutation.isPending} />
+              </>
+            )}
+          >
+            {isVetOrAdmin && <Text style={styles.inputLabel}>Entry type</Text>}
+            {isVetOrAdmin && <View style={styles.entryTypeRow}>
+              {(['observation', 'intervention', 'follow_up', 'note'] as const).map(
+                (t) => {
+                  const isSelected = newEntryType === t;
                   return (
                     <TouchableOpacity
-                      key={a.id}
-                      style={[styles.animalChip, isSelected && styles.animalChipSelected]}
-                      onPress={() => setSelectedAnimalId(a.id)}
+                      key={t}
+                      style={[styles.entryTypeChip, isSelected && styles.entryTypeChipSelected]}
+                      onPress={() => setNewEntryType(t)}
                     >
-                      <Text style={[styles.animalChipText, isSelected && styles.animalChipTextSelected]}>
-                        {a.name} (#{a.id})
+                      <Text
+                        style={[
+                          styles.entryTypeText,
+                          isSelected && styles.entryTypeTextSelected,
+                        ]}
+                      >
+                        {t}
                       </Text>
                     </TouchableOpacity>
                   );
-                })}
-              </ScrollView>
+                },
+              )}
+            </View>}
 
-              {/* Titre */}
-              <Text style={styles.inputLabel}>Case title</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="E.g. hoof examination, suspected cough..."
-                placeholderTextColor={Colors.text.muted}
-                value={caseTitle}
-                onChangeText={setCaseTitle}
-              />
+            <Text style={styles.inputLabel}>Note content</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              placeholder="Observation details, treatment given, recommendations..."
+              placeholderTextColor={Colors.text.muted}
+              multiline
+              numberOfLines={4}
+              value={newContent}
+              onChangeText={setNewContent}
+            />
+          </AppModal>
+        </AppModal>
 
-              {/* Note initiale */}
-              <Text style={styles.inputLabel}>Initial observation (optional)</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder="Clinical observations made by the practitioner..."
-                placeholderTextColor={Colors.text.muted}
-                multiline
-                numberOfLines={3}
-                value={initialContent}
-                onChangeText={setInitialContent}
-              />
-              </ScrollView>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={closeCreateModal}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.submitBtn}
-                  onPress={handleCreateCase}
-                  disabled={createCaseMutation.isPending}
-                >
-                  {createCaseMutation.isPending ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.submitBtnText}>Create case</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* MODAL AJOUT NOTE / INTERVENTION */}
-        <Modal
-          visible={showAddEntryModal}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={closeAddEntryModal}
+        {/* New case */}
+        <AppModal
+          visible={showCreateModal}
+          title="New Clinical Case"
+          onClose={closeCreateModal}
+          primaryAction={{ label: 'Create', onPress: handleCreateCase, busy: createCaseMutation.isPending }}
+          footer={(
+            <>
+              <ModalButton label="Cancel" kind="secondary" onPress={closeCreateModal} />
+              <ModalButton label="Create case" onPress={handleCreateCase} busy={createCaseMutation.isPending} />
+            </>
+          )}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.createModalContent}>
-              <Text style={styles.modalTitle}>{isVetOrAdmin ? 'Add a Clinical Note' : 'Add an Observation'}</Text>
+          {/* Animal: searchable by name, ear tag or ID */}
+          <Text style={styles.inputLabel}>Animal</Text>
+          <SearchablePicker
+            label="Animal"
+            placeholder="Select an animal"
+            searchPlaceholder="Search by name, ear tag or ID"
+            emptyText="No animal matches"
+            options={(animalsList?.animals || []).map(animalOption)}
+            value={selectedAnimalId}
+            onChange={(value) => setSelectedAnimalId(value === null ? null : Number(value))}
+          />
 
-              <ScrollView style={styles.formScroll} contentContainerStyle={styles.formBody} keyboardShouldPersistTaps="handled">
-              {isVetOrAdmin && <Text style={styles.inputLabel}>Entry type</Text>}
-              {isVetOrAdmin && <View style={styles.entryTypeRow}>
-                {(['observation', 'intervention', 'follow_up', 'note'] as const).map(
-                  (t) => {
-                    const isSelected = newEntryType === t;
-                    return (
-                      <TouchableOpacity
-                        key={t}
-                        style={[styles.entryTypeChip, isSelected && styles.entryTypeChipSelected]}
-                        onPress={() => setNewEntryType(t)}
-                      >
-                        <Text
-                          style={[
-                            styles.entryTypeText,
-                            isSelected && styles.entryTypeTextSelected,
-                          ]}
-                        >
-                          {t}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  },
-                )}
-              </View>}
+          {/* Title */}
+          <Text style={styles.inputLabel}>Case title</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="E.g. hoof examination, suspected cough..."
+            placeholderTextColor={Colors.text.muted}
+            value={caseTitle}
+            onChangeText={setCaseTitle}
+          />
 
-              <Text style={styles.inputLabel}>Note content</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder="Observation details, treatment given, recommendations..."
-                placeholderTextColor={Colors.text.muted}
-                multiline
-                numberOfLines={4}
-                value={newContent}
-                onChangeText={setNewContent}
-              />
-              </ScrollView>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={closeAddEntryModal}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.submitBtn}
-                  onPress={handleAddEntry}
-                  disabled={addEntryMutation.isPending}
-                >
-                  {addEntryMutation.isPending ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.submitBtnText}>Save</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
+          {/* Initial note */}
+          <Text style={styles.inputLabel}>Initial observation (optional)</Text>
+          <TextInput
+            style={[styles.textInput, styles.textArea]}
+            placeholder="Clinical observations made by the practitioner..."
+            placeholderTextColor={Colors.text.muted}
+            multiline
+            numberOfLines={3}
+            value={initialContent}
+            onChangeText={setInitialContent}
+          />
+        </AppModal>
       </View>
     </DrawerScreenBase>
   );
@@ -693,50 +624,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.base,
-  },
-  detailModalContent: {
-    width: '100%',
-    maxHeight: '85%',
-    backgroundColor: Colors.bg.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-  },
-  createModalContent: {
-    width: '100%',
-    maxHeight: '85%',
-    backgroundColor: Colors.bg.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.base,
-    gap: Spacing.sm,
-  },
-  formScroll: {
-    flexGrow: 0,
-  },
-  formBody: {
-    gap: Spacing.xs,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.default,
-    paddingBottom: Spacing.sm,
-  },
-  modalTitle: {
-    fontSize: Typography.md,
-    fontWeight: '700',
-    color: Colors.text.primary,
-    flex: 1,
-  },
   detailScroll: {
-    paddingVertical: Spacing.md,
     gap: Spacing.md,
   },
   detailInfoBox: {
@@ -869,36 +757,6 @@ const styles = StyleSheet.create({
     maxHeight: 160,
     textAlignVertical: 'top',
   },
-  animalPicker: {
-    flexGrow: 0,
-    flexShrink: 0,
-    marginVertical: Spacing.xs,
-  },
-  animalPickerContent: {
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  animalChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border.default,
-    backgroundColor: Colors.bg.elevated,
-  },
-  animalChipSelected: {
-    backgroundColor: Colors.primary + '25',
-    borderColor: Colors.primary,
-    borderWidth: 1,
-  },
-  animalChipText: {
-    fontSize: Typography.sm,
-    color: Colors.text.secondary,
-  },
-  animalChipTextSelected: {
-    color: Colors.primary,
-    fontWeight: '700',
-  },
   entryTypeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -927,35 +785,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   // Footer buttons follow FarmCreateModal.
-  modalActions: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.sm,
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.bg.input,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtnText: {
-    fontSize: Typography.sm,
-    fontWeight: '600',
-    color: Colors.text.secondary,
-  },
-  submitBtn: {
-    flex: 2,
-    backgroundColor: Colors.primary,
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtnText: {
-    fontSize: Typography.sm,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
 });

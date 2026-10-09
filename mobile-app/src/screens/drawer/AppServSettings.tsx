@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text,
+  ActivityIndicator, Linking, ScrollView, StyleSheet, Text,
   TouchableOpacity, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import DrawerScreenBase from './DrawerScreenBase';
 import { Colors, Config, Radius, Spacing, Typography } from '../../constants/config';
 import { useDailyJobRuns, useRunDailyJobs, useSystemStatus } from '../../hooks/useSystemStatus';
 import { useAuthStore } from '../../store/authStore';
+import { showDialog } from '../../components/dialog';
 
 function StatusRow({ label, value, state }: {
   label: string;
@@ -50,16 +51,16 @@ export default function AppServSettings() {
   };
 
   const confirmRun = () => {
-    Alert.alert('Run daily pipeline', 'Run the pipeline for yesterday in the target timezone?', [
+    showDialog('Run daily pipeline', 'Run the pipeline for yesterday in the target timezone?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Run',
         onPress: async () => {
           try {
             await runJobs.mutateAsync(undefined);
-            Alert.alert('Pipeline completed', 'The execution was added to the history.');
+            showDialog('Pipeline completed', 'The execution was added to the history.');
           } catch (error) {
-            Alert.alert('Pipeline failed', error instanceof Error ? error.message : 'Unable to run the pipeline.');
+            showDialog('Pipeline failed', error instanceof Error ? error.message : 'Unable to run the pipeline.');
           }
         },
       },
@@ -67,7 +68,7 @@ export default function AppServSettings() {
   };
 
   const confirmLogout = () => {
-    Alert.alert('Logout', 'Do you want to logout?', [
+    showDialog('Logout', 'Do you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Logout', style: 'destructive', onPress: logout },
     ]);

@@ -5,6 +5,7 @@ const { afterEach, mock, test } = require('node:test');
 const React = require('react');
 const { act, create } = require('react-test-renderer');
 const { loadTypeScript } = require('./helpers/load-typescript.cjs');
+const { buttonsLabelled, sharedUiOverrides } = require('./helpers/shared-ui.cjs');
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const mounted = [];
@@ -24,7 +25,7 @@ async function harness(options = {}) {
   native.StyleSheet = { create: (styles) => styles };
   native.Alert = { alert: mock.fn() };
   const Component = loadTypeScript(path.resolve(__dirname, '../src/screens/drawer/ReportsScreen.tsx'), {
-    'react-native': native,
+    ...sharedUiOverrides(native),
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     './DrawerScreenBase': { __esModule: true,
       default: ({ children, ...props }) => React.createElement('Screen', props, children) },

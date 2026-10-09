@@ -1,7 +1,7 @@
 /**
- * LoginScreen - Écran de connexion
- * Prêt pour JWT quand POST /auth/login sera implémenté
- * En dev : bouton "Bypass" pour passer directement
+ * LoginScreen - sign-in screen (JWT through POST /auth/login)
+ * Fields stay above the keyboard.
+ * In development: a "bypass" button to skip sign-in
  */
 import React, { useState } from 'react';
 import {
@@ -10,9 +10,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuthStore } from '../store/authStore';
 import { Colors, Radius, Spacing, Typography } from '../constants/config';
+import KeyboardAwareForm from '../components/KeyboardAwareForm';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -41,17 +39,12 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
-    >
-      <ScrollView
+    <View style={styles.screen}>
+      <KeyboardAwareForm
         contentContainerStyle={[
           styles.scrollContent,
           { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing['2xl'] },
         ]}
-        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
       {/* Logo */}
@@ -123,7 +116,7 @@ export default function LoginScreen() {
           </View>
         )}
 
-        {/* Bouton connexion */}
+        {/* Sign-in button */}
         <TouchableOpacity
           style={[styles.loginBtn, isLoading && styles.loginBtnDisabled]}
           onPress={handleLogin}
@@ -133,7 +126,7 @@ export default function LoginScreen() {
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.loginBtnText}>Connexion</Text>
+            <Text style={styles.loginBtnText}>Sign in</Text>
           )}
         </TouchableOpacity>
 
@@ -150,8 +143,8 @@ export default function LoginScreen() {
         Backend : FastAPI + PostgreSQL
       </Text>
 
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareForm>
+    </View>
   );
 }
 

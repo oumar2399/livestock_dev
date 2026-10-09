@@ -3,10 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +16,9 @@ import { useAuthStore } from '../../store/authStore';
 import { useFarmStore } from '../../store/farmStore';
 import FarmCreateModal from '../../components/FarmCreateModal';
 import { showApiError } from '../../utils/apiErrors';
+import { showDialog } from '../../components/dialog';
+import { HeaderAction } from '../../components/AppModal';
+import KeyboardAwareForm from '../../components/KeyboardAwareForm';
 
 export default function FarmScreen() {
   const navigation = useNavigation<any>();
@@ -65,7 +66,7 @@ export default function FarmScreen() {
         size_hectares: form.size_hectares ? parseFloat(form.size_hectares) : null,
       });
       setEditing(false);
-      Alert.alert('Succès', 'Ferme mise à jour avec succès');
+      showDialog('Saved', 'The farm was updated.');
       const { data } = await apiClient.get(`/farms/${currentFarmId}`);
       setFarm(data);
       await loadFarms();
@@ -78,8 +79,10 @@ export default function FarmScreen() {
 
   return (
     <DrawerScreenBase
-      title="Gestion de l'exploitation"
-      rightAction={
+      title="Farm management"
+      rightAction={editing ? (
+        <HeaderAction action={{ label: 'Save', onPress: handleSave, busy: saving }} />
+      ) : (
         <View style={{ flexDirection: 'row', gap: Spacing.xs, alignItems: 'center' }}>
           {!loading && !editing && canManageFarm && (
             <TouchableOpacity onPress={() => setEditing(true)} style={styles.editBtn}>
@@ -92,7 +95,7 @@ export default function FarmScreen() {
             </TouchableOpacity>
           )}
         </View>
-      }
+      )}
     >
       {loading ? (
         <View style={styles.center}>
@@ -121,7 +124,7 @@ export default function FarmScreen() {
           )}
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <KeyboardAwareForm contentContainerStyle={styles.content}>
           {/* Onboarding Quicklink Banner */}
           <TouchableOpacity
             style={styles.onboardingBanner}
@@ -132,9 +135,9 @@ export default function FarmScreen() {
               <Ionicons name="checkbox-outline" size={22} color={Colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.bannerTitle}>Guide de mise en route</Text>
+              <Text style={styles.bannerTitle}>Setup guide</Text>
               <Text style={styles.bannerSubtitle}>
-                Vérifier les étapes de configuration (animaux, colliers, zones)
+                Check the setup steps (animals, collars, zones)
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
@@ -148,9 +151,9 @@ export default function FarmScreen() {
             {editing ? (
               <>
                 {[
-                  { label: 'Nom de la ferme', key: 'name' },
-                  { label: 'Adresse / Localisation', key: 'address' },
-                  { label: 'Superficie (ha)', key: 'size_hectares', numeric: true },
+                  { label: 'Farm name', key: 'name' },
+                  { label: 'Address / Location', key: 'address' },
+                  { label: 'Area (ha)', key: 'size_hectares', numeric: true },
                 ].map(({ label, key, numeric }) => (
                   <View key={key} style={styles.field}>
                     <Text style={styles.fieldLabel}>{label}</Text>
@@ -164,35 +167,35 @@ export default function FarmScreen() {
                   </View>
                 ))}
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Enregistrer</Text>}
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.cancelBtn}
                   onPress={() => setEditing(false)}
                   disabled={saving}
                 >
-                  <Text style={styles.cancelText}>Annuler</Text>
+                  <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 {[
-                  { label: 'Nom', value: farm?.name, icon: 'home-outline' },
-                  { label: 'Adresse', value: farm?.address, icon: 'location-outline' },
+                  { label: 'Name', value: farm?.name, icon: 'home-outline' },
+                  { label: 'Address', value: farm?.address, icon: 'location-outline' },
                   {
-                    label: 'Superficie',
+                    label: 'Area',
                     value: farm?.size_hectares ? `${farm.size_hectares} ha` : '-',
                     icon: 'resize-outline',
                   },
                   {
-                    label: 'Rôle sur l’exploitation',
-                    value: farm?.membership_role ? String(farm.membership_role).toUpperCase() : 'MEMBRE',
+                    label: 'Role on this farm',
+                    value: farm?.membership_role ? String(farm.membership_role).toUpperCase() : 'MEMBER',
                     icon: 'shield-checkmark-outline',
                   },
                   {
-                    label: 'Créée le',
+                    label: 'Created on',
                     value: farm?.created_at
-                      ? new Date(farm.created_at).toLocaleDateString('fr-FR')
+                      ? new Date(farm.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                       : '-',
                     icon: 'calendar-outline',
                   },
@@ -206,7 +209,7 @@ export default function FarmScreen() {
               </>
             )}
           </View>
-        </ScrollView>
+        </KeyboardAwareForm>
       )}
 
       {/* Farm creation modal */}

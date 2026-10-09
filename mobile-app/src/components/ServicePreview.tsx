@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../constants/config';
 import { useFarmStore } from '../store/farmStore';
 import DrawerScreenBase from '../screens/drawer/DrawerScreenBase';
+import AppModal from './AppModal';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -75,21 +75,11 @@ export function PreviewEmptyState({ icon, title, detail }: { icon: IconName; tit
 export function PreviewSheet({ title, onClose, children }: {
   title: string; onClose: () => void; children: React.ReactNode;
 }) {
-  const insets = useSafeAreaInsets();
+  // Mounted only while open, hence always visible.
   return (
-    <Modal transparent animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.scrim, { paddingTop: insets.top + 16, paddingBottom: insets.bottom }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss details"
-          onPress={onClose} style={StyleSheet.absoluteFillObject} />
-        <View accessibilityViewIsModal style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <PreviewIconButton icon="close-outline" label="Close details" onPress={onClose} />
-          </View>
-          <ScrollView contentContainerStyle={styles.sheetContent}>{children}</ScrollView>
-        </View>
-      </View>
-    </Modal>
+    <AppModal visible title={title} onClose={onClose} closeLabel="Close details" closeOnBackdrop>
+      <View style={styles.sheetContent}>{children}</View>
+    </AppModal>
   );
 }
 
@@ -113,11 +103,5 @@ const styles = StyleSheet.create({
   empty: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   emptyTitle: { color: Colors.text.primary, fontSize: Typography.base, fontWeight: '600', textAlign: 'center' },
   emptyDetail: { color: Colors.text.secondary, fontSize: Typography.sm, lineHeight: 20, textAlign: 'center' },
-  scrim: { flex: 1, backgroundColor: Colors.overlay, alignItems: 'center', justifyContent: 'flex-end' },
-  sheet: { width: '100%', maxWidth: 680, maxHeight: '95%', backgroundColor: Colors.bg.primary,
-    borderTopLeftRadius: 8, borderTopRightRadius: 8, overflow: 'hidden' },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', padding: 12,
-    borderBottomWidth: 1, borderBottomColor: Colors.border.default },
-  sheetTitle: { flex: 1, color: Colors.text.primary, fontSize: Typography.md, fontWeight: '600' },
-  sheetContent: { padding: 16, gap: 16 },
+  sheetContent: { gap: 16 },
 });

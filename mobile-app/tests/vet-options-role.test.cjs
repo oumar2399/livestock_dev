@@ -5,6 +5,7 @@ const { afterEach, mock, test } = require('node:test');
 const React = require('react');
 const { act, create } = require('react-test-renderer');
 const { loadTypeScript } = require('./helpers/load-typescript.cjs');
+const { buttonsLabelled, sharedUiOverrides } = require('./helpers/shared-ui.cjs');
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const mounted = [];
@@ -60,7 +61,7 @@ async function render({ accountRole = 'vet', currentFarmId, caseFarmId = current
   });
 
   const Component = loadTypeScript(path.resolve(__dirname, '../src/screens/drawer/VetOptionsScreen.tsx'), {
-    'react-native': native,
+    ...sharedUiOverrides(native),
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     './DrawerScreenBase': {
       __esModule: true,
@@ -93,9 +94,9 @@ async function render({ accountRole = 'vet', currentFarmId, caseFarmId = current
       node.findAll((child) => child.type === 'Text' && child.props.children === 'Lameness').length > 0);
     await act(async () => card.props.onPress());
   };
+  // Form actions are at the top right and at the bottom; the bottom one is pressed here.
   const press = async (label) => {
-    const button = renderer.root.findAllByType('TouchableOpacity').find((node) =>
-      node.findAll((child) => child.type === 'Text' && [].concat(child.props.children).join('') === label).length > 0);
+    const button = buttonsLabelled(renderer.root, label).at(-1);
     assert.ok(button, `button "${label}" not found`);
     await act(async () => button.props.onPress());
   };
@@ -169,7 +170,9 @@ test('New case form is empty again after Cancel', async () => {
 test('New case form keeps the text after a failed save and is empty after a successful one', async () => {
   const h = await render({ currentFarmId: 1 });
   await h.press('New case');
-  await h.press('Bella (#11)');
+  // Searchable animal picker (Phase 4): open it, then choose Bella.
+  await h.press('Animal: Select an animal');
+  await h.press('Bella');
   await h.type(TITLE, 'Lameness check');
   await h.type(INITIAL, 'Limping on left foreleg');
   h.saves.fail = true;

@@ -4,6 +4,48 @@ Plan: `docs/fix_plan_2026-10.md`. Audit reports: `docs/audit_conformance_2026-10
 Rules for a new session: read-only git unless asked; never `.env`, `device_config.py`,
 `livestock_dev`, `livestock_bench`; tests only through the test guard (disposable DB).
 
+## 0. Update 2026-10-09 — acceptance test fixes
+
+Acceptance test of 2026-10-07: `docs/acceptance_checklist_roles.md` (read its "Changes after
+Phase 3" section first) and `docs/acceptance_results_2026-10-07.md` (findings A1–A21, phases,
+decisions). Phases 1–3 are done and committed (`983c34a`); phase 4 (user experience) is not
+started. Manual re-test of phases 2 and 3 in the app is pending.
+
+**Current state:** backend 703 passed, 0 failed, 0 skipped, `alembic check` clean
+(`scripts/run_isolated_tests.py tests`, disposable database, 2026-10-08 13:02 +0900) ·
+mobile 130 passed, 0 failed, TypeScript clean (`node --test tests/*.test.cjs`,
+`tsc --noEmit`, 2026-10-08 13:00 +0900). Measured on the working tree since committed as
+`983c34a`; not re-run on that commit. The totals in §1 below are from 2026-10-04.
+
+### Decisions taken in Phase 3
+
+- **Roles per farm:** owner = all farm rights including members; farmer = operational
+  rights (herd, devices, geofences, alerts, feedback) plus reading veterinary cases and
+  adding observation notes (they apply treatments day to day), no member management;
+  vet = view + full veterinary write, no alert acknowledge/resolve and no feedback (the
+  vet's conclusion is the case status). The platform admin has every permission.
+- **Accounts and farms:** farms are created by the admin only, who then invites the owner;
+  public registration closed by default (`PUBLIC_REGISTRATION_ENABLED`, default off, for
+  development only); the first admin is created with `backend/scripts/create_admin.py`.
+- **Devices:** added in the app by owner / farmer; the server picks the transport ID (lowest
+  free from 100) and the secret, shown once (text + QR code via `react-native-qrcode-svg`
+  6.3.26); device ID 3–50 characters `A–Z 0–9 - _`, unique regardless of case.
+- **Health indicators (indicators only, "lost" stays a human decision):** offline after
+  30 min without reception (to revisit for LoRaWAN uplink intervals), battery ≤ 25 % (the
+  M5 reports only 0/25/50/75/100 %), no GPS fix for > 60 min, battery unreadable > 60 min.
+- **Transfer:** by the admin in the app; the collar moves with the animal; the previous
+  farm's open alerts are resolved as `animal_transferred`. The receiving farm sees the
+  health history (health / anomaly alerts, veterinary cases read-only, daily summaries),
+  not past locations or geofence / battery / offline alerts. Exports and farm reports keep
+  the strict period rule.
+
+### Test data still in livestock_dev
+
+Accounts `owner1@gmail.com`, `owner2@gmail.com`, `test-farmer-1@gmail.com`,
+`test-vet-1@gmail.com`; farms "Test Farm A" / "Test Farm B"; device SIM-001 and its
+telemetry. They stay until the cleanup in `docs/acceptance_checklist_roles.md` §7
+(adapted to these names), run by the owner.
+
 ## 1. Done
 
 | Work | Summary | Full suite after |

@@ -1,20 +1,17 @@
 /**
- * AnimalFormScreen - Formulaire ajout / édition animal
- * Mode ajout  : navigation sans params
- * Mode édition : navigation avec { animalId: number }
+ * AnimalFormScreen - add / edit an animal
+ * Add mode : navigation without params
+ * Edit mode: navigation with { animalId: number }
+ * Save is at the top right and at the bottom; fields stay above the keyboard.
  */
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,8 +22,12 @@ import { Colors, Radius, Spacing, Typography } from '../constants/config';
 import apiClient from '../api/client';
 import { useFarmStore } from '../store/farmStore';
 import { useFarmDevices } from '../hooks/useDevices';
-import { assignableDevices } from '../utils/deviceStatus';
+import { assignableDevices, deviceOption } from '../utils/deviceStatus';
 import { showApiError } from '../utils/apiErrors';
+import { showDialog } from '../components/dialog';
+import { HeaderAction } from '../components/AppModal';
+import KeyboardAwareForm from '../components/KeyboardAwareForm';
+import SearchablePicker from '../components/SearchablePicker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ const DEFAULT_FORM: FormData = {
   farm_id: 0,
 };
 
-// ─── Composants UI ────────────────────────────────────────────────────────────
+// ─── UI components ────────────────────────────────────────────────────────────
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
@@ -155,7 +156,7 @@ export default function AnimalFormScreen() {
     }
   }, [currentFarmId, isEdit]);
 
-  // Charger données existantes en mode édition
+  // Load the existing data in edit mode
   useEffect(() => {
     if (!isEdit) return;
     setFetching(true);
@@ -216,7 +217,7 @@ export default function AnimalFormScreen() {
       queryClient.invalidateQueries({ queryKey: ['animals'] });
       queryClient.invalidateQueries({ queryKey: ['animal', animalId] });
 
-      Alert.alert(
+      showDialog(
         'Success',
         isEdit ? 'Animal modified successfully' : 'Animal added successfully',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
@@ -228,13 +229,13 @@ export default function AnimalFormScreen() {
     }
   };
   const handleDelete = () => {
-    Alert.alert(
+    showDialog(
       'Delete Animal',
-      `Delete ${form.name} ? This action will also delete all its telemetry and alert data.`,
+      `Delete ${form.name}? This action will also delete all its telemetry and alert data.`,
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -261,11 +262,8 @@ export default function AnimalFormScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      {/* ── Header : retour + titre centré ───────────────────────────── */}
+    <View style={styles.screen}>
+      {/* ── Header: back, centered title, Save ───────────────────────── */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
@@ -273,16 +271,16 @@ export default function AnimalFormScreen() {
         <Text style={styles.headerTitle}>
           {isEdit ? 'Modify Animal' : 'New Animal'}
         </Text>
-        {/* Spacer symétrique pour centrer le titre */}
-        <View style={styles.headerBtn} />
+        <View style={styles.headerAction}>
+          <HeaderAction action={{ label: isEdit ? 'Save' : 'Add', onPress: handleSubmit, busy: loading }} />
+        </View>
       </View>
 
-      <ScrollView
+      <KeyboardAwareForm
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-        keyboardShouldPersistTaps="handled"
       >
-        {/* ── Identité ─────────────────────────────────────────────── */}
+        {/* ── Identity ─────────────────────────────────────────────── */}
         <Text style={styles.sectionTitle}>Identity</Text>
 
         <Field
@@ -310,7 +308,7 @@ export default function AnimalFormScreen() {
           ]}
           onSelect={(v) => setForm(p => ({ ...p, sex: v }))}
         />
-        {/* ── Infos physiques ──────────────────────────────────────── */}
+        {/* ── Physical information ──────────────────────────────────────── */}
         <Text style={styles.sectionTitle}>Physical Information</Text>
 
         <Field
@@ -326,7 +324,7 @@ export default function AnimalFormScreen() {
         />
         {errors.weight && <Text style={styles.errorText}>{errors.weight}</Text>}
 
-        {/* ── Statut ───────────────────────────────────────────────── */}
+        {/* ── Status ───────────────────────────────────────────────── */}
         <Text style={styles.sectionTitle}>Health Status</Text>
 
         <SegmentedField
@@ -346,22 +344,16 @@ export default function AnimalFormScreen() {
 
         <View style={styles.fieldContainer}>
           <FieldLabel label="Assigned Device" />
-          {/* Only the farm's collars not assigned to another animal (searchable picker: Phase 4) */}
-          <View style={styles.segmentRow}>
-            {[{ id: '', label: 'No device' },
-              ...deviceChoices.map((device) => ({ id: device.id, label: device.id }))].map(({ id, label }) => {
-              const active = form.assigned_device === id;
-              return (
-                <TouchableOpacity
-                  key={id || 'none'}
-                  style={[styles.segmentBtn, active && { borderColor: Colors.primary, backgroundColor: Colors.primary + '20' }]}
-                  onPress={() => setForm(p => ({ ...p, assigned_device: id }))}
-                >
-                  <Text style={[styles.segmentText, active && { color: Colors.primary, fontWeight: '700' }]}>{label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {/* Only the farm's collars not assigned to another animal */}
+          <SearchablePicker
+            label="Assigned Device"
+            options={deviceChoices.map(deviceOption)}
+            value={form.assigned_device || null}
+            onChange={(value) => setForm(p => ({ ...p, assigned_device: value === null ? '' : String(value) }))}
+            clearLabel="No device"
+            searchPlaceholder="Search by collar ID"
+            emptyText="No collar matches"
+          />
           <Text style={styles.fieldHint}>
             {deviceChoices.length === 0
               ? 'No free collar in this farm. Add one in Devices.'
@@ -369,7 +361,7 @@ export default function AnimalFormScreen() {
           </Text>
         </View>
 
-        {/* ── Bouton enregistrer (pleine largeur, en bas) ───────────── */}
+        {/* ── Save button (full width, bottom; also at the top right) ───────────── */}
         <TouchableOpacity
           style={[styles.submitBtn, loading && { opacity: 0.6 }]}
           onPress={handleSubmit}
@@ -387,7 +379,7 @@ export default function AnimalFormScreen() {
           )}
         </TouchableOpacity>
 
-        {/* ── Bouton supprimer (mode édition, après enregistrer) ───── */}
+        {/* ── Delete button (edit mode, after Save) ───── */}
         {isEdit && (
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
             <Ionicons name="trash-outline" size={18} color={Colors.severity.critical} />
@@ -395,8 +387,8 @@ export default function AnimalFormScreen() {
           </TouchableOpacity>
         )}
 
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareForm>
+    </View>
   );
 }
 
@@ -417,6 +409,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.default,
     backgroundColor: Colors.bg.primary,
   },
+  headerAction: { minWidth: 40, alignItems: 'flex-end' },
   headerBtn: {
     width: 44, height: 44,
     alignItems: 'center', justifyContent: 'center',
@@ -465,7 +458,7 @@ const styles = StyleSheet.create({
   deviceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   clearDeviceBtn: { padding: Spacing.xs },
 
-  // ✅ Bouton enregistrer — vert, pleine largeur, en bas du formulaire
+  // ✅ Save button: green, full width, at the bottom of the form (also at the top right)
   submitBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: Spacing.sm, backgroundColor: Colors.primary,
@@ -474,7 +467,7 @@ const styles = StyleSheet.create({
   },
   submitBtnText: { color: '#fff', fontWeight: '700', fontSize: Typography.base },
 
-  // 🗑️ Bouton supprimer — rouge discret, après le bouton enregistrer
+  // 🗑️ Delete button: discreet red, after the Save button
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: Spacing.sm,

@@ -7,6 +7,7 @@ const { afterEach, mock, test } = require('node:test');
 const React = require('react');
 const { act, create } = require('react-test-renderer');
 const { loadTypeScript } = require('./helpers/load-typescript.cjs');
+const { buttonsLabelled, sharedUiOverrides } = require('./helpers/shared-ui.cjs');
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const SRC = path.join(__dirname, '../src');
@@ -66,7 +67,7 @@ async function renderUsers({ permissions, userId = 10 }) {
   const native = nativeMock();
   const client = clientMock({ members: MEMBERS });
   const Component = loadTypeScript(path.join(SRC, 'screens/drawer/UsersScreen.tsx'), {
-    'react-native': native,
+    ...sharedUiOverrides(native),
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     './DrawerScreenBase': screenBase(),
     '../../store/authStore': { useAuthStore: () => ({ isAdmin: () => false, user: { id: userId } }) },
@@ -105,11 +106,11 @@ async function renderAlerts(permissions) {
     title: 'Low activity', message: null, alert_metadata: null, triggered_at: '2026-10-08T00:00:00Z',
     acknowledged_at: null, resolved_at: null };
   const ui = loadTypeScript(path.join(SRC, 'components/ui.tsx'), {
-    'react-native': native, '@expo/vector-icons': { Ionicons: 'Ionicons' },
+    ...sharedUiOverrides(native), '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
   });
   const Component = loadTypeScript(path.join(SRC, 'screens/AlertsListScreen.tsx'), {
-    'react-native': native,
+    ...sharedUiOverrides(native),
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     '../hooks/useAlerts': {
@@ -152,7 +153,7 @@ async function renderFarmScreen(role) {
   const native = nativeMock();
   const client = clientMock({});
   const Component = loadTypeScript(path.join(SRC, 'screens/drawer/FarmScreen.tsx'), {
-    'react-native': native,
+    ...sharedUiOverrides(native),
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     '@react-navigation/native': { useNavigation: () => ({ navigate: mock.fn() }) },
     './DrawerScreenBase': screenBase(),
@@ -176,7 +177,7 @@ test('only the platform admin is offered farm creation', async () => {
 
 function loadDeviceStatus(native = nativeMock()) {
   return loadTypeScript(path.join(SRC, 'utils/deviceStatus.ts'), {
-    'react-native': native, '../api/client': clientMock({}),
+    ...sharedUiOverrides(native), '../api/client': clientMock({}),
   });
 }
 
@@ -219,7 +220,7 @@ test('adding a device shows the secret once, as text and QR code, then forgets i
   const qrValues = [];
   const onClose = mock.fn();
   const Component = loadTypeScript(path.join(SRC, 'components/AddDeviceModal.tsx'), {
-    'react-native': native,
+    ...sharedUiOverrides(native),
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'react-native-qrcode-svg': { __esModule: true, default: ({ value }) => { qrValues.push(value); return null; } },
     '../hooks/useDevices': { useCreateDevice: () => ({ mutateAsync: create, isPending: false }) },
@@ -229,8 +230,7 @@ test('adding a device shows the secret once, as text and QR code, then forgets i
   assert.match(textOf(renderer), /Into farm:\s+Test Farm A/);
   await act(async () => renderer.root.findByType('TextInput').props.onChangeText('sim-002'));
   const press = async (label) => {
-    const button = renderer.root.findAllByType('TouchableOpacity')
-      .find((b) => b.findAllByType('Text').some((t) => t.props.children === label));
+    const button = buttonsLabelled(renderer.root, label).at(-1);
     await act(async () => button.props.onPress());
   };
   await press('Add device');
@@ -251,7 +251,7 @@ test('adding a device shows the secret once, as text and QR code, then forgets i
 
 test('the transfer confirmation names both farms, the collar and the visibility rule', () => {
   const { transferMessage } = loadTypeScript(path.join(SRC, 'components/TransferAnimalModal.tsx'), {
-    'react-native': nativeMock(), '../api/client': clientMock({}),
+    ...sharedUiOverrides(nativeMock()), '../api/client': clientMock({}),
   });
   assert.equal(transferMessage('Bella', 'Test Farm A', 'Test Farm B', 'SIM-001'),
     'Transfer Bella from Test Farm A to Test Farm B? Collar SIM-001 moves with it. Test Farm B will see its health history, not its past locations.');
@@ -265,7 +265,7 @@ test('the transfer is sent only after confirmation, to the chosen farm', async (
   client.default.post = mock.fn(async () => ({ data: {} }));
   const onTransferred = mock.fn();
   const Component = loadTypeScript(path.join(SRC, 'components/TransferAnimalModal.tsx'), {
-    'react-native': native, '../api/client': client,
+    ...sharedUiOverrides(native), '../api/client': client,
   }).default;
   const renderer = await mount(React.createElement(Component, {
     visible: true, animal: { id: 9, name: 'Bella', farm_id: 1, assigned_device: 'SIM-001' },

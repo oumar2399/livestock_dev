@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Linking, Platform,
-  Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity,
+  ActivityIndicator, FlatList, Linking,
+  Pressable, StyleSheet, Switch, Text, TextInput, TouchableOpacity,
   useWindowDimensions, View,
 } from 'react-native';
 import MapView, { MapPressEvent, Marker, Polygon, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 
 import DrawerScreenBase from './DrawerScreenBase';
+import { HeaderAction } from '../../components/AppModal';
+import { FormScroll, useKeyboardInset } from '../../components/KeyboardAwareForm';
 import { Colors, Radius, Typography } from '../../constants/config';
 import { useCreateGeofence, useDeleteGeofence, useGeofences, useUpdateGeofence } from '../../hooks/useGeofences';
 import { useTelemetryLatest } from '../../hooks/useTelemetry';
@@ -22,6 +24,7 @@ import {
   editablePoints, GEOFENCE_POSITION_LIMIT, initialMapRegion, isMapPoint,
   mapAnimals, positionRecency, positionLabel,
 } from '../../utils/geofenceMap';
+import { showDialog } from '../../components/dialog';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -65,6 +68,9 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
   const locationRequest = useRef(0);
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
+  // The editor panel is at the bottom: the whole workspace moves up with the keyboard.
+  const workspaceRef = useRef<View>(null);
+  const keyboardInset = useKeyboardInset(workspaceRef);
   const { height } = useWindowDimensions();
   const geofencesQuery = useGeofences(farm.id);
   const telemetryQuery = useTelemetryLatest({ limit: GEOFENCE_POSITION_LIMIT }, { enabled: isFocused });
@@ -156,10 +162,10 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
       if (requestId !== locationRequest.current) return;
       setLocationAllowed(permission.granted);
       if (!permission.granted) {
-        Alert.alert('Location permission needed', 'Your position is optional. Animal positions and zone editing remain available.',
+        showDialog('Location permission needed', 'Your position is optional. Animal positions and zone editing remain available.',
           permission.canAskAgain ? [{ text: 'OK' }] : [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Open settings', onPress: () => { void Linking.openSettings().catch(() => Alert.alert('Unable to open settings')); } },
+            { text: 'Open settings', onPress: () => { void Linking.openSettings().catch(() => showDialog('Unable to open settings')); } },
           ]);
         return;
       }
@@ -172,7 +178,7 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
       if (requestId === locationRequest.current) focusCoordinates([position.coords]);
     } catch {
       if (requestId === locationRequest.current) {
-        Alert.alert('Position unavailable', 'Check that location services are enabled, then try again.');
+        showDialog('Position unavailable', 'Check that location services are enabled, then try again.');
       }
     } finally {
       if (timeout) clearTimeout(timeout);
@@ -216,17 +222,17 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
       resetEditor();
       setPanelTab('zones');
     } catch (error) {
-      Alert.alert('Unable to save zone', error instanceof Error ? error.message : 'The polygon is invalid.');
+      showDialog('Unable to save zone', error instanceof Error ? error.message : 'The polygon is invalid.');
     }
   };
 
   const confirmDelete = (zone: Geofence) => {
     if (!canManage) return;
-    Alert.alert('Delete zone', 'This permanently removes the selected zone.', [
+    showDialog('Delete zone', 'This permanently removes the selected zone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try { await deleteGeofence.mutateAsync(zone.id); }
-        catch { Alert.alert('Unable to delete zone'); }
+        catch { showDialog('Unable to delete zone'); }
       } },
     ]);
   };
@@ -243,13 +249,15 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
 
   return (
     <DrawerScreenBase title="Geofencing Zones" subtitle={farm.name}
-      rightAction={canManage && !drawing ? (
+      rightAction={!canManage ? undefined : drawing ? (
+        <HeaderAction action={{ label: 'Save', onPress: handleSave, busy: saving,
+          disabled: points.length < 3 || !name.trim() }} />
+      ) : (
         <TouchableOpacity style={styles.iconButton} onPress={startCreate} accessibilityRole="button" accessibilityLabel="Create zone">
           <Ionicons name="add" size={24} color={Colors.primary} />
         </TouchableOpacity>
-      ) : undefined}>
-      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={insets.top + 64}>
+      )}>
+      <View ref={workspaceRef} style={[styles.screen, { paddingBottom: keyboardInset }]}>
         <View style={styles.mapArea}>
           <MapView ref={mapRef} style={StyleSheet.absoluteFillObject} provider={PROVIDER_DEFAULT}
             initialRegion={initialRegion} mapType={mapType} showsUserLocation={isFocused && locationAllowed}
@@ -310,7 +318,7 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
 
         <View style={[styles.panel, { height: panelHeight + insets.bottom, paddingBottom: insets.bottom }]}>
           {drawing ? (
-            <ScrollView contentContainerStyle={styles.editor} keyboardShouldPersistTaps="handled">
+            <FormScroll frameStyle={styles.editorFrame} contentContainerStyle={styles.editor}>
               <View style={styles.editorHeading}>
                 <Text style={styles.panelTitle}>{editingId === null ? 'New zone' : 'Edit zone'}</Text>
                 <Text style={styles.meta}>{points.length} points</Text>
@@ -336,7 +344,7 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
                   <Text style={styles.primaryText}>Save</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+            </FormScroll>
           ) : (
             <>
               <View style={styles.panelTabs}>
@@ -392,7 +400,7 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
                         {canManage && <>
                           <Switch value={zone.active} disabled={saving} accessibilityLabel={'Activate ' + zone.name}
                             onValueChange={(active) => updateGeofence.mutate({ id: zone.id, payload: { active } }, {
-                              onError: () => Alert.alert('Unable to update zone'),
+                              onError: () => showDialog('Unable to update zone'),
                             })} trackColor={{ true: Colors.primary, false: Colors.bg.elevated }} />
                           <TouchableOpacity style={styles.rowAction} onPress={() => startEdit(zone)} disabled={saving} accessibilityRole="button" accessibilityLabel={'Edit ' + zone.name}>
                             <Ionicons name="create-outline" size={19} color={Colors.text.secondary} />
@@ -407,7 +415,7 @@ function GeofenceWorkspace({ farm, canManage }: { farm: FarmAccess; canManage: b
             </>
           )}
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </DrawerScreenBase>
   );
 }
@@ -443,6 +451,7 @@ const styles = StyleSheet.create({
   meta: { color: Colors.text.secondary, fontSize: Typography.xs, marginTop: 3 },
   coordinates: { color: Colors.text.muted, fontSize: Typography.xs, marginTop: 3 },
   rowAction: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
+  editorFrame: { flex: 1 },
   editor: { padding: 12, gap: 10 },
   editorHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   panelTitle: { color: Colors.text.primary, fontSize: Typography.base, fontWeight: '700' },

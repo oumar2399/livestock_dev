@@ -8,6 +8,7 @@ const { afterEach, mock, test } = require('node:test');
 const React = require('react');
 const { act, create } = require('react-test-renderer');
 const { loadTypeScript } = require('./helpers/load-typescript.cjs');
+const { buttonsLabelled, sharedUiOverrides } = require('./helpers/shared-ui.cjs');
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const SRC = path.join(__dirname, '../src');
@@ -52,7 +53,7 @@ async function renderUsers() {
     farms: [{ id: 17, name: 'Test Farm A', membership_role: 'owner', permissions: ['invite_members'] }],
   };
   const Component = loadTypeScript(path.join(SRC, 'screens/drawer/UsersScreen.tsx'), {
-    'react-native': native,
+    ...sharedUiOverrides(native),
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     './DrawerScreenBase': {
       __esModule: true,
@@ -77,9 +78,11 @@ test('Users screen names the target farm and confirms before inviting', async ()
   const buttons = () => renderer.root.findAllByType('TouchableOpacity');
   await act(async () => buttons()[0].props.onPress());  // header "add member"
   assert.match(textOf(renderer), /Into farm: Test Farm A/);
-  const email = renderer.root.findAllByType('TextInput').find((n) => n.props.placeholder === 'email@exemple.com');
+  const email = renderer.root.findAllByType('TextInput').find((n) => n.props.placeholder === 'email@example.com');
   await act(async () => email.props.onChangeText('vet@example.com'));
-  const invite = buttons().find((b) => b.findAllByType('Text').some((t) => t.props.children === 'Invite'));
+  // Invite is both at the top right and at the bottom of the form (Phase 4); the bottom one here.
+  assert.equal(buttonsLabelled(renderer.root, 'Invite').length, 2);
+  const invite = buttonsLabelled(renderer.root, 'Invite').at(-1);
   await act(async () => invite.props.onPress());
 
   const [title, message, choices] = native.Alert.alert.mock.calls.at(-1).arguments;
@@ -191,7 +194,7 @@ test('map markers follow the collar status', () => {
 
 test('error titles say what happened and keep the server reason', () => {
   const errors = loadTypeScript(path.join(SRC, 'utils/apiErrors.ts'), {
-    '../api/client': api, 'react-native': { Alert: { alert: mock.fn() } },
+    '../api/client': api, '../components/dialog': { showDialog: mock.fn() },
   });
   const ownRole = new api.ApiError(403, 'You cannot change your own role.');
   assert.equal(errors.apiErrorTitle(ownRole, 'Could not change role'), 'Not allowed');

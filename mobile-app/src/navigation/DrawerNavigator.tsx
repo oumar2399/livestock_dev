@@ -16,7 +16,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
 } from 'react-native';
 import {
   createDrawerNavigator,
@@ -48,6 +47,7 @@ import HistoryScreen from '../screens/drawer/HistoryScreen';
 import VideoMonitoring from '../screens/drawer/VideoMonitoring';
 import AppServSettings from '../screens/drawer/AppServSettings';
 import FarmCreateModal from '../components/FarmCreateModal';
+import { showDialog } from '../components/dialog';
 
 // ─── AppStack ─────────────────────────────────────────────────────────────────
 // Stack qui contient HomeTabs + tous les écrans secondaires.
@@ -159,7 +159,7 @@ function DrawerContent(props: DrawerContentComponentProps) {
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Do you want to logout?', [
+    showDialog('Logout', 'Do you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout',

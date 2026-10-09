@@ -12,6 +12,7 @@ import { useAnimals } from '../../hooks/useAnimals';
 import { useAnimalTimeline } from '../../hooks/useHistory';
 import { TimelineEventType, TimelineItem } from '../../types';
 import { eventVisual } from '../../utils/timelineVisuals';
+import SearchablePicker, { animalOption } from '../../components/SearchablePicker';
 
 type Period = 7 | 30 | 0;
 
@@ -69,17 +70,18 @@ export default function HistoryScreen() {
   return (
     <DrawerScreenBase title="Animal History" subtitle={selectedAnimal?.name}>
       <View style={styles.screen}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.animalStrip}>
-          {animals.map((animal) => {
-            const selected = animal.id === animalId;
-            return (
-              <TouchableOpacity key={animal.id} style={[styles.animalButton, selected && styles.activeButton]}
-                onPress={() => setAnimalId(animal.id)}>
-                <Text style={[styles.buttonText, selected && styles.activeText]} numberOfLines={1}>{animal.name}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        {/* Animal: searchable by name, ear tag or ID */}
+        <View style={styles.animalPicker}>
+          <SearchablePicker
+            label="Animal"
+            placeholder="Select an animal"
+            searchPlaceholder="Search by name, ear tag or ID"
+            emptyText="No animal matches"
+            options={animals.map(animalOption)}
+            value={animalId}
+            onChange={(value) => { if (value !== null) setAnimalId(Number(value)); }}
+          />
+        </View>
 
         <View style={styles.filters}>
           <View style={styles.segment}>
@@ -133,10 +135,8 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  animalStrip: { paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm, gap: Spacing.sm },
-  animalButton: { height: 36, maxWidth: 140, justifyContent: 'center', paddingHorizontal: Spacing.md, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border.default, backgroundColor: Colors.bg.card },
+  animalPicker: { paddingHorizontal: Spacing.base, paddingVertical: Spacing.sm },
   activeButton: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
-  buttonText: { color: Colors.text.secondary, fontSize: Typography.sm, fontWeight: '600' },
   activeText: { color: Colors.primary },
   filters: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border.default, padding: Spacing.sm, gap: Spacing.sm },
   segment: { alignSelf: 'flex-start', flexDirection: 'row', backgroundColor: Colors.bg.card, borderRadius: Radius.sm, padding: 2 },
