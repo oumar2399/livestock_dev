@@ -10,19 +10,19 @@ interface OfflineBannerProps {
 }
 
 export function formatTimeAgo(isoString?: string | null): string {
-  if (!isoString) return 'inconnue';
+  if (!isoString) return 'unknown';
   try {
     const diffMs = Date.now() - new Date(isoString).getTime();
-    if (diffMs < 0) return 'à l\'instant';
+    if (diffMs < 0) return 'just now';
     const mins = Math.floor(diffMs / 60000);
-    if (mins < 1) return 'à l\'instant';
-    if (mins < 60) return `il y a ${mins} min`;
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `il y a ${hours} h`;
+    if (hours < 24) return `${hours} h ago`;
     const days = Math.floor(hours / 24);
-    return `il y a ${days} j`;
+    return `${days} d ago`;
   } catch {
-    return 'inconnue';
+    return 'unknown';
   }
 }
 
@@ -42,10 +42,10 @@ export default function OfflineBanner({
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.title}>
-          Mode hors-ligne {resourceName ? `(${resourceName})` : ''}
+          Offline mode {resourceName ? `(${resourceName})` : ''}
         </Text>
         <Text style={styles.subText}>
-          Dernière synchronisation : {timeAgo} • Données en cache
+          Last sync: {timeAgo} • Cached data
         </Text>
       </View>
     </View>

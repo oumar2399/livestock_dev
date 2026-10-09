@@ -4,12 +4,31 @@ Plan: `docs/fix_plan_2026-10.md`. Audit reports: `docs/audit_conformance_2026-10
 Rules for a new session: read-only git unless asked; never `.env`, `device_config.py`,
 `livestock_dev`, `livestock_bench`; tests only through the test guard (disposable DB).
 
+## 0a. Update 2026-10-09 (evening) — Phase 4
+
+Phase 4 (user experience, A14–A21): groups A–C done and committed (`8a54fb7`, `001d99a`).
+Group D (remaining English translation, done by another agent) was reviewed; its 7
+problems and the minor points were fixed on 2026-10-09 (details, decisions and the
+correction-code mapping: `docs/acceptance_results_2026-10-07.md`, sections "Phase 4").
+Group D and the fixes are **not committed**. Translated strings and the manual re-check
+list: `docs/phase4_strings_and_recheck_2026-10-09.md`.
+
+**Current state (commit `001d99a` + uncommitted group D and fixes):** backend 724 passed, 0 failed, 0 skipped, `alembic check` clean (`scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short`, disposable database, 2026-10-09 22:20–22:22 +0900) · mobile 161 passed, 0 failed, TypeScript clean (`node --test tests/*.test.cjs` and `tsc --noEmit` from `mobile-app`, 2026-10-09 22:21 +0900).
+
+Next: commit; then the manual re-test of phases 2–4 in the app.
+
+New since Phase 3: backend `correction` validation (codes + old stored values, else 422);
+shared mobile components `AppModal`, `dialog`, `KeyboardAwareForm`, `SearchablePicker`;
+test helper `mobile-app/tests/helpers/shared-ui.cjs` (screen tests route `showDialog` to
+their `Alert.alert` mock); French guards `mobile-app/tests/guard-french.test.cjs` and
+`backend/tests/test_guard_french.py`.
+
 ## 0. Update 2026-10-09 — acceptance test fixes
 
 Acceptance test of 2026-10-07: `docs/acceptance_checklist_roles.md` (read its "Changes after
 Phase 3" section first) and `docs/acceptance_results_2026-10-07.md` (findings A1–A21, phases,
-decisions). Phases 1–3 are done and committed (`983c34a`); phase 4 (user experience) is not
-started. Manual re-test of phases 2 and 3 in the app is pending.
+decisions). Phases 1–3 are done and committed (`983c34a`); phase 4: see §0a above.
+Manual re-test of phases 2 and 3 in the app is pending.
 
 **Current state:** backend 703 passed, 0 failed, 0 skipped, `alembic check` clean
 (`scripts/run_isolated_tests.py tests`, disposable database, 2026-10-08 13:02 +0900) ·

@@ -44,9 +44,10 @@ expected behaviour, not a defect.
 | 1 — Investigation (A1–A4) | done 2026-10-08 (A1: Dcube memberships of test accounts removed by the owner) |
 | 2 — Bug fixes (A1–A6) | done 2026-10-08; A2: no code cause found, role line added to the veterinary screen |
 | 3 — Missing features (A7–A13) | done 2026-10-08 in three groups (roles/accounts/members; devices/assignment/health indicators; transfer/visibility rule) |
-| 4 — User experience (A14–A21) | not started |
+| 4 — User experience (A14–A21) | groups A–C done and committed (`8a54fb7`, `001d99a`); group D (remaining English translation, other agent) reviewed and its 7 problems fixed on 2026-10-09, not committed yet (see "Phase 4 review") |
 
-Manual re-test of phases 2 and 3 in the app: pending.
+Manual re-test of phases 2, 3 and 4 in the app: pending. Phase 4 re-check list and the
+list of translated strings: `docs/phase4_strings_and_recheck_2026-10-09.md`.
 
 **Test totals after phase 3:** backend 703 passed, 0 failed, 0 skipped, `alembic check`
 clean (`scripts/run_isolated_tests.py tests` on a disposable database, 2026-10-08 13:02
@@ -75,6 +76,94 @@ since committed as `983c34a` (2026-10-09); not re-run on that commit.
   health history (health / anomaly alerts, veterinary cases read-only, daily summaries),
   not past locations or geofence / battery / offline alerts. Exports and farm reports keep
   the strict period rule.
+
+## Phase 4 — what was done
+
+- **A16 popups:** one dialog (`components/dialog.tsx`, `showDialog` = same arguments as
+  `Alert.alert`) replaces all 39 `Alert.alert` calls; one modal frame
+  (`components/AppModal.tsx`) for the 9 popups. Android back closes a dialog (Cancel, or OK
+  for a message), then the popup. A dialog over a popup is drawn inside it (iOS cannot stack
+  two modals); the vet "add note" popup is nested in the case popup for the same reason.
+- **A15 forms:** Save at the top right **and** at the bottom on every form; fields kept above
+  the keyboard by `components/KeyboardAwareForm.tsx` (measured keyboard overlap, works with
+  Android edge-to-edge; no new dependency).
+- **A17 pickers:** `components/SearchablePicker.tsx` (name, ear tag, ID; case, accents and a
+  leading "#" ignored) for the animal in "New case" and History, the collar in the animal form.
+- **A18 herd list:** single top safe area (also fixed in Alerts and animal details),
+  "Herd · N animals" on one line, search behind a header icon (closing clears it), filters
+  on one scrolling row, 3-line cards.
+- **A19 geofence:** tap a point to select it, "Remove selected point", Undo, "Clear all"
+  asks first.
+- **A20 report tables:** columns sized from content (72–220 px), headers on two lines, rows
+  grow with content, height from the screen, narrow tables fill the width.
+- **A21 App & Server:** "Settings are read-only. Admin actions below." (admin) / "Settings
+  are read-only." (others); drawer label "App & Server". Dead `OtherDrawerScreens.tsx` deleted.
+- **A14 English:** groups B/C translated the files they rewrote; group D the rest. List:
+  `docs/phase4_strings_and_recheck_2026-10-09.md`.
+
+## Decisions taken in Phase 4
+
+- **Behaviour correction:** the app sends a stable code (`active`, `resting`, `grazing`,
+  `walking`, `lying`, `running`) and shows English labels. The backend accepts only these
+  codes and the values stored before Phase 4, anything else → 422
+  (`schemas/feedback.py`, `ALLOWED_CORRECTIONS`). No migration of stored rows. Mapping of
+  the old stored values (also in `mobile-app/src/utils/feedbackLabels.ts`):
+
+  | Old stored value | Code |
+  |---|---|
+  | `Active` | `active` |
+  | `Resting` | `resting` |
+  | `Grazing (Pâturage)` | `grazing` |
+  | `Walking (Marche)` | `walking` |
+  | `Lying (Couché)` | `lying` |
+  | `Running (Course)` | `running` |
+
+- **App & Server** stays read-only; the admin "Run daily pipeline" action is kept.
+- **Save buttons:** top right in addition to the bottom one, never instead of it.
+- Database rows already written in French (alert titles/messages, notifications) are not
+  translated.
+
+## Phase 4 review (2026-10-09) — group D
+
+Group D changed only user-facing text, comments, a date-locale import, the `app.json` iOS
+prompts and test assertions (no logic, codes, keys, alert types, feedback codes, old stored
+values or correction validator changed). The review found 7 problems, **all fixed on
+2026-10-09** (with the owner's approval):
+
+1. `AnimalDetailScreen.tsx` — broken string quote (`animal\\'s.'`) made `tsc --noEmit`
+   fail; no test loads this screen, so the mobile suite had still passed. Fixed.
+2. `FarmOnboardingScreen.tsx` — step 4 description still French and damaged by a word
+   replacement ("sur" → "out of"). Translated.
+3. `SettingsScreen.tsx` — "Géofencing" → "Geofencing".
+4. Strings outside group D's files translated: `OfflineBanner.tsx` (offline title, last
+   sync line, "il y a …" times); `AnimalDetailScreen.tsx` GPS labels, "Aucune position",
+   "Aucune trame", map button.
+5. Backend: empty-period label in `services/farm_reports.py` and default
+   `mandatory_label` in `schemas/farm_report.py` translated.
+6. `farm-reports-screen.test.cjs` — half-replaced fixture restored to the backend's
+   English notes.
+7. Guard tests made stricter: `mobile-app/tests/guard-french.test.cjs` parses the source
+   with the TypeScript compiler and checks UI text only (string literals, template text,
+   JSX text; not comments, import paths, property names or types), flags accented letters
+   and French words (whole words, never next to a hyphen, so "non-null" stays English),
+   also checks `app.json`; the only allowance is the six old correction values of
+   `feedbackLabels.ts` (no more file-wide exceptions; `apiErrors.ts` exception removed).
+   New `backend/tests/test_guard_french.py` checks every backend string constant that can
+   reach a user (not docstrings, comments, Swagger text or log calls); the only allowance
+   is `LEGACY_CORRECTIONS`. Both include a self-test, and run on the pre-fix files they
+   flag the French found above.
+
+Minor points also fixed: "Required roles:" (no space before the colon); vet screen dates
+no longer follow the phone language (`formatDate` / `formatDateTime`); the Alerts tab has a
+single header (tab header hidden, ☰ menu button in the screen header, as on Herd) and
+says "N unresolved" (was "N unresolveds"). French remains only in Swagger
+descriptions/examples and code comments (not shown in the app).
+
+**Test totals (commit `001d99a` + uncommitted group D and review fixes):** backend 724 passed, 0 failed, 0 skipped, `alembic check` clean (`scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short`, disposable database, 2026-10-09 22:20–22:22 +0900) · mobile 161 passed, 0 failed, TypeScript clean (`node --test tests/*.test.cjs` and `tsc --noEmit` from `mobile-app`, 2026-10-09 22:21 +0900).
+
+Earlier on 2026-10-09: group D as delivered, backend 722 passed (22:08), mobile 160 passed,
+TypeScript failing; `001d99a` content before group D, mobile 159 passed, TypeScript clean
+(10:12), backend 722 passed (09:52).
 
 ## Test data still in livestock_dev
 

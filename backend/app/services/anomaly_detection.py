@@ -239,12 +239,12 @@ def evaluate_animal_anomaly(
     # Directional classification
     if target_summary.pct_active < median_val:
         alert_type = AlertType.ACTIVITY_DEVIATION_LOW.value
-        title = f"Activité inhabituellement basse ({animal_name})"
-        message = f"Activité inhabituellement basse ({delta_pct:.1f}{unit} vs habitude)"
+        title = f"Unusually low activity ({animal_name})"
+        message = f"Unusually low activity ({delta_pct:.1f}{unit} vs baseline)"
     else:
         alert_type = AlertType.ACTIVITY_DEVIATION_HIGH.value
-        title = f"Activité inhabituellement élevée ({animal_name})"
-        message = f"Activité inhabituellement élevée (+{delta_pct:.1f}{unit} vs habitude)"
+        title = f"Unusually high activity ({animal_name})"
+        message = f"Unusually high activity (+{delta_pct:.1f}{unit} vs baseline)"
 
     # Idempotency check: prevent duplicate alert for same animal, type, and target_date
     existing_alert = (

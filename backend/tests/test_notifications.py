@@ -153,7 +153,7 @@ def test_preferences_filtering(db, notif_setup):
         farm_id=farm.id,
         type="geofence",
         severity="warning",
-        title="Alerte mineure",
+        title="MINOR alert",
         message="Message test",
         triggered_at=datetime.utcnow(),
     )
@@ -318,7 +318,7 @@ def test_permission_revocation_before_dispatch_cancels_delivery(db, notif_setup)
         farm_id=farm.id,
         type="geofence",
         severity="critical",
-        title="Alerte critique",
+        title="CRITICAL alert",
         triggered_at=datetime.utcnow(),
     )
     db.add(alert)

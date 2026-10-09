@@ -55,7 +55,7 @@ class FarmUntimedSummary(BaseModel):
     untimed_count: int
     breakdown_by_reason: dict[str, int]
     breakdown_by_attribution: dict[str, int]
-    mandatory_label: str = "Archives reçues par les colliers rattachés à cette ferme à la réception"
+    mandatory_label: str = "Archives received by collars attached to this farm at reception"
 
 
 class FarmOverviewResponse(BaseModel):

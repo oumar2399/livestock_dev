@@ -39,12 +39,12 @@ def create_veterinary_case(
     if not animal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Animal #{data.animal_id} introuvable",
+            detail=f"Animal #{data.animal_id} not found",
         )
     if animal.farm_id != farm_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"L'animal #{animal.id} n'appartient pas à la ferme #{farm_id}",
+            detail=f"Animal #{animal.id} does not belong to farm #{farm_id}",
         )
 
     # 2. Vérification de l'alerte liée si fournie
@@ -53,19 +53,19 @@ def create_veterinary_case(
         if not alert:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Alerte #{data.linked_alert_id} introuvable",
+                detail=f"Alert #{data.linked_alert_id} not found",
             )
         # L'alerte doit appartenir au même animal et à la même ferme
         if alert.animal_id != animal.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="L'alerte liée n'appartient pas à cet animal",
+                detail="The linked alert does not belong to this animal",
             )
         alert_farm_id = alert.farm_id or (alert.animal.farm_id if alert.animal else None)
         if alert_farm_id != farm_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="L'alerte liée n'appartient pas à cette ferme",
+                detail="The linked alert does not belong to this farm",
             )
 
     now = datetime.utcnow()

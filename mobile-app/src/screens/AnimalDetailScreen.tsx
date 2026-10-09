@@ -519,8 +519,8 @@ export default function AnimalDetailScreen() {
               <Ionicons name="warning-outline" size={16} color="#E67E22" />
               <Text style={styles.lostCollarText}>
                 {location.device_status === 'lost'
-                  ? 'Collier déclaré égaré — position de l’équipement seul, pas de l’animal.'
-                  : 'Matériel seul — position non garantie de l’animal.'}
+                  ? 'Collar reported lost — position of the equipment only, not the animal.'
+                  : 'Equipment only — position is not guaranteed to be the animal’s.'}
               </Text>
             </View>
           )}
@@ -534,23 +534,23 @@ export default function AnimalDetailScreen() {
 
           <View style={styles.gpsTimestamps}>
             <View style={styles.gpsMetaRow}>
-              <Text style={styles.gpsMetaLabel}>Position fixée :</Text>
+              <Text style={styles.gpsMetaLabel}>Position fix:</Text>
               <Text style={styles.gpsMetaValue}>
                 {location?.position_time
                   ? `${format(parseISO(location.position_time), 'dd/MM/yyyy HH:mm')} (${timeAgo(location.position_time)})`
                   : position?.position_time
                   ? `${timeAgo(position.position_time)}`
-                  : 'Aucune position'}
+                  : 'No position'}
               </Text>
             </View>
             <View style={styles.gpsMetaRow}>
-              <Text style={styles.gpsMetaLabel}>Dernière télémétrie :</Text>
+              <Text style={styles.gpsMetaLabel}>Last telemetry:</Text>
               <Text style={styles.gpsMetaValue}>
                 {latestRecord?.time
                   ? `${format(parseISO(latestRecord.time), 'dd/MM/yyyy HH:mm')} (${timeAgo(latestRecord.time)})`
                   : animal.last_update
                   ? timeAgo(animal.last_update)
-                  : 'Aucune trame'}
+                  : 'No data received'}
               </Text>
             </View>
           </View>
@@ -562,7 +562,7 @@ export default function AnimalDetailScreen() {
               activeOpacity={0.7}
             >
               <Ionicons name="navigate-outline" size={16} color="#fff" />
-              <Text style={styles.locateMapBtnText}>Localiser & Voir le trajet sur la carte</Text>
+              <Text style={styles.locateMapBtnText}>Locate & show the track on the map</Text>
             </TouchableOpacity>
           )}
         </View>

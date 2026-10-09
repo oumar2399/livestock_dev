@@ -48,7 +48,7 @@ def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Token invalide ou expiré",
+        detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -107,7 +107,7 @@ def require_roles(*roles: str):
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Accès refusé. Rôles requis : {', '.join(roles)}",
+                detail=f"Access denied. Required roles: {', '.join(roles)}",
             )
         return current_user
     return _check

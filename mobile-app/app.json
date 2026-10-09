@@ -18,8 +18,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "jp.research.livestock",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Nécessaire pour afficher votre position sur la carte du troupeau.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Utilisée pour les alertes géofencing en arrière-plan."
+        "NSLocationWhenInUseUsageDescription": "Required to show your position on the herd map.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Used for background geofencing alerts."
       }
     },
     "android": {

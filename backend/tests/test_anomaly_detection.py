@@ -131,7 +131,7 @@ def test_anomaly_detection_flow():
         assert alert_low is not None, "Alert should be triggered for extreme low activity!"
         assert alert_low.type == AlertType.ACTIVITY_DEVIATION_LOW.value
         assert alert_low.severity == AlertSeverity.CRITICAL.value  # Z >= 4.5
-        assert "% vs habitude" in alert_low.message
+        assert "% vs baseline" in alert_low.message
         assert "-80.0%" in alert_low.message  # Native signed negative format
         
         # Verify no medical diagnosis terms in message
@@ -223,7 +223,7 @@ def test_anomaly_detection_flow():
         alert_zero = evaluate_animal_anomaly(db, animal_zero.id, target_date, z_threshold=3.0)
         assert alert_zero is not None
         assert alert_zero.type == AlertType.ACTIVITY_DEVIATION_HIGH.value
-        assert "pts vs habitude" in alert_zero.message
+        assert "pts vs baseline" in alert_zero.message
         assert "+15.0 pts" in alert_zero.message
         # Identical baseline (MAD = MeanAD = 0): no Z-score, warning on a >= 5 pt change.
         assert alert_zero.severity == AlertSeverity.WARNING.value

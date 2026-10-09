@@ -122,9 +122,9 @@ Cette architecture LoRaWAN est **proposée et documentée**, mais **pas encore i
 
 État retenu pour la documentation courante :
 
-- **703 tests backend réussis, 0 échec, 0 ignoré** — commit `6c5f786` + modifications Phase 2 et 3 non commitées ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-08 13:02 +0900 ;
-- **130 tests mobile réussis, 0 échec** — commit `6c5f786` + modifications Phase 2 et 3 non commitées ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-08 13:00 +0900 ;
-- TypeScript vérifié sans erreur (`tsc --noEmit`, même commit, 2026-10-08 13:00 +0900) ;
+- **724 tests backend réussis, 0 échec, 0 ignoré**, `alembic check` propre — commit `001d99a` + Phase 4 groupe D et correctifs de revue non commités ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-09 22:20–22:22 +0900 ;
+- **161 tests mobile réussis, 0 échec** — même arbre ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-09 22:21 +0900 ;
+- TypeScript vérifié sans erreur (`tsc --noEmit`, même arbre, 2026-10-09 22:21 +0900) ;
 - schéma / migrations Alembic **réconciliés** depuis B1 (`bc03c42`), `alembic check` propre.
 
 Les anciens nombres de tests (`43`, `54`, `57`, `61`, `73`, `76`, etc.) restent uniquement des **résultats historiques de lots ou de campagnes intermédiaires**. Ils ne doivent pas être utilisés comme total courant.
@@ -557,6 +557,13 @@ Phase 3 (test d’acceptation du 2026-10-07) :
 - rôles par ferme : **owner** = tous les droits de la ferme, y compris les membres ; **farmer** = droits opérationnels (troupeau, colliers, zones, alertes, feedback, notes d’observation pour le vétérinaire), sans gestion des membres ; **vet** = lecture + écriture vétérinaire complète, sans traitement d’alertes ni feedback (sa conclusion est le statut du dossier) ;
 - fermes créées par l’admin seulement, qui invite ensuite le propriétaire ; inscription publique fermée par défaut (`PUBLIC_REGISTRATION_ENABLED`) ; premier admin par `scripts/create_admin.py` ;
 - écran Users : boutons « Change role » et « Revoke » par membre, « You » sur sa propre ligne.
+
+Phase 4 (expérience utilisateur, test d’acceptation du 2026-10-07) — groupes A–C commités (`8a54fb7`, `001d99a`), groupe D (traduction restante) relu, ses 7 problèmes corrigés le 2026-10-09, non commité :
+
+- popups et dialogues unifiés, Save en haut à droite et en bas, champs au-dessus du clavier, sélecteurs avec recherche, liste du troupeau compacte, suppression d’un point de zone, tableaux de rapports dimensionnés selon leur contenu, « App & Server » en lecture seule (architecture §12.1d) ;
+- feedback de prédiction : `correction` = code `active/resting/grazing/walking/lying/running` ; anciennes valeurs stockées acceptées ; toute autre valeur → 422 ; pas de migration ;
+- textes affichés en anglais, gardes anti-français sur l’appli (`guard-french.test.cjs`) et les messages du backend (`test_guard_french.py`) ;
+- détail, décisions, revue : `docs/acceptance_results_2026-10-07.md` ; liste des textes traduits et re-test manuel : `docs/phase4_strings_and_recheck_2026-10-09.md`.
 
 Correctifs Phase 2 (test d’acceptation du 2026-10-07) :
 

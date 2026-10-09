@@ -78,14 +78,14 @@ export default function SettingsScreen() {
   };
 
   return (
-    <DrawerScreenBase title="Paramètres">
+    <DrawerScreenBase title="Settings">
       <ScrollView contentContainerStyle={styles.content}>
         {/* Notifications */}
-        <Text style={styles.sectionTitle}>Notifications Push</Text>
+        <Text style={styles.sectionTitle}>Push Notifications</Text>
         <View style={styles.settingRow}>
           <View style={styles.rowLabelContainer}>
             <Ionicons name="notifications-outline" size={20} color={Colors.text.primary} />
-            <Text style={styles.settingLabel}>Activer les alertes push</Text>
+            <Text style={styles.settingLabel}>Enable push alerts</Text>
           </View>
           {isPrefsLoading ? (
             <ActivityIndicator size="small" color={Colors.primary} />
@@ -102,7 +102,7 @@ export default function SettingsScreen() {
         {enabled && (
           <>
             <View style={styles.cardBlock}>
-              <Text style={styles.subTitle}>Sévérité minimale</Text>
+              <Text style={styles.subTitle}>Minimum severity</Text>
               <View style={styles.chipRow}>
                 {(['info', 'warning', 'critical'] as const).map((sev) => {
                   const isSelected = minSeverity === sev;
@@ -130,13 +130,13 @@ export default function SettingsScreen() {
             </View>
 
             <View style={styles.cardBlock}>
-              <Text style={styles.subTitle}>Catégories autorisées</Text>
+              <Text style={styles.subTitle}>Allowed categories</Text>
               <View style={styles.categoryGrid}>
                 {[
-                  { id: 'geofence', label: 'Géofencing', icon: 'map-outline' },
-                  { id: 'health', label: 'Santé / Activité', icon: 'fitness-outline' },
-                  { id: 'battery', label: 'Batterie', icon: 'battery-charging-outline' },
-                  { id: 'offline', label: 'Hors-ligne', icon: 'cloud-offline-outline' },
+                  { id: 'geofence', label: 'Geofencing', icon: 'map-outline' },
+                  { id: 'health', label: 'Health / Activity', icon: 'fitness-outline' },
+                  { id: 'battery', label: 'Battery', icon: 'battery-charging-outline' },
+                  { id: 'offline', label: 'Offline', icon: 'cloud-offline-outline' },
                 ].map((item) => {
                   const isChecked = categories.includes(item.id);
                   return (
@@ -167,7 +167,7 @@ export default function SettingsScreen() {
         )}
 
         {/* Connexion */}
-        <Text style={styles.sectionTitle}>Connexion</Text>
+        <Text style={styles.sectionTitle}>Connection</Text>
         {[
           { label: 'API Server', value: 'config.ts → API_BASE_URL' },
           { label: 'Request Timeout', value: '15 seconds' },
@@ -182,13 +182,13 @@ export default function SettingsScreen() {
         ))}
 
         {/* Seuils */}
-        <Text style={styles.sectionTitle}>Seuils d'alerte</Text>
+        <Text style={styles.sectionTitle}>Alert Thresholds</Text>
         {[
           { label: 'Battery Warning', value: '< 20%' },
           { label: 'Battery Critical', value: '< 10%' },
           { label: 'Device Offline', value: '> 30 min' },
-          { label: 'Inactivity Alert', value: '< 30% pendant 6h' },
-          { label: 'Herd Isolation', value: '> 3 km du centre' },
+          { label: 'Inactivity Alert', value: '< 30% over 6h' },
+          { label: 'Herd Isolation', value: '> 3 km from center' },
         ].map(({ label, value }) => (
           <View key={label} style={styles.settingRow}>
             <Text style={styles.settingLabel}>{label}</Text>

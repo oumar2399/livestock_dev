@@ -212,7 +212,7 @@ def test_cross_farm_and_animal_alert_validation(db, vet_setup):
             ),
         )
     msg1 = getattr(excinfo.value, "detail", str(excinfo.value))
-    assert "n'appartient pas à la ferme" in msg1
+    assert "does not belong to farm" in msg1
 
     # 2. Alerte d'une autre ferme/animal rejetée
     with pytest.raises(Exception) as excinfo_alert:
@@ -227,7 +227,7 @@ def test_cross_farm_and_animal_alert_validation(db, vet_setup):
             ),
         )
     msg2 = getattr(excinfo_alert.value, "detail", str(excinfo_alert.value))
-    assert "n'appartient pas" in msg2
+    assert "does not belong" in msg2
 
 
 def test_clinical_neutrality_no_auto_feedback(db, vet_setup):

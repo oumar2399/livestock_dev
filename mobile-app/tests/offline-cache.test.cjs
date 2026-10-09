@@ -227,12 +227,12 @@ test('formatTimeAgo calculates friendly text', () => {
     },
   });
 
-  assert.equal(formatTimeAgo(null), 'inconnue');
-  assert.equal(formatTimeAgo(undefined), 'inconnue');
+  assert.equal(formatTimeAgo(null), 'unknown');
+  assert.equal(formatTimeAgo(undefined), 'unknown');
 
   const now = Date.now();
-  assert.equal(formatTimeAgo(new Date(now - 10_000).toISOString()), 'à l\'instant');
-  assert.equal(formatTimeAgo(new Date(now - 15 * 60_000).toISOString()), 'il y a 15 min');
-  assert.equal(formatTimeAgo(new Date(now - 2 * 3600_000).toISOString()), 'il y a 2 h');
-  assert.equal(formatTimeAgo(new Date(now - 3 * 86400_000).toISOString()), 'il y a 3 j');
+  assert.equal(formatTimeAgo(new Date(now - 10_000).toISOString()), 'just now');
+  assert.equal(formatTimeAgo(new Date(now - 15 * 60_000).toISOString()), '15 min ago');
+  assert.equal(formatTimeAgo(new Date(now - 2 * 3600_000).toISOString()), '2 h ago');
+  assert.equal(formatTimeAgo(new Date(now - 3 * 86400_000).toISOString()), '3 d ago');
 });

@@ -265,7 +265,7 @@ def test_untimed_archives_mandatory_label(reports_env):
 
     untimed = data["untimed_summary"]
     assert untimed["untimed_count"] >= 1
-    assert untimed["mandatory_label"] == "Archives reçues par les colliers rattachés à cette ferme à la réception"
+    assert untimed["mandatory_label"] == "Archives received by collars attached to this farm at reception"
 
 
 def test_alert_metrics_and_resolution_window(reports_env):

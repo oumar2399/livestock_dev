@@ -112,6 +112,8 @@ async function renderAlerts(permissions) {
   const Component = loadTypeScript(path.join(SRC, 'screens/AlertsListScreen.tsx'), {
     ...sharedUiOverrides(native),
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
+    // Phase 4: the Alerts header has its own menu button (the tab header is hidden).
+    '@react-navigation/native': { useNavigation: () => ({ dispatch: mock.fn() }), DrawerActions: { openDrawer: () => ({}) } },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     '../hooks/useAlerts': {
       useAlerts: () => ({ data: { total: 1, alerts: [alert], unresolved_count: 1 }, isLoading: false,

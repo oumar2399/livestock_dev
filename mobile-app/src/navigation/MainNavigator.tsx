@@ -143,8 +143,10 @@ export default function MainNavigator() {
       <Tab.Screen
         name="Alerts"
         component={AlertsNavigator}
+        // Header drawn by AlertsListScreen (ScreenHeader with the menu button), as for the Herd tab.
         options={{
           tabBarLabel: 'Alerts',
+          headerShown: false,
           tabBarBadge: unresolvedCount > 0 ? unresolvedCount : undefined,
           tabBarBadgeStyle: styles.tabBadge,
         }}

@@ -698,6 +698,13 @@ L’admin plateforme a l’union de toutes les permissions. Création de ferme :
 - Indicateurs (`config.py`) : hors ligne si rien reçu depuis > 30 min ; batterie ≤ 25 % (la puce d’alimentation du M5 ne donne que 0/25/50/75/100 %) ; pas de fix GPS > 60 min ; batterie illisible > 60 min. **Indicateurs seulement** : « lost » reste confirmé par une personne (géofencing et qualité des données en dépendent). Le seuil hors ligne est à revoir pour les intervalles d’émission LoRaWAN.
 - Écran Détail du collier (statut, vu pour la dernière fois, batterie, dernière position avec « Show on map », animal) ; sélection du collier dans le formulaire animal limitée aux colliers libres de la ferme.
 
+## 12.1d Expérience utilisateur et feedback (Phase 4)
+
+- Composants partagés (`mobile-app/src/components/`) : `dialog.tsx` (`showDialog`, mêmes arguments que `Alert.alert`, file d’attente, bouton retour Android = Cancel ou OK) ; `AppModal.tsx` (cadre unique des popups : Close à gauche, action principale en haut à droite, pied de page optionnel ; un dialogue ouvert par-dessus une popup est dessiné dans celle-ci, iOS ne superposant pas deux modales) ; `KeyboardAwareForm.tsx` (champs gardés au-dessus du clavier par mesure du recouvrement réel, compatible Android edge-to-edge) ; `SearchablePicker.tsx` (recherche nom, boucle d’oreille, ID).
+- Formulaires : Save en haut à droite **et** en bas. « App & Server » en lecture seule (seule l’action admin « Run daily pipeline » agit).
+- Feedback de prédiction : l’appli envoie un code stable `active`, `resting`, `grazing`, `walking`, `lying`, `running` et affiche un libellé anglais. `POST /feedback/predictions` n’accepte que ces codes et les valeurs stockées avant la Phase 4 (`Active`, `Resting`, `Grazing (Pâturage)`, `Walking (Marche)`, `Lying (Couché)`, `Running (Course)`), sinon **422** (`app/schemas/feedback.py`, `ALLOWED_CORRECTIONS`). Pas de migration ; correspondance ancienne valeur → code : `mobile-app/src/utils/feedbackLabels.ts` et `docs/acceptance_results_2026-10-07.md`.
+- Textes affichés en anglais (Phase 4, A14) ; les lignes déjà en base (titres d’alertes, notifications) gardent leur texte d’origine.
+
 ## 12.2 Écrans / domaines existants
 
 - Dashboard ;

@@ -92,11 +92,11 @@ export default function FarmOnboardingScreen() {
   const steps: StepItem[] = [
     {
       id: 'farm',
-      title: '1. Création de votre ferme',
-      description: 'Définissez le nom, l’adresse et la superficie de votre exploitation.',
+      title: '1. Farm creation',
+      description: 'Set the name, address and size of your farm.',
       completed: hasFarm,
-      completedDetail: farm ? `${farm.name} (${farm.size_hectares ? `${farm.size_hectares} ha` : 'Superficie non renseignée'})` : undefined,
-      actionLabel: hasFarm ? 'Modifier' : 'Créer ma ferme',
+      completedDetail: farm ? `${farm.name} (${farm.size_hectares ? `${farm.size_hectares} ha` : 'Size not provided'})` : undefined,
+      actionLabel: hasFarm ? 'Edit' : 'Create my farm',
       actionIcon: hasFarm ? 'create-outline' : 'add-circle-outline',
       onPress: () => {
         if (hasFarm || !canCreateFarm) {
@@ -109,11 +109,11 @@ export default function FarmOnboardingScreen() {
     },
     {
       id: 'animals',
-      title: '2. Enregistrement du premier animal',
-      description: 'Ajoutez un bovin, ovin ou caprin à votre cheptel pour démarrer le suivi.',
+      title: '2. Register the first animal',
+      description: 'Add cattle, sheep or goats to your herd to start tracking.',
       completed: hasAnimals,
-      completedDetail: hasAnimals ? `${animalsCount} animal(s) enregistré(s)` : undefined,
-      actionLabel: hasAnimals ? 'Voir le cheptel' : 'Ajouter un animal',
+      completedDetail: hasAnimals ? `${animalsCount} registered animal(s)` : undefined,
+      actionLabel: hasAnimals ? 'View herd' : 'Add an animal',
       actionIcon: hasAnimals ? 'list-outline' : 'paw-outline',
       onPress: () => {
         if (hasAnimals) {
@@ -128,31 +128,31 @@ export default function FarmOnboardingScreen() {
     },
     {
       id: 'collar',
-      title: '3. Association d’un collier M5Stack',
-      description: 'Rattachez un boîtier télémétrique autorisé à un animal pour collecter positions et activités.',
+      title: '3. M5Stack collar association',
+      description: 'Attach an authorized telemetry device to an animal to collect positions and activities.',
       completed: hasCollar,
-      completedDetail: hasCollar ? `${assignedDevicesCount} animal(s) équipé(s)` : undefined,
-      actionLabel: 'Gérer les colliers',
+      completedDetail: hasCollar ? `${assignedDevicesCount} equipped animal(s)` : undefined,
+      actionLabel: 'Manage collars',
       actionIcon: 'hardware-chip-outline',
       onPress: () => navigation.navigate('Devices'),
     },
     {
       id: 'geofence',
-      title: '4. Périmètre de pâturage & danger',
-      description: 'Délimitez les zones autorisées sur la carte pour activer les alertes automatiques de franchissement.',
+      title: '4. Pasture & danger perimeters',
+      description: 'Draw the allowed zones on the map to turn on automatic boundary-crossing alerts.',
       completed: hasGeofence,
-      completedDetail: hasGeofence ? `${geofencesCount} zone(s) configurée(s)` : undefined,
-      actionLabel: 'Définir une zone',
+      completedDetail: hasGeofence ? `${geofencesCount} configured zone(s)` : undefined,
+      actionLabel: 'Set a zone',
       actionIcon: 'map-outline',
       onPress: () => navigation.navigate('Geofence'),
     },
     {
       id: 'team',
-      title: '5. Invitation de l’équipe',
-      description: 'Associez un berger ou un vétérinaire pour partager l’accès aux alertes et au suivi.',
+      title: '5. Team invitation',
+      description: 'Add a shepherd or veterinarian to share access to alerts and tracking.',
       completed: hasTeam,
-      completedDetail: hasTeam ? `${membersCount} membre(s) actifs` : undefined,
-      actionLabel: 'Gérer les membres',
+      completedDetail: hasTeam ? `${membersCount} active member(s)` : undefined,
+      actionLabel: 'Manage members',
       actionIcon: 'people-outline',
       onPress: () => navigation.navigate('Users'),
     },
@@ -163,8 +163,8 @@ export default function FarmOnboardingScreen() {
 
   return (
     <DrawerScreenBase
-      title="Guide d'installation"
-      subtitle="Mise en route pas-à-pas"
+      title="Setup guide"
+      subtitle="Step-by-step setup"
     >
       <ScrollView
         style={styles.container}
@@ -181,9 +181,9 @@ export default function FarmOnboardingScreen() {
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
             <View>
-              <Text style={styles.progressTitle}>Progression de la mise en service</Text>
+              <Text style={styles.progressTitle}>Setup progress</Text>
               <Text style={styles.progressSubtitle}>
-                {completedCount} sur {steps.length} étapes validées ({progressPct}%)
+                {completedCount} out of {steps.length} steps completed ({progressPct}%)
               </Text>
             </View>
             <View style={styles.progressBadge}>
@@ -196,7 +196,7 @@ export default function FarmOnboardingScreen() {
           </View>
 
           <Text style={styles.progressHint}>
-            Chaque étape est indépendante. Vous pouvez quitter et reprendre ce parcours à tout moment sans rien perdre.
+            Each step is independent. You can leave and resume this guide at any time without losing anything.
           </Text>
         </View>
 
@@ -273,7 +273,7 @@ export default function FarmOnboardingScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="speedometer-outline" size={20} color="#fff" />
-            <Text style={styles.dashboardBtnText}>Accéder au Tableau de Bord</Text>
+            <Text style={styles.dashboardBtnText}>Go to Dashboard</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

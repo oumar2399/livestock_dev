@@ -302,8 +302,8 @@ def dispatch_pending_notifications(
             continue
 
         # Préparation du contenu non sensible
-        title = f"Alerte {alert.severity.upper()} : {alert.type}"
-        body = f"Alerte détectée pour l'animal #{alert.animal_id}."
+        title = f"{alert.severity.upper()} alert: {alert.type}"
+        body = f"Alert detected for animal #{alert.animal_id}."
         data = {
             "alert_id": alert.id,
             "animal_id": alert.animal_id,

@@ -363,7 +363,7 @@ export function isAlertAcknowledged(alert: Alert): boolean {
 
 // ─── Dates ────────────────────────────────────────────────────────────────────
 
-/** Formate une date ISO en français "Il y a 5 minutes" */
+/** ISO date as relative English text, e.g. "5 minutes ago" */
 export function timeAgo(isoDate: string | null): string {
   if (!isoDate) return '–';
   try {
@@ -373,7 +373,7 @@ export function timeAgo(isoDate: string | null): string {
   }
 }
 
-/** Formate une date ISO en "14 mars 2024, 10:30" */
+/** ISO date as English date and time, e.g. "Mar 14, 2024, 10:30" */
 export function formatDateTime(isoDate: string | null): string {
   if (!isoDate) return '–';
   try {
@@ -400,7 +400,7 @@ export function dangerZonePresence(alert: Pick<Alert, 'type' | 'alert_metadata'>
   return lines;
 }
 
-/** Formate une date ISO en "14/03/2024" */
+/** ISO date as "03/14/2024" (month/day/year, independent of the phone language) */
 export function formatDate(isoDate: string | null): string {
   if (!isoDate) return '–';
   try {

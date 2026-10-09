@@ -14,8 +14,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { format, parseISO } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 
 import { useAlerts, useAcknowledgeAlert, useResolveAlert } from '../hooks/useAlerts';
 import { useSubmitAlertFeedback } from '../hooks/useFeedback';
@@ -233,7 +234,7 @@ function AlertCard({ alert, onAcknowledge, onResolve, isProcessing, canManage, c
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AlertsListScreen() {
-
+  const navigation = useNavigation<any>();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | 'all'>('all');
 
@@ -282,9 +283,12 @@ export default function AlertsListScreen() {
   return (
     // ScreenHeader already adds the top safe area: no second inset here.
     <View style={styles.screen}>
+      {/* The only header of the Alerts tab (the tab header is hidden), with the menu button. */}
       <ScreenHeader
         title="Alerts"
-        subtitle={unresolvedCount > 0 ? `${unresolvedCount} unresolved${unresolvedCount > 1 ? 's' : ''}` : 'All clear'}
+        subtitle={unresolvedCount > 0 ? `${unresolvedCount} unresolved` : 'All clear'}
+        onBack={() => navigation.dispatch(DrawerActions.openDrawer())}
+        backIcon="menu-outline"
       />
 
       {/* Filtres statut */}

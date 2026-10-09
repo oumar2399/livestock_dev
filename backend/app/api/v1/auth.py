@@ -93,7 +93,7 @@ def login(
     if not user or not verify_password(login_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
+            detail="Incorrect email or password",
         )
 
     # Mettre à jour last_login
@@ -110,13 +110,13 @@ def reset_password(
     db: Session = Depends(get_db)
 ):
     if len(data.password) < 6:
-        raise HTTPException(status_code=400, detail="Mot de passe min 6 caractères")
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        raise HTTPException(status_code=404, detail="User not found")
     user.password_hash = hash_password(data.password)
     db.commit()
-    return {"message": f"Mot de passe de {user.email} réinitialisé"}
+    return {"message": f"Password reset for {user.email}"}
 
 # ─── POST /auth/login/form ────────────────────────────────────────────────────
 # Compatible OAuth2PasswordRequestForm (Swagger UI "Authorize" button)
@@ -132,7 +132,7 @@ def login_form(
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
+            detail="Incorrect email or password",
         )
 
     user.last_login = datetime.utcnow()
@@ -174,7 +174,7 @@ def register(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Un compte existe déjà avec l'email {data.email}",
+            detail=f"An account with email {data.email} already exists",
         )
 
     # Créer user
@@ -209,7 +209,7 @@ def refresh_token(
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token invalide ou expiré",
+            detail="Invalid or expired refresh token",
         )
 
     user_id = payload.get("sub")
@@ -218,7 +218,7 @@ def refresh_token(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Utilisateur introuvable",
+            detail="User not found",
         )
 
     return _make_token_response(user)
@@ -264,7 +264,7 @@ def update_me(
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Le mot de passe actuel est incorrect",
+                detail="Current password is incorrect",
             )
         current_user.password_hash = hash_password(data.password)
 
@@ -302,7 +302,7 @@ def update_user_role(
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        raise HTTPException(status_code=404, detail="User not found")
 
     user.role = data.role
     db.commit()
@@ -326,20 +326,20 @@ def delete_user(
     if user_id == current_user.id:
         raise HTTPException(
             status_code=400,
-            detail="Impossible de supprimer votre propre compte"
+            detail="Cannot delete your own account"
         )
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        raise HTTPException(status_code=404, detail="User not found")
 
     owned_farm = db.query(Farm.id).filter(Farm.owner_id == user_id).first()
     if owned_farm:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                f"Cet utilisateur possède encore la ferme {owned_farm[0]}. "
-                "Transférez sa propriété avant de supprimer le compte."
+                f"This user still owns farm {owned_farm[0]}. "
+                "Transfer ownership before deleting the account."
             ),
         )
 
@@ -367,8 +367,8 @@ def delete_user(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    f"Cet utilisateur est le dernier owner actif de la ferme "
-                    f"{membership.farm_id}. Ajoutez un autre owner avant de supprimer le compte."
+                    f"This user is the last active owner of farm "
+                    f"{membership.farm_id}. Add another owner before deleting the account."
                 ),
             )
 

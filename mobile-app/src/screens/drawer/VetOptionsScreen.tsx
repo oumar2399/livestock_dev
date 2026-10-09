@@ -25,6 +25,7 @@ import { VeterinaryCase, VeterinaryEntry } from '../../api/veterinary';
 import { selectedFarmRole } from '../../utils/selectedFarmRole';
 import { entryTypeLabel } from '../../utils/veterinaryLabels';
 import { showApiError } from '../../utils/apiErrors';
+import { formatDate, formatDateTime } from '../../utils/helpers';
 import { showDialog } from '../../components/dialog';
 import AppModal, { ModalButton } from '../../components/AppModal';
 import SearchablePicker, { animalOption } from '../../components/SearchablePicker';
@@ -299,7 +300,7 @@ export default function VetOptionsScreen() {
                   <Text style={styles.detailOpener}>Opened by a previous farm — read only. Open a new case to continue.</Text>
                 )}
                 <Text style={styles.detailDate}>
-                  Date: {new Date(caseDetail.opened_at).toLocaleDateString()}
+                  Date: {formatDate(caseDetail.opened_at)}
                 </Text>
 
                 {isVetOrAdmin && !caseReadOnly && (
@@ -354,7 +355,7 @@ export default function VetOptionsScreen() {
                         {entryTypeLabel(entry.entry_type)}
                       </Text>
                       <Text style={styles.entryDate}>
-                        {new Date(entry.occurred_at).toLocaleString()}
+                        {formatDateTime(entry.occurred_at)}
                       </Text>
                     </View>
                     <Text style={styles.entryContent}>{entry.content}</Text>

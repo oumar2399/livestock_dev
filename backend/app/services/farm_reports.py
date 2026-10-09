@@ -274,11 +274,11 @@ def get_farm_overview_data(
     denominator_seconds = calculate_proven_tracking_denominator(proven_periods, start_utc, eff_end_utc)
 
     limitations = [
-        "La part d'activité représente la part des fenêtres classées observées et non un temps total sur 24h.",
-        "Les données sans preuve historique de rattachement à la ferme sont exclues de ce bilan.",
+        "The activity share represents the share of observed classified windows and not a total time over 24h.",
+        "Data without historical proof of attachment to the farm is excluded from this summary.",
     ]
     if date_to >= now.astimezone(TARGET_TZ).date():
-        limitations.append("Journée courante bornée à l'heure du rapport pour ne pas compter les heures futures comme manquantes.")
+        limitations.append("Current day bounded to the report time to not count future hours as missing.")
 
     start_naive = start_utc.replace(tzinfo=None)
     eff_end_naive = eff_end_utc.replace(tzinfo=None)
@@ -321,7 +321,7 @@ def get_farm_overview_data(
             dated_coverage_ratio=None,
             behavioral_coverage_seconds=0.0,
             behavioral_coverage_ratio=None,
-            behavior_breakdown={"active_count": 0, "resting_count": 0, "active_ratio": None, "label": "part des fenêtres classées observées"},
+            behavior_breakdown={"active_count": 0, "resting_count": 0, "active_ratio": None, "label": "share of observed classified windows"},
             gps_presence_ratio=None,
             behavioral_exclusions={},
             reception_delay={"median_seconds": None, "p95_seconds": None, "negative_anomalies_count": 0},
@@ -401,7 +401,7 @@ def get_farm_overview_data(
             scope_status = MetricState.PARTIAL
         if unqualified_windows:
             limitations.append(
-                f"{unqualified_windows} fenetres a profil ou heure non qualifies : conservees dans les comptes, exclues des durees de couverture fiable."
+                f"{unqualified_windows} unqualified profile or time windows: kept in counts, excluded from reliable coverage durations."
             )
 
         period_summary = FarmPeriodSummary(
@@ -421,7 +421,7 @@ def get_farm_overview_data(
                 "active_count": active_count,
                 "resting_count": resting_count,
                 "active_ratio": active_ratio,
-                "label": "part des fenêtres classées observées",
+                "label": "share of observed classified windows",
             },
             gps_presence_ratio=gps_ratio,
             behavioral_exclusions=exclusions,
@@ -461,7 +461,7 @@ def get_farm_overview_data(
         untimed_count=sum(r[2] for r in untimed_rows),
         breakdown_by_reason=reason_breakdown,
         breakdown_by_attribution=attribution_breakdown,
-        mandatory_label="Archives reçues par les colliers rattachés à cette ferme à la réception",
+        mandatory_label="Archives received by collars attached to this farm at reception",
     )
 
     return FarmOverviewResponse(

@@ -345,14 +345,14 @@ function AnimalInfoSheet({
               color={showTrack ? '#fff' : Colors.primary}
             />
             <Text style={[styles.trackToggleBtnText, showTrack && styles.trackToggleBtnTextActive]}>
-              {showTrack ? 'Masquer trajet' : 'Voir trajet GPS'}
+              {showTrack ? 'Hide track' : 'Show GPS track'}
             </Text>
           </TouchableOpacity>
 
           {showTrack && (
             <TouchableOpacity style={styles.fitTrackBtn} onPress={onFitTrack} activeOpacity={0.7}>
               <Ionicons name="scan-outline" size={16} color={Colors.primary} />
-              <Text style={styles.fitTrackBtnText}>Centrer trajet</Text>
+              <Text style={styles.fitTrackBtnText}>Center track</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -373,12 +373,12 @@ function AnimalInfoSheet({
 
             <View style={styles.trackSummaryMeta}>
               {isHistoryLoading ? (
-                <Text style={styles.trackSummaryText}>Chargement...</Text>
+                <Text style={styles.trackSummaryText}>Loading...</Text>
               ) : historyData ? (
                 <Text style={styles.trackSummaryText}>
                   {historyData.total_points} pts
-                  {historyData.proven_coverage_ratio != null ? ` · ${Math.round(historyData.proven_coverage_ratio * 100)}% couv.` : ''}
-                  {historyData.gaps.length > 0 ? ` · ${historyData.gaps.length} coupure(s)` : ''}
+                  {historyData.proven_coverage_ratio != null ? ` · ${Math.round(historyData.proven_coverage_ratio * 100)}% cov.` : ''}
+                  {historyData.gaps.length > 0 ? ` · ${historyData.gaps.length} gap(s)` : ''}
                 </Text>
               ) : null}
             </View>
@@ -389,15 +389,15 @@ function AnimalInfoSheet({
       {/* Timestamps distincts : Position vs Télémétrie (Lot B) */}
       <View style={styles.timestampContainer}>
         <View style={styles.timestampRow}>
-          <Text style={styles.timestampLabel}>Position fixée :</Text>
+          <Text style={styles.timestampLabel}>Position fix:</Text>
           <Text style={styles.timestampValue}>
-            {point.position_time ? timeAgo(point.position_time) : 'Inconnue'}
+            {point.position_time ? timeAgo(point.position_time) : 'Unknown'}
           </Text>
         </View>
         <View style={styles.timestampRow}>
-          <Text style={styles.timestampLabel}>Dernière télémétrie :</Text>
+          <Text style={styles.timestampLabel}>Last telemetry:</Text>
           <Text style={styles.timestampValue}>
-            {point.last_update ? timeAgo(point.last_update) : 'Inconnue'}
+            {point.last_update ? timeAgo(point.last_update) : 'Unknown'}
           </Text>
         </View>
       </View>

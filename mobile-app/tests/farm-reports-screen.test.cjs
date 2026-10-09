@@ -50,7 +50,7 @@ async function harness(options = {}) {
         dated_coverage_ratio: 0.5,
         behavioral_coverage_seconds: 40000,
         behavioral_coverage_ratio: 0.463,
-        behavior_breakdown: { active_count: 600, resting_count: 600, active_ratio: 0.5, label: 'part des fenêtres classées observées' },
+        behavior_breakdown: { active_count: 600, resting_count: 600, active_ratio: 0.5, label: 'share of observed classified windows' },
         gps_presence_ratio: 0.95,
         behavioral_exclusions: {},
         reception_delay: { median_seconds: 2.1, p95_seconds: 4.5, negative_anomalies_count: 0 },
@@ -58,15 +58,15 @@ async function harness(options = {}) {
         alerts_triggered_in_period: 2,
         alerts_resolved_in_period: 2,
         limitations: [
-          'La part d’activité représente la part des fenêtres classées observées et non un temps total sur 24h.',
-          'Les données sans preuve historique de rattachement à la ferme sont exclues de ce bilan.',
+          'The activity share represents the share of observed classified windows and not a total time over 24h.',
+          'Data without historical proof of attachment to the farm is excluded from this summary.',
         ],
       },
       untimed_summary: {
         untimed_count: 12,
         breakdown_by_reason: {},
         breakdown_by_attribution: {},
-        mandatory_label: 'Archives reçues par les colliers rattachés à cette ferme à la réception',
+        mandatory_label: 'Archives received by collars attached to this farm at reception',
       },
     },
     preview: options.preview || {
@@ -182,7 +182,7 @@ test('renders complete overview, quality, untimed archives, and export for owner
   // Archive v3 avec libellé obligatoire
   assert.match(screenText, /Untimed Archives \(v3\)/);
   assert.match(screenText, /12\s+windows/);
-  assert.match(screenText, /Archives reçues par les colliers rattachés à cette ferme à la réception/);
+  assert.match(screenText, /Archives received by collars attached to this farm at reception/);
 
   // Tableau d'aperçu et bouton d'export
   assert.equal(h.host('PreviewTable').length, 1);

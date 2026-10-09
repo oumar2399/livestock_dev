@@ -1,5 +1,5 @@
 # Livestock Monitoring IoT — Project Overview
-Last updated: 2026-10-04
+Last updated: 2026-10-09
 
 Short version of the two reference documents, meant to be browsed day to day.
 For full detail, open the reference files:
@@ -64,10 +64,12 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 | Veterinary | ✅ | `VeterinaryCase` + append-only entries; status changes journaled (`STATUS CHANGE` in the app); no automatic diagnosis | handoff §8.6 |
 | Reports / data quality | ✅ | provenance periods; `available/no_data/not_computable/partial` | handoff §8.7 |
 | Anomaly detection | 🟡 | daily modified Z (Iglewicz & Hoaglin), Z ≥ 3.5, MeanAD fallback, change ≥ 5 pts; min 10 days history in 20-day window; inactive on new data while `ANOMALY_MIN_COVERAGE_SECONDS` is unset; scheduler off by default | arch §17 |
+| Mobile UX (Phase 4) | 🟡 | one shared dialog and popup frame (Android back closes them); Save at top right and bottom on every form; fields kept above the keyboard; searchable animal / collar pickers; herd search behind a header icon; geofence points removable one by one; report tables sized from content; "App & Server" read-only. UI text in English (French guards on app UI text, `app.json` and backend messages); group D and its review fixes not committed yet; manual re-test pending | `docs/acceptance_results_2026-10-07.md` |
+| Behaviour feedback | ✅ | prediction feedback `correction` = code `active/resting/grazing/walking/lying/running`; values stored before Phase 4 still accepted (mapping in acceptance results); anything else 422; no migration | arch §12.1d |
 | Previews only | — | video, AI assistant, marketplace (no real backend) | arch §12.2 |
 | LoRaWAN | 💡 | documented, not implemented | handoff §13–15 |
 
-**Software checks:** 703 backend tests passed, 0 failed, 0 skipped (commit `6c5f786` + uncommitted Phase 2 and 3 changes; `scripts/run_isolated_tests.py tests` on a disposable database; 2026-10-08 13:02 +0900) · 130 mobile tests passed, 0 failed; TypeScript clean (commit `6c5f786` + uncommitted Phase 2 and 3 changes; from `mobile-app`: `node --test tests/*.test.cjs` and `tsc --noEmit`; 2026-10-08 13:00 +0900) · Alembic reconciled since B1 (`bc03c42`), `alembic check` clean (same backend run).
+**Software checks:** 724 backend tests passed, 0 failed, 0 skipped; `alembic check` clean (commit `001d99a` + uncommitted Phase 4 group D and review fixes; `scripts/run_isolated_tests.py tests` on a disposable database; 2026-10-09 22:20–22:22 +0900) · 161 mobile tests passed, 0 failed; TypeScript clean (same tree; from `mobile-app`: `node --test tests/*.test.cjs` and `tsc --noEmit`; 2026-10-09 22:21 +0900) · Alembic reconciled since B1 (`bc03c42`).
 
 ---
 

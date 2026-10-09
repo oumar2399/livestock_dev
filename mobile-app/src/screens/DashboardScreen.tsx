@@ -421,9 +421,9 @@ export default function DashboardScreen() {
               <Ionicons name="sparkles" size={24} color={Colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.onboardingCtaTitle}>Guide de mise en route</Text>
+              <Text style={styles.onboardingCtaTitle}>Setup guide</Text>
               <Text style={styles.onboardingCtaSub}>
-                Configurez votre exploitation : enregistrez vos premiers animaux, associez vos colliers et délimitez vos zones.
+                Configure your farm: register your first animals, assign collars and delimit your zones.
               </Text>
             </View>
             <Ionicons name="arrow-forward-circle" size={26} color={Colors.primary} />
