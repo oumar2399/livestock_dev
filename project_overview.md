@@ -1,5 +1,5 @@
 # Livestock Monitoring IoT — Project Overview
-Last updated: 2026-10-09
+Last updated: 2026-10-10
 
 Short version of the two reference documents, meant to be browsed day to day.
 For full detail, open the reference files:
@@ -42,6 +42,8 @@ React Native / Expo (Zustand, TanStack Query, react-native-maps)
 **Target field architecture (💡 not built):**
 device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoRaWAN adapter → existing FastAPI services.
 
+**Hardware path (decided 2026-10-10):** the M5Stack is the proof-of-concept platform for the thesis. The field collar comes later (💡 not built): ESP32 + LoRa + GPS, no screen, IMU from the same InvenSense family as the MPU6886 (another IMU family = retrain and revalidate the model). RFID: not now; later an "official ID" field on the animal record.
+
 → Details: architecture §1–§6
 
 ---
@@ -68,8 +70,11 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 | Behaviour feedback | ✅ | prediction feedback `correction` = code `active/resting/grazing/walking/lying/running`; values stored before Phase 4 still accepted (mapping in acceptance results); anything else 422; no migration | arch §12.1d |
 | Previews only | — | video, AI assistant, marketplace (no real backend) | arch §12.2 |
 | LoRaWAN | 💡 | documented, not implemented | handoff §13–15 |
+| Device fleet | 🟡 | current M5 (M5GO) = reference device (development, validated); test devices: M5Stack Core2 v1.0 (MPU6886, AXP192) and M5StickC (model [to verify]); same IMU, different hosts = a "same sensor, different device" test, not identical devices; tests on USB power, battery reported as unknown (255) on those boards for now; firmware plan (💡): one shared core + a small board file per model | handoff §3.1 |
 
 **Software checks:** 724 backend tests passed, 0 failed, 0 skipped; `alembic check` clean (commit `001d99a` + uncommitted Phase 4 group D and review fixes; `scripts/run_isolated_tests.py tests` on a disposable database; 2026-10-09 22:20–22:22 +0900) · 161 mobile tests passed, 0 failed; TypeScript clean (same tree; from `mobile-app`: `node --test tests/*.test.cjs` and `tsc --noEmit`; 2026-10-09 22:21 +0900) · Alembic reconciled since B1 (`bc03c42`).
+
+**Development data (`livestock_dev`):** tracking periods were backfilled with source `history_backfill` (`backend/scripts/backfill_tracking_periods.py --apply`, 2026-10-04; development data only). Only the dry-run output was saved (`docs/backfill_dryrun.txt`); the `--apply` output was not kept. Test data (owner1/owner2, test-farmer-1, test-vet-1, Test Farm A/B, SIM-001) stays until the cleanup in `docs/acceptance_checklist_roles.md` §7. → architecture §10
 
 ---
 
@@ -105,7 +110,7 @@ Evidence files (check they exist in `docs/`): `validation_m5stack_avant_lora.md`
 
 1. No biological validation on target cattle.
 2. Domain shift Japan → Côte d'Ivoire.
-3. Too few physical devices for multi-device validation.
+3. Too few physical devices for multi-device validation: the test boards (Core2, M5StickC) share the IMU but not the host, so they test "same sensor, different device", not identical devices.
 4. LoRaWAN not implemented.
 5. Long-term autonomy not established.
 6. v3 persistence under power loss not validated.
@@ -131,6 +136,8 @@ Evidence files (check they exist in `docs/`): `validation_m5stack_avant_lora.md`
 | Medically neutral decision support | LoRaWAN validated in Côte d'Ivoire |
 | Reproducible technical validation method | Business model validated / West African dataset created |
 
+Claim limit for the model (to state clearly): *evaluated on unseen domains (other animals, other datasets); performance on West African breeds not yet demonstrated.*
+
 Safe gap wording: *"No public IMU dataset matching the targeted West African cattle populations and Ivorian extensive context was identified in our review."*
 
 ---
@@ -147,7 +154,8 @@ Safe gap wording: *"No public IMU dataset matching the targeted West African cat
 | Uplink cadence | compare periodic / batch / event / hybrid |
 | ChirpStack adapter | define webhook + security |
 | CI radio hardware | 868 MHz + ARTCI compliance before purchase |
-| Target dataset | depends on field partnership |
+| Target dataset | depends on field partnership; own labelled data in Côte d'Ivoire later = final test set |
+| Own-device recording | possible short labelled recording on real cattle in Japan, to discuss with the supervisor |
 
 ---
 
@@ -157,7 +165,10 @@ Feature freeze: no new large features.
 
 1. **Consistency:** code ↔ docs audit, full test rerun, pinned versions, archived logs.
 2. **System validation:** endurance (≥100 cycles / 1–2 h), battery, network cuts, M5 qualification of the new HTTP client.
-3. **Science:** metrics, domain-shift protocol (multi-dataset), technical vs biological separation.
+3. **Science:** metrics, domain-shift protocol (multi-dataset), technical vs biological separation. Plans (💡, not results; handoff P-SCI-06/07):
+   - **Step 2 (model):** LOAO baseline with 200 trees; device-matched preprocessing (~5 Hz low-pass, then 10 Hz point sampling); per-class and per-animal metrics; orientation-independent features (ablation); multi-dataset training.
+   - **Data:** train and test on several public datasets (Japanese Black, Versluijs 2023, Morales-Vargas 2025, MmCows); ask the authors of the Nellore (Sci Rep 2022) and Brahman-cross (Sensors 2024) studies for their data; own labelled data in Côte d'Ivoire later as the final test set.
+   - **Evaluation (no African data yet), three levels:** leave-one-animal-out within each dataset; leave-one-dataset-out across datasets; own-device test (possible short labelled recording on real cattle in Japan, to discuss with the supervisor).
 4. **LoRaWAN:** compact contract, adapter, legal radio bench, airtime/autonomy.
 5. **Business:** structured interviews (later, outside thesis core).
 
@@ -185,6 +196,7 @@ Feature freeze: no new large features.
 | Data flows, contracts, components | `project_architecture.md` |
 | LoRaWAN regulation and radio proposals | handoff §13–15 · architecture §20–29 |
 | Business hypotheses | handoff §16–18 |
+| Literature review (Oct 2026): African sensor studies, public datasets, evaluation protocols | `docs/research/review_2026_10_10.md` |
 | Article strategy and datasets | `scientific_article_development_dossier_livestock_monitoring.docx` |
 | Test evidence | `docs/validation_*` |
 | Old full versions | `docs/archive/` |

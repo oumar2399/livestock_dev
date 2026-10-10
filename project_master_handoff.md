@@ -2,7 +2,7 @@
 
 **Master Research — Kobe Institute of Computing (KIC), Graduate School of Information Technology**  
 **Territoire cible : Côte d’Ivoire — élevage bovin extensif / semi-mobile**  
-**Dernière mise à jour : 2026-10-04**
+**Dernière mise à jour : 2026-10-10**
 
 ---
 
@@ -227,6 +227,21 @@ Cette question porte sur **l’intégration, la robustesse, la qualité des donn
 
 **Limite :**
 l’absence de saturation sur le banc ne garantit pas l’absence de saturation en élevage réel.
+
+### 🟢 DECISION — Plateforme de preuve de concept et collier terrain (2026-10-10)
+
+- Le M5Stack est la **plateforme de preuve de concept** de la thèse, pas le collier terrain.
+- Collier terrain (💡 plus tard, non construit) : **ESP32 + LoRa + GPS, sans écran**, IMU de la **même famille InvenSense** que la MPU6886.
+- Une IMU d’une autre famille impose de **réentraîner et revalider** le modèle (plage, filtre, bruit et axes différents).
+- RFID : **pas maintenant**. Plus tard, un champ « identifiant officiel » (official ID) sur la fiche animal.
+
+### 🟡 Parc de devices (2026-10-10)
+
+- **M5 actuel (M5GO) = device de référence** (développement, validé).
+- Devices de test : **M5Stack Core2 v1.0** (MPU6886, AXP192) et **M5StickC (modèle [to verify])**.
+- Même IMU, hôtes différents : c’est un test **« même capteur, device différent »**, pas un test sur devices identiques.
+- Tests sur **alimentation USB** ; batterie rapportée comme inconnue (255) sur ces cartes pour l’instant.
+- 💡 Plan firmware : **un cœur commun**, plus un **petit fichier de carte par modèle**.
 
 ---
 
@@ -863,6 +878,8 @@ Le projet peut défendre :
 - “Le business model est validé.”
 - “Un dataset ouest-africain a été constitué” si aucune collecte correspondante n’est effectivement réalisée.
 
+**Limite à énoncer clairement (2026-10-10) :** le modèle est *évalué sur des domaines non vus* (autres animaux, autres datasets) ; *sa performance sur les races ouest-africaines n’est pas encore démontrée*.
+
 ---
 
 ## 11.3 Gap scientifique — formulation prudente
@@ -1042,6 +1059,47 @@ Deux axes doivent rester distincts :
 - validation vétérinaire.
 
 **Raison :** un système techniquement fiable peut être biologiquement faux, et inversement.
+
+---
+
+## P-SCI-06 — Plan étape 2 : modèle
+
+**Statut :** 💡 PLAN (2026-10-10), non réalisé — le modèle actif (§5.2) est inchangé.
+
+### Plan
+
+1. Baseline **LOAO avec 200 arbres** (aujourd’hui les modèles de fold ont 100 arbres : `docs/work_status_2026-10-04.md` §4, M6).
+2. **Prétraitement aligné sur le device** : filtre passe-bas ~5 Hz puis échantillonnage ponctuel à 10 Hz (aujourd’hui : moyenne par bin de 100 ms à l’entraînement vs points sur le device, M5c).
+3. **Métriques par classe et par animal**, pas seulement la moyenne.
+4. **Features indépendantes de l’orientation**, évaluées en ablation (orientation du collier non définie, M5b).
+5. **Entraînement multi-dataset** (voir P-SCI-07).
+
+### 📌 Basis
+
+- [PROJECT EVIDENCE] `docs/audit_conformance_2026-10.md` (M5b, M5c) ;
+- [SCIENTIFIC LITERATURE] `docs/research/review_2026_10_10.md` (prétraitement, orientation, protocole d’évaluation).
+
+---
+
+## P-SCI-07 — Stratégie données et évaluation
+
+**Statut :** 💡 PLAN (2026-10-10). Aucune donnée africaine disponible pour l’instant.
+
+### Données
+
+- Entraîner **et** tester sur plusieurs datasets publics : Japanese Black (Ito et al.), Versluijs et al. 2023, Morales-Vargas et al. 2025, MmCows (références : §22 S3).
+- Demander leurs données aux auteurs des études **Nellore brésilien** (*Sci. Rep.* 2022) et **Brahman-cross** (*Sensors* 2024).
+- Plus tard, données labellisées propres en Côte d’Ivoire = **jeu de test final** (voir P-SCI-02).
+
+### Évaluation — trois niveaux
+
+1. **Leave-one-animal-out** dans chaque dataset.
+2. **Leave-one-dataset-out** entre datasets.
+3. **Test sur notre device** : possible enregistrement court labellisé sur de vrais bovins au Japon, **à discuter avec le superviseur**.
+
+### Limite de revendication
+
+Évalué sur des domaines non vus ; performance sur les races ouest-africaines non encore démontrée (voir §11.2).
 
 ---
 
@@ -1754,8 +1812,9 @@ Aucune nouvelle grosse feature avant :
 | ChirpStack adapter | 💡 proposé | définir webhook + sécurité |
 | cadence uplink | 💡 proposée | comparer périodique / batch / event |
 | matériel CI | ouvert | 868 MHz + conformité ARTCI |
-| multi-device | limité | acquérir / emprunter si possible |
-| dataset cible | conditionnel | terrain / partenariat |
+| multi-device | limité : Core2 v1.0 et M5StickC (modèle [to verify]) = même IMU, hôtes différents (§3.1) | test « même capteur, device différent » ; plan firmware cœur commun + fichier de carte |
+| dataset cible | conditionnel | terrain / partenariat ; d’ici là, multi-dataset public + 3 niveaux d’évaluation (P-SCI-07) |
+| enregistrement sur notre device | proposé | court enregistrement labellisé sur bovins au Japon, à discuter avec le superviseur |
 | business model | hypothèse | entretiens et coût réel |
 | timezone terrain | ouvert | basculer vers `Africa/Abidjan` avant déploiement |
 
@@ -1819,6 +1878,18 @@ https://doi.org/10.1016/j.compag.2021.106610
 Santos et al., 2023, *Monitoring and classification of cattle behavior: a survey*.  
 https://doi.org/10.1016/j.atech.2022.100091
 
+### Revue de littérature du projet (octobre 2026)
+
+`docs/research/review_2026_10_10.md` — études capteurs en Afrique, datasets publics, protocoles d’évaluation.
+
+### Datasets prévus (P-SCI-07) — références reprises de la revue
+
+- Versluijs E. et al. (2023), *Front. Anim. Sci.* 4:1083272, doi:10.3389/fanim.2023.1083272 ; données DataverseNO doi:10.18710/ND4CLL.
+- Morales-Vargas D. et al. (2025), *Front. Vet. Sci.* 12:1630083, doi:10.3389/fvets.2025.1630083.
+- Vu H. et al. (2024), *MmCows: A Multimodal Dataset for Dairy Cattle Monitoring*, NeurIPS 2024 Datasets & Benchmarks ; github.com/neis-lab/mmcows.
+- Nellore (Brésil), *Sci. Rep.* 2022, doi:10.1038/s41598-022-06650-5 — données à demander aux auteurs.
+- Brahman-cross, *Sensors* 2024, 24:3171, doi:10.3390/s24103171 — données à demander aux auteurs.
+
 ---
 
 # 23. Règles à préserver pour la suite
@@ -1840,4 +1911,4 @@ https://doi.org/10.1016/j.atech.2022.100091
 ---
 
 *Livestock Monitoring IoT — Master Handoff de référence*  
-*Révision : 2026-10-04*
+*Révision : 2026-10-10*

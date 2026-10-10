@@ -65,6 +65,10 @@ Accounts `owner1@gmail.com`, `owner2@gmail.com`, `test-farmer-1@gmail.com`,
 telemetry. They stay until the cleanup in `docs/acceptance_checklist_roles.md` §7
 (adapted to these names), run by the owner.
 
+Tracking periods in livestock_dev were backfilled with source `history_backfill`
+(`backend/scripts/backfill_tracking_periods.py --apply`, 2026-10-04, development data only).
+Only the dry-run output was saved (`docs/backfill_dryrun.txt`); the `--apply` output was not kept.
+
 ## 1. Done
 
 | Work | Summary | Full suite after |

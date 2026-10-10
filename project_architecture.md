@@ -1,7 +1,7 @@
 # 🏗️ Livestock Monitoring IoT — Architecture de référence
 
 **Complément technique au `project_master_handoff.md`**  
-**Dernière mise à jour : 2026-10-04**
+**Dernière mise à jour : 2026-10-10**
 
 ---
 
@@ -185,6 +185,13 @@ Par axe X/Y/Z :
 - max.
 
 Total : **12 features**.
+
+### Devices et cartes (2026-10-10)
+
+- Device de référence : M5 actuel (M5GO). Devices de test : M5Stack Core2 v1.0 (MPU6886, AXP192) et M5StickC (modèle [to verify]) ; même IMU, hôtes différents (handoff §3.1).
+- Sur ces cartes de test : alimentation USB, batterie envoyée comme inconnue (255).
+- 💡 Plan firmware : un cœur commun + un petit fichier de carte par modèle.
+- Contrainte modèle : le collier terrain futur (ESP32 + LoRa + GPS, sans écran) garde une IMU de la même famille InvenSense ; une autre famille impose réentraînement et revalidation.
 
 ---
 
@@ -607,6 +614,12 @@ Transfert : `POST /animals/{id}/transfer` (admin seulement), en une transaction 
 
 Sécurité + validité scientifique.
 
+### Données de développement (`livestock_dev`)
+
+- Les périodes de suivi ont été étendues avec la source `history_backfill` par `backend/scripts/backfill_tracking_periods.py --apply`, le **2026-10-04**, sur les **données de développement uniquement** (jamais sur des données réelles sans provenance prouvée).
+- Seule la sortie du dry-run a été conservée (`docs/backfill_dryrun.txt`) ; la sortie de `--apply` n’a pas été gardée.
+- Les données de test (owner1/owner2, test-farmer-1, test-vet-1, Test Farm A/B, SIM-001) restent dans `livestock_dev` jusqu’au nettoyage de `docs/acceptance_checklist_roles.md` §7.
+
 ---
 
 # 11. API utilisateur et RBAC
@@ -851,6 +864,8 @@ Random Forest
       ↓
 serialized artifact
 ```
+
+💡 Plan étape 2 (handoff P-SCI-06/07, non réalisé) : 200 arbres, passe-bas ~5 Hz puis échantillonnage ponctuel 10 Hz, métriques par classe et par animal, features indépendantes de l’orientation (ablation), entraînement multi-dataset. Le pipeline ci-dessus reste celui du modèle actif.
 
 Note : malgré son nom, `backend/ml/train_copy_001.py` est une dépendance de `ablation_study.py` et `test_non_regression.py` ; il ne doit pas être archivé.
 
@@ -1471,4 +1486,4 @@ https://doi.org/10.1016/j.compag.2021.106610
 ---
 
 *Livestock Monitoring IoT — Architecture de référence*  
-*Révision : 23 septembre 2026*
+*Révision : 2026-10-10*
