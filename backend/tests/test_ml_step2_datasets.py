@@ -53,10 +53,10 @@ def test_validate_canonical_rejects_bad_tables():
 
 def test_device_data_across_the_filter_change_is_refused():
     boundary = int(datasets.DEVICE_FILTER_BOUNDARY.timestamp() * 1000)
-    assert boundary == int(pd.Timestamp("2026-10-05T14:30:00Z").timestamp() * 1000)  # 23:30 JST
+    assert boundary == int(pd.Timestamp("2026-10-05T14:29:00Z").timestamp() * 1000)  # 23:29 JST
     assert datasets.filter_regime(pd.Series([boundary - 1])) == "unfiltered (A_DLPF_CFG=0)"
     assert datasets.filter_regime(pd.Series([boundary])) == "filtered (A_DLPF_CFG=6)"
-    with pytest.raises(ValueError, match="spans 2026-10-05 23:30 JST"):
+    with pytest.raises(ValueError, match="spans 2026-10-05 14:29:00 UTC"):
         datasets.filter_regime(pd.Series([boundary - 1, boundary]))
 
 
@@ -97,3 +97,14 @@ def test_loday_with_a_single_day_is_refused(tmp_path, monkeypatch):
     with pytest.raises(SystemExit, match="single recording day"):
         _run(tmp_path, "syn_one_day", "--datasets", "synthetic_a", "--scheme", "loday")
     assert not any((tmp_path / "results").iterdir())
+
+
+def test_real_windows_on_each_side_of_the_filter_change():
+    ms = lambda text: int(pd.Timestamp(text, tz="Asia/Tokyo").timestamp() * 1000)
+    # first filtered packet: window end 23:30:08 JST -> start about 23:29:53 JST
+    first_filtered_start = ms("2026-10-05 23:30:08") - 15_000
+    assert first_filtered_start == ms("2026-10-05 23:29:53")
+    assert datasets.filter_regime(pd.Series([first_filtered_start])) == "filtered (A_DLPF_CFG=6)"
+    # last unfiltered packet: window end 2026-10-04 22:07:52 JST
+    last_unfiltered_start = ms("2026-10-04 22:07:52") - 15_000
+    assert datasets.filter_regime(pd.Series([last_unfiltered_start])) == "unfiltered (A_DLPF_CFG=0)"

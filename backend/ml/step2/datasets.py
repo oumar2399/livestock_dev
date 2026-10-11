@@ -30,9 +30,13 @@ JB_DATA_DIR = ML_DIR / "data"
 JB_NATIVE_HZ = 25
 JB_TIMEZONE = "Asia/Tokyo"
 
-# Own device: the accelerometer low-pass filter was switched on by the firmware
-# flashed on 2026-10-05; data before and after must never be mixed.
-DEVICE_FILTER_BOUNDARY = pd.Timestamp("2026-10-05 23:30", tz="Asia/Tokyo")
+# Own device: the accelerometer low-pass filter (A_DLPF_CFG=6) was switched on by
+# the firmware flashed on 2026-10-05; data before and after must never be mixed.
+# Owner's SQL on livestock_dev: last unfiltered window ended 2026-10-04 22:07:52 JST,
+# first filtered window ended 2026-10-05 23:30:08 JST (started ~23:29:53 JST), no
+# device data in between. The boundary sits inside that > 25 h gap, before the
+# first filtered window's start: 2026-10-05 14:29:00 UTC = 23:29:00 JST.
+DEVICE_FILTER_BOUNDARY = pd.Timestamp("2026-10-05 14:29:00", tz="UTC")
 
 
 @dataclass(frozen=True)
@@ -72,13 +76,18 @@ def validate_canonical(raw: pd.DataFrame) -> pd.DataFrame:
     return raw
 
 
-def filter_regime(t_ms: pd.Series) -> str:
-    """For the future own-device loader: refuse data spanning the filter change."""
+def filter_regime(window_start_ms: pd.Series) -> str:
+    """For the future own-device loader: refuse data spanning the filter change.
+
+    Compares each window's START (UTC ms; a v2 packet's time is the window end,
+    so start = end - 15 s) with DEVICE_FILTER_BOUNDARY: start >= boundary means
+    filtered. A whole window is then on one side, since no window lies in the gap.
+    """
     boundary = int(DEVICE_FILTER_BOUNDARY.timestamp() * 1000)
-    before, after = (t_ms < boundary).any(), (t_ms >= boundary).any()
+    before, after = (window_start_ms < boundary).any(), (window_start_ms >= boundary).any()
     if before and after:
-        raise ValueError("Device data spans 2026-10-05 23:30 JST (unfiltered before, "
-                         "filtered after): load one side only")
+        raise ValueError("Device data spans 2026-10-05 14:29:00 UTC / 23:29:00 JST (unfiltered "
+                         "before, filtered after): load one side only")
     return "unfiltered (A_DLPF_CFG=0)" if before else "filtered (A_DLPF_CFG=6)"
 
 

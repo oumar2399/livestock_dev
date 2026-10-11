@@ -1,5 +1,5 @@
 # ML model registry
-Last updated: 2026-10-11 (Steps A, B, C; mapping v2, predictions, matched comparison)
+Last updated: 2026-10-11 (Steps A, B, C; mapping v2, predictions, matched comparison; M2 pending note; device filter boundary)
 
 One "model card" per model or evaluation run. M0 is the deployed model; every
 Step 2 run gets an ID (R1, R2, …), a results folder under
@@ -53,6 +53,22 @@ this mapping = R12 (M0's preprocessing).
 | R12 | experimental | 100 ms bin mean | 200 | LOAO (42–46) | 75 / 393 | 0.945 ± 0.057 (0.864) | 0.903 ± 0.103 (0.765) | 0.939 ± 0.110 (0.727) | 0.956 | — |
 | R13 | experimental | low-pass 1st order 5.1 Hz + point | 200 | LOAO (42–46) | 73 / 378² | 0.935 ± 0.071 (0.812) | 0.884 ± 0.116 (0.744) | 0.924 ± 0.150 (0.625) | 0.951 | −0.010² |
 | R14 | experimental | 100 ms bin mean **on R13's windows** (matched) | 200 | LOAO (42–46) | 73 / 378² | 0.933 ± 0.069 (0.812) | 0.884 ± 0.109 (0.744) | 0.924 ± 0.150 (0.625) | 0.951 | −0.012² |
+
+**M2 candidate: pending.** M2 = device-matched preprocessing +
+`active_inactive_v2` (evaluated as R13, which stays **experimental**). It is
+not declared a candidate until two decisions are taken:
+- **(a) orientation-independent features** (vector magnitude, VeDBA), to be
+  tested as an ablation. The literature is mixed: Versluijs et al. 2023 found
+  no gain from orientation-independent features (same fitting protocol in
+  training and test), but the collar orientation of our device is not defined.
+- **(b) clipping device data to ±2 g** for consistency with the training range
+  (Japanese Black: ±2 g sensor; device: ±4 g). This is a recommendation of the
+  project's own literature review (`docs/research/review_2026_10_10.md` §5.1),
+  not an established practice.
+
+R13 < R12 (−0.010 mean balanced accuracy) comes from the window sets, not the
+preprocessing: on the same windows the two differ by 0.0004 (C2, matched
+comparison below).
 
 ### Label mapping `active_inactive_v1` (Active / Inactive) — superseded by v2
 
@@ -133,8 +149,9 @@ one breed, one farm, Japan; sensor ±2 g vs device ±4 g.
 - **Name:** `behavior_classifier_v3_staged.pkl` (+ `loao_metrics.json`), loaded
   through `MODEL_15S_PATH` (`backend/app/core/config.py`).
 - **Date:** trained 2026-09-01 11:43–11:45 (`backend/ml/train_log_v3_staged.txt`).
-- **Commit:** training commit not recorded [to verify]; script, model and metrics
-  first committed together in `b47bc89` (2026-09-06), unchanged since.
+- **Commit:** trained on 2026-09-01 with `backend/ml/train_v2.py` from the
+  working tree (no commit at training time); script, model and metrics then
+  committed unchanged together in `b47bc89` (2026-09-06), unchanged since.
 - **Status:** deployed.
 - **Data:** Japanese Black, 6 cows, files above (hashes computed 2026-10-10,
   not recorded at training time).
@@ -276,7 +293,13 @@ approximation of what the M5 records since the 2026-10-05 firmware.
    **487 windows instead of 509**.
 
 **Not used:** any device data. The future own-device test must use only data
-from one side of 2026-10-05 23:30 JST (unfiltered before, filtered after).
+from one side of **2026-10-05 14:29:00 UTC = 23:29:00 JST** (unfiltered before,
+filtered after), compared on each window's start (packet time = window end,
+so start = end − 15 s). Evidence (owner's SQL on `livestock_dev`): last
+unfiltered window ended 2026-10-04 22:07:52 JST (received 22:07:57); first
+filtered window ended 2026-10-05 23:30:08 JST (received 23:30:16), so it
+started about 23:29:53 JST; no device data in between (gap > 25 h). A boundary
+at 23:30:00 JST would fall inside that first filtered window.
 
 ---
 
@@ -452,7 +475,9 @@ R4 and R5 are repeated in the table for comparison.
   (native rate, time zone), a section in each label map that should cover it,
   then its own card here.
 - **Own-device data** (later): `datasets.filter_regime()` refuses any set that
-  spans 2026-10-05 23:30 JST and says which filter regime the data belongs to.
+  spans 2026-10-05 14:29:00 UTC (23:29:00 JST), compared on window starts, and
+  says which filter regime the data belongs to (tested with the real first
+  filtered window, start ≈ 23:29:53 JST → filtered).
 - **Example commands** (from `backend/`):
   `venv/Scripts/python.exe -m ml.step2.run --name <new_name> --datasets japanese_black <second_dataset> --scheme lodo --label-map <map>`
   · `--scheme loday` on Japanese Black stops with "leave-one-day-out not

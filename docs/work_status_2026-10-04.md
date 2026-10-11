@@ -1,5 +1,9 @@
 # Work status — 2026-10-04 (handoff)
 
+> **SUPERSEDED on 2026-10-11 by `docs/work_status_2026-10-11.md`** (single current
+> state). Kept for history: its sections mix the 2026-10-04 state with later updates,
+> and B5 / B6 below are done although still listed "to do".
+
 Plan: `docs/fix_plan_2026-10.md`. Audit reports: `docs/audit_conformance_2026-10*.md`.
 Rules for a new session: read-only git unless asked; never `.env`, `device_config.py`,
 `livestock_dev`, `livestock_bench`; tests only through the test guard (disposable DB).
@@ -168,5 +172,10 @@ Update `project_master_handoff.md`, `project_architecture.md`,
 ACCEL_CONFIG2 (0x1D) `A_DLPF_CFG=6` (5.1 Hz bandwidth; [to verify] against the
 MPU-6886 datasheet table). Before it, the accelerometer ran at the chip reset value
 (`A_DLPF_CFG=0`, 218.1 Hz). Telemetry received before the flash is unfiltered, after it
-filtered. Flash date and time (UTC): **[to fill in when flashed]** · device: **[id]** ·
-`main.py` / `b4_runtime.py` SHA-256 as in the firmware manifest at that commit.
+filtered. **Boundary: 2026-10-05 14:29:00 UTC = 23:29:00 JST** (set 2026-10-11 from the
+data; the flash time itself was not recorded). Evidence (owner's SQL on `livestock_dev`):
+last unfiltered window ended 2026-10-04 22:07:52 JST (received 22:07:57), first filtered
+window ended 2026-10-05 23:30:08 JST (received 23:30:16, so started ≈ 23:29:53 JST), no
+device data in between (gap > 25 h). Compare window starts (packet time = window end).
+Device: **`M5-TEST3-BENCH`** · `main.py` / `b4_runtime.py` SHA-256 as in the firmware
+manifest at that commit.

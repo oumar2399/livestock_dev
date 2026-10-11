@@ -46,7 +46,8 @@ expected behaviour, not a defect.
 | 3 — Missing features (A7–A13) | done 2026-10-08 in three groups (roles/accounts/members; devices/assignment/health indicators; transfer/visibility rule) |
 | 4 — User experience (A14–A21) | groups A–C done and committed (`8a54fb7`, `001d99a`); group D (remaining English translation, other agent) reviewed and its 7 problems fixed on 2026-10-09, not committed yet (see "Phase 4 review") |
 
-Manual re-test of phases 2, 3 and 4 in the app: pending. Phase 4 re-check list and the
+Manual re-test of phases 2, 3 and 4 in the app: pending. **Update 2026-10-11: done**
+(reported by the owner); a few minor UX improvements noted, not urgent. Phase 4 re-check list and the
 list of translated strings: `docs/phase4_strings_and_recheck_2026-10-09.md`.
 
 **Test totals after phase 3:** backend 703 passed, 0 failed, 0 skipped, `alembic check`

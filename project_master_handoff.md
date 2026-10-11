@@ -2,7 +2,7 @@
 
 **Master Research — Kobe Institute of Computing (KIC), Graduate School of Information Technology**  
 **Territoire cible : Côte d’Ivoire — élevage bovin extensif / semi-mobile**  
-**Dernière mise à jour : 2026-10-10**
+**Dernière mise à jour : 2026-10-11**
 
 ---
 
@@ -122,9 +122,9 @@ Cette architecture LoRaWAN est **proposée et documentée**, mais **pas encore i
 
 État retenu pour la documentation courante :
 
-- **724 tests backend réussis, 0 échec, 0 ignoré**, `alembic check` propre — commit `001d99a` + Phase 4 groupe D et correctifs de revue non commités ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-09 22:20–22:22 +0900 ;
-- **161 tests mobile réussis, 0 échec** — même arbre ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-09 22:21 +0900 ;
-- TypeScript vérifié sans erreur (`tsc --noEmit`, même arbre, 2026-10-09 22:21 +0900) ;
+- **761 tests backend réussis, 0 échec, 0 ignoré**, `alembic check` propre — commit `8025bc0` + changement non commité de la frontière du filtre (`backend/ml/step2/datasets.py`, un test ajouté) ; commande `venv/Scripts/python.exe scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short` (depuis `backend/`, base jetable) ; 2026-10-11 11:01–11:03 +0900 (760 sur le commit propre, 10:58–11:00) ;
+- **161 tests mobile réussis, 0 échec** — commit `8025bc0` ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-11 10:58–10:59 +0900 ;
+- TypeScript vérifié sans erreur (`npx tsc --noEmit`, commit `8025bc0`, 2026-10-11 10:59 +0900) ;
 - schéma / migrations Alembic **réconciliés** depuis B1 (`bc03c42`), `alembic check` propre.
 
 Les anciens nombres de tests (`43`, `54`, `57`, `61`, `73`, `76`, etc.) restent uniquement des **résultats historiques de lots ou de campagnes intermédiaires**. Ils ne doivent pas être utilisés comme total courant.
@@ -268,7 +268,7 @@ La fenêtre n’est pas envoyée si un échantillon dépasse ±4 g, arrive avec 
 
 Batterie illisible : envoyée comme 255 = inconnue, stockée NULL côté backend ; LCD `BAT ?` ; l’app mobile affiche « Unknown » (B5).
 
-Des cycles stabilisés d’environ **19,4 s** ont été rapportés dans la documentation après optimisation fast-bytes.
+Cycle mesuré : **21,2 s** en moyenne (max 24,0 s) sur 2 h d’endurance le 2026-10-06 (`docs/validation_endurance_2026-10-06.md`). Historique : des cycles d’environ 19,4 s avaient été rapportés après l’optimisation fast-bytes (`docs/validation_optimisation_gps_m5stack.md`).
 
 ### Important
 
@@ -573,12 +573,13 @@ Phase 3 (test d’acceptation du 2026-10-07) :
 - fermes créées par l’admin seulement, qui invite ensuite le propriétaire ; inscription publique fermée par défaut (`PUBLIC_REGISTRATION_ENABLED`) ; premier admin par `scripts/create_admin.py` ;
 - écran Users : boutons « Change role » et « Revoke » par membre, « You » sur sa propre ligne.
 
-Phase 4 (expérience utilisateur, test d’acceptation du 2026-10-07) — groupes A–C commités (`8a54fb7`, `001d99a`), groupe D (traduction restante) relu, ses 7 problèmes corrigés le 2026-10-09, non commité :
+Phase 4 (expérience utilisateur, test d’acceptation du 2026-10-07) — groupes A–C commités (`8a54fb7`, `001d99a`), groupe D (traduction restante) relu, ses 7 problèmes corrigés le 2026-10-09, commité depuis (arbre propre à `8025bc0`, 2026-10-11) :
 
 - popups et dialogues unifiés, Save en haut à droite et en bas, champs au-dessus du clavier, sélecteurs avec recherche, liste du troupeau compacte, suppression d’un point de zone, tableaux de rapports dimensionnés selon leur contenu, « App & Server » en lecture seule (architecture §12.1d) ;
 - feedback de prédiction : `correction` = code `active/resting/grazing/walking/lying/running` ; anciennes valeurs stockées acceptées ; toute autre valeur → 422 ; pas de migration ;
 - textes affichés en anglais, gardes anti-français sur l’appli (`guard-french.test.cjs`) et les messages du backend (`test_guard_french.py`) ;
-- détail, décisions, revue : `docs/acceptance_results_2026-10-07.md` ; liste des textes traduits et re-test manuel : `docs/phase4_strings_and_recheck_2026-10-09.md`.
+- détail, décisions, revue : `docs/acceptance_results_2026-10-07.md` ; liste des textes traduits et re-test manuel : `docs/phase4_strings_and_recheck_2026-10-09.md` ;
+- re-test manuel des phases 2–4 dans l’app : **fait** (signalé par le propriétaire le 2026-10-11) ; quelques améliorations UX mineures notées, non urgentes.
 
 Correctifs Phase 2 (test d’acceptation du 2026-10-07) :
 
@@ -790,6 +791,8 @@ Tests rapportés :
 - stabilité RAM sur la séquence testée ;
 - cold reboot.
 
+Ces tests portaient sur l’**ancien client HTTP** ; la résilience aux coupures réseau du client réécrit le 21 septembre **reste à tester**.
+
 ## 9.4 Validation extérieure du 19 septembre
 
 Le M5GO a été exécuté sur batterie à Kobe avec :
@@ -814,6 +817,25 @@ Le M5GO a été exécuté sur batterie à Kobe avec :
 ❌ fonctionnement multi-device ;  
 ❌ efficacité clinique.
 
+## 9.4b Endurance 2 h du 2026-10-06
+
+Device `M5-TEST3-BENCH`, firmware avec filtre passe-bas (`A_DLPF_CFG=6`) et client HTTP réécrit le 21 septembre ; intérieur, Wi‑Fi, immobile, **alimentation USB** (`docs/validation_endurance_2026-10-06.md`).
+
+- 354/354 paquets reçus, 0 perte, 0 drop ;
+- cycle moyen **21,2 s**, max 24,0 s, aucun trou > 45 s ;
+- délai fin de fenêtre → réception : moyenne 5,8 s, max 8,8 s ;
+- RAM 40 Ko libres en fin de run, watchdog OK.
+
+### Ce que cette validation prouve
+
+✅ client HTTP réécrit **qualifié sur le device** ; chaîne complète stable pendant 2 h.
+
+### Ce qu’elle ne prouve pas
+
+❌ autonomie batterie (USB) ;  
+❌ résilience du nouveau client aux coupures réseau (non testée) ;  
+❌ conditions terrain ; plusieurs devices.
+
 ---
 
 # 9.5 État fonctionnel autoritaire
@@ -829,7 +851,7 @@ Pour éviter toute ambiguïté avec les sections historiques :
 - ✅ **Roadmap applicative correspondante** : les lots mentionnés ci-dessus sont faits ; les anciennes phrases indiquant qu’ils sont “prochains”, “futurs” ou “non codés” sont obsolètes.
 - ✅ **Idempotence création ferme** : version récente PostgreSQL durable.
 - ✅ **Alembic / schéma** : réconcilié depuis B1 (`bc03c42`).
-- ✅ **Tests mobile courants** : **130** (commit `6c5f786` + modifications Phase 2 et 3 non commitées, `node --test tests/*.test.cjs`, 2026-10-08 13:00 +0900).
+- ✅ **Tests mobile courants** : **161** (commit `8025bc0`, `node --test tests/*.test.cjs`, 2026-10-11 10:58–10:59 +0900 ; totaux complets : §1.2).
 
 ---
 
@@ -839,7 +861,7 @@ Pour éviter toute ambiguïté avec les sections historiques :
 2. **Domain shift Japon → Côte d’Ivoire.**
 3. **Un nombre limité de devices physiques empêche une validation multi-device réelle.**
 4. **LoRaWAN non implémenté.**
-5. **Autonomie longue durée non établie.**
+5. **Autonomie longue durée non établie** (l’endurance de 2 h du 2026-10-06 était sur USB).
 6. **Persistance v3 sous coupure physique non validée.**
 7. **HTTP prototype non chiffré.**
 8. **`TARGET_TIMEZONE = Asia/Tokyo` doit passer à `Africa/Abidjan` avant terrain** (constante du code, pas une variable d’environnement).
@@ -1750,7 +1772,7 @@ Aucune nouvelle grosse feature avant :
 1. nettoyage documentaire ;
 2. reprise de validation globale ;
 3. protocole d’évaluation scientifique ;
-4. tests d’endurance ;
+4. tests d’endurance (2 h sur banc faits le 2026-10-06 ; restent batterie et coupures réseau) ;
 5. préparation LoRaWAN ;
 6. rédaction progressive de la thèse.
 
@@ -1768,9 +1790,9 @@ Aucune nouvelle grosse feature avant :
 
 ### Priorité 2 — Validation système
 
-- longue durée ;
-- batterie ;
-- interruptions réseau ;
+- longue durée : ✅ 2 h sur banc, USB (2026-10-06, §9.4b) ;
+- batterie (autonomie) ;
+- interruptions réseau avec le nouveau client HTTP ;
 - GPS ;
 - v3 sous coupure si réactivé ;
 - multi-device si matériel disponible.
@@ -1911,4 +1933,4 @@ https://doi.org/10.1016/j.atech.2022.100091
 ---
 
 *Livestock Monitoring IoT — Master Handoff de référence*  
-*Révision : 2026-10-10*
+*Révision : 2026-10-11*

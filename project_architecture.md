@@ -1,7 +1,7 @@
 # 🏗️ Livestock Monitoring IoT — Architecture de référence
 
 **Complément technique au `project_master_handoff.md`**  
-**Dernière mise à jour : 2026-10-10**
+**Dernière mise à jour : 2026-10-11**
 
 ---
 
@@ -46,9 +46,9 @@ En cas de contradiction entre deux descriptions datées, **la plus récente est 
 
 # 0.2 État de validation courant
 
-- **703 tests backend réussis, 0 échec, 0 ignoré** — commit `6c5f786` + modifications Phase 2 et 3 non commitées ; commande `scripts/run_isolated_tests.py tests` sur base jetable ; 2026-10-08 13:02 +0900 ;
-- **130 tests mobile réussis, 0 échec** — commit `6c5f786` + modifications Phase 2 et 3 non commitées ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-08 13:00 +0900 ;
-- TypeScript sans erreur (`tsc --noEmit`, même commit, 2026-10-08 13:00 +0900) ;
+- **761 tests backend réussis, 0 échec, 0 ignoré**, `alembic check` propre — commit `8025bc0` + changement non commité de la frontière du filtre ; commande `venv/Scripts/python.exe scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short` (depuis `backend/`, base jetable) ; 2026-10-11 11:01–11:03 +0900 (760 sur le commit propre, 10:58–11:00) ;
+- **161 tests mobile réussis, 0 échec** — commit `8025bc0` ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-11 10:58–10:59 +0900 ;
+- TypeScript sans erreur (`npx tsc --noEmit`, commit `8025bc0`, 2026-10-11 10:59 +0900) ;
 - Alembic / schéma réconcilié depuis B1 (`bc03c42`), `alembic check` propre.
 
 ---
@@ -1397,7 +1397,7 @@ Le choix dépendra de :
 - **Geofence engine** : implémenté.
 - **Création de ferme** : idempotence durable PostgreSQL ; les anciens caches mémoire sont historiques.
 - **Alembic / schéma** : réconcilié depuis B1 (`bc03c42`).
-- **Tests mobile courants** : **130** (commit `6c5f786` + modifications Phase 2 et 3 non commitées, `node --test tests/*.test.cjs`, 2026-10-08 13:00 +0900).
+- **Tests mobile courants** : **161** (commit `8025bc0`, `node --test tests/*.test.cjs`, 2026-10-11 10:58–10:59 +0900 ; totaux complets : §0.2).
 - **Lots B, C, D, E** : réalisés ; les anciennes mentions “prochain”, “futur” ou “pas encore codé” sont obsolètes.
 - **LoRaWAN Côte d’Ivoire** : bande 868–870 MHz / profil EU868 documentés ; les anciennes mentions “plan à confirmer” sont historiques.
 
@@ -1410,7 +1410,7 @@ Lorsqu’une ancienne section contredit une mise à jour plus récente, **la mis
 - configuration backend v3 runtime si elle change à l’avenir ;
 - réception push réelle sur téléphone (enregistrement du token mobile et dispatch automatique non implémentés) ;
 - intégration du mode offline dans l’app ;
-- endurance / batterie ;
+- autonomie batterie et résilience aux coupures réseau du client HTTP réécrit (endurance 2 h sur USB validée le 2026-10-06, `docs/validation_endurance_2026-10-06.md`) ;
 - radio LoRaWAN ;
 - terrain bovin cible.
 
@@ -1486,4 +1486,4 @@ https://doi.org/10.1016/j.compag.2021.106610
 ---
 
 *Livestock Monitoring IoT — Architecture de référence*  
-*Révision : 2026-10-10*
+*Révision : 2026-10-11*
