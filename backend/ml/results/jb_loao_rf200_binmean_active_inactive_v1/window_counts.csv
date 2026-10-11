@@ -1,0 +1,39 @@
+dataset,animal_id,label_native,n_windows,class
+japanese_black,cow1,,394,(not mapped: dropped)
+japanese_black,cow1,DRN,2,Active
+japanese_black,cow1,ETC,252,(not mapped: dropped)
+japanese_black,cow1,FES,15,Active
+japanese_black,cow1,GRZ,4,Active
+japanese_black,cow1,MOV,5,Active
+japanese_black,cow1,RES,73,Inactive
+japanese_black,cow1,RUS,2,Inactive
+japanese_black,cow2,,208,(not mapped: dropped)
+japanese_black,cow2,ETC,223,(not mapped: dropped)
+japanese_black,cow2,MOV,5,Active
+japanese_black,cow2,RES,96,Inactive
+japanese_black,cow2,RUS,61,Inactive
+japanese_black,cow3,,208,(not mapped: dropped)
+japanese_black,cow3,DRN,2,Active
+japanese_black,cow3,ETC,288,(not mapped: dropped)
+japanese_black,cow3,LCK,1,Active
+japanese_black,cow3,MOV,8,Active
+japanese_black,cow3,RES,34,Inactive
+japanese_black,cow3,RUS,21,Inactive
+japanese_black,cow3,SLT,24,Active
+japanese_black,cow4,,256,(not mapped: dropped)
+japanese_black,cow4,ETC,130,(not mapped: dropped)
+japanese_black,cow4,GRZ,3,Active
+japanese_black,cow4,MOV,17,Active
+japanese_black,cow4,RES,25,Inactive
+japanese_black,cow4,RUS,24,Inactive
+japanese_black,cow5,,148,(not mapped: dropped)
+japanese_black,cow5,ETC,126,(not mapped: dropped)
+japanese_black,cow5,FES,2,Active
+japanese_black,cow5,GRZ,2,Active
+japanese_black,cow5,MOV,4,Active
+japanese_black,cow5,RES,22,Inactive
+japanese_black,cow6,,102,(not mapped: dropped)
+japanese_black,cow6,ETC,239,(not mapped: dropped)
+japanese_black,cow6,GRZ,14,Active
+japanese_black,cow6,MOV,8,Active
+japanese_black,cow6,RES,35,Inactive

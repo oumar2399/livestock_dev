@@ -1,0 +1,25 @@
+{
+  "name": "active_resting_v1",
+  "description": "Mapping of the deployed model M0 (train_v2.BEHAVIOR_MAP), kept for reproduction. Grazing, feeding, salt licking, drinking and licking count as Resting.",
+  "classes": ["Active", "Resting"],
+  "maps": {
+    "japanese_black": {
+      "MOV": "Active",
+      "ATT": "Active",
+      "ESC": "Active",
+      "RES": "Resting",
+      "RUS": "Resting",
+      "GRZ": "Resting",
+      "FES": "Resting",
+      "SLT": "Resting",
+      "DRN": "Resting",
+      "LCK": "Resting",
+      "URI": "Resting",
+      "BMN": "Resting",
+      "REL": "Resting"
+    }
+  },
+  "excluded": {
+    "japanese_black": ["BLN", "ETC", ""]
+  }
+}

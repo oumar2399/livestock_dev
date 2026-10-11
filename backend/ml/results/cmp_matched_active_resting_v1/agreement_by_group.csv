@@ -1,0 +1,13 @@
+test_group,class,n,correct_a,correct_b,only_a,only_b
+japanese_black/cow1,Active,6,6,6,0,0
+japanese_black/cow1,Resting,88,88,88,0,0
+japanese_black/cow2,Active,3,3,3,0,0
+japanese_black/cow2,Resting,152,146,146,0,0
+japanese_black/cow3,Active,5,4,4,0,0
+japanese_black/cow3,Resting,76,76,76,0,0
+japanese_black/cow4,Active,20,15,15,1,1
+japanese_black/cow4,Resting,53,53,53,0,0
+japanese_black/cow5,Active,2,2,2,0,0
+japanese_black/cow5,Resting,26,22,22,0,0
+japanese_black/cow6,Active,8,8,8,0,0
+japanese_black/cow6,Resting,48,40,47,0,7

@@ -1,0 +1,152 @@
+{
+  "run_name": "jb_loao_rf200_binmatched_active_resting_v1",
+  "created_at": "2026-10-11T01:33:16+09:00",
+  "command": "python -m ml.step2.run --name jb_loao_rf200_binmatched_active_resting_v1 --label-map active_resting_v1 --preprocess binmean_matched --trees 200 --seeds 42 43 44 45 46",
+  "git": {
+    "commit": "66d68020411f3971f0b205f93fa09c35d68b173a",
+    "dirty": true,
+    "n_changed_paths": 8
+  },
+  "code_sha256": {
+    "step2/__init__.py": "886a02b2e8433899cb53de2f57bbb1874fa8dccbd3d638d3c1bb34e3dca7f2fb",
+    "step2/compare.py": "cd90d1ea73946fe63af857025709fb22981a4c6b3ec1f967aa62048202cb422e",
+    "step2/datasets.py": "fba45e6c53af8f79e6b0a0690ce391a7ebf08be5c054b68bdbc0028c130a27dc",
+    "step2/evaluate.py": "a2098f74314b8c18f1bee400a623210ebe23565f59dbdc4e068471e0f77e8052",
+    "step2/labels.py": "fe932f5a0bc0831a0ce5665c0f96ba95a3d4804564e68d151f8e2944b29a88b5",
+    "step2/preprocess.py": "c958d1f41390bff236e7b32d07c26e2ba538c54308ccca891dc9d377314ac723",
+    "step2/run.py": "ac27af96897e4be2e13e7372921594ef62d57c006d8e35ac59ce46eeadbdb614",
+    "step2/windows.py": "233745e7dac07e91a7f2e4bb83b4ffc8d8d2d3e5157a6c30f95030ee538d110b",
+    "step2/label_maps/active_inactive_v1.json": "b372eeabed38bebaaa5312e16c232d5b21dff9512b134b721a906415de8f83bf",
+    "step2/label_maps/active_inactive_v2.json": "3f772bb3da23db89d7f19bc420eec892d8bfd59a0113df6355310652fcac9719",
+    "step2/label_maps/active_resting_v1.json": "6d4df278d60ce6200e61c3e2822870e41f36227a609271e25b17d7f637e83fbd",
+    "train_v2.py": "d443c825bee57d6f54cb1856eaba954434846975d551c07e51508e8caf682bba"
+  },
+  "versions": {
+    "python": "3.11.9",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "scipy": "1.17.1",
+    "sklearn": "1.8.0"
+  },
+  "data": {
+    "datasets": {
+      "japanese_black": "Japanese Black, Ito et al., Zenodo 10.5281/zenodo.5849025"
+    },
+    "files": [
+      {
+        "dataset": "japanese_black",
+        "file": "cow1.csv",
+        "bytes": 16274857,
+        "sha256": "92cbb5a1691e16397358a1cefd3225c818843f7b6ecdfe97382afc2ea90e46e5"
+      },
+      {
+        "dataset": "japanese_black",
+        "file": "cow2.csv",
+        "bytes": 14230432,
+        "sha256": "4a7808e88939445fdb933928c3234cecab38cd2c2e08fa93832282f8abed83b7"
+      },
+      {
+        "dataset": "japanese_black",
+        "file": "cow3.csv",
+        "bytes": 14178907,
+        "sha256": "ec78f8e4574ac8e506273b3b7d5619fd8796ff0b0ab94900f867dc478d922036"
+      },
+      {
+        "dataset": "japanese_black",
+        "file": "cow4.csv",
+        "bytes": 11728280,
+        "sha256": "3f433b9ebb90aada5ca885898136bcdba2d0861ef9ee7bc53de71cea695c7ad4"
+      },
+      {
+        "dataset": "japanese_black",
+        "file": "cow5.csv",
+        "bytes": 7104203,
+        "sha256": "a4e6df9a5d2a0782397e1b9f298dea5ae8bbb594fee95d04e613dfae72ca9e9c"
+      },
+      {
+        "dataset": "japanese_black",
+        "file": "cow6.csv",
+        "bytes": 9536358,
+        "sha256": "55484465db6ab6ade47ae6862ff0bcaa8c174229bb5ab153d8577e5bbd42c306"
+      }
+    ],
+    "animals": [
+      "japanese_black/cow1",
+      "japanese_black/cow2",
+      "japanese_black/cow3",
+      "japanese_black/cow4",
+      "japanese_black/cow5",
+      "japanese_black/cow6"
+    ],
+    "recording_days": {
+      "japanese_black": [
+        "2020-06-12"
+      ]
+    },
+    "n_raw_rows": 1391224
+  },
+  "preprocess": {
+    "japanese_black": {
+      "method": "binmean_matched",
+      "windows": "the device_lp_point plan: same blocks, 100 ms ticks, point-sampled labels, purity and windows as --preprocess device_lp_point (the plan does not depend on the filter)",
+      "features": "M0's transform on those windows: mean of the raw, unfiltered samples within +-50 ms of each tick (100 ms bins centred on the ticks); no other filter",
+      "purpose": "matched-window comparison: same windows and labels as device_lp_point, only the preprocessing differs",
+      "target_hz": 10
+    }
+  },
+  "windowing": {
+    "window_seconds": 15,
+    "window_samples": 150,
+    "purity": 0.8,
+    "purity_on": "native label",
+    "alignment": "non-overlapping, from each segment start; never across a segment or a day"
+  },
+  "label_map": {
+    "name": "active_resting_v1",
+    "classes": [
+      "Active",
+      "Resting"
+    ],
+    "path": "step2/label_maps/active_resting_v1.json",
+    "sha256": "6d4df278d60ce6200e61c3e2822870e41f36227a609271e25b17d7f637e83fbd",
+    "reasons": {}
+  },
+  "features": [
+    "accel_x_mean",
+    "accel_x_std",
+    "accel_x_min",
+    "accel_x_max",
+    "accel_y_mean",
+    "accel_y_std",
+    "accel_y_min",
+    "accel_y_max",
+    "accel_z_mean",
+    "accel_z_std",
+    "accel_z_min",
+    "accel_z_max"
+  ],
+  "classifier": {
+    "type": "RandomForestClassifier",
+    "n_estimators": 200,
+    "max_depth": 20,
+    "min_samples_leaf": 5,
+    "max_features": "sqrt",
+    "class_weight": "balanced",
+    "n_jobs": -1,
+    "tuning": "none (fixed M0 hyperparameters)",
+    "rebalancing": "class_weight=balanced, computed on each training fold only"
+  },
+  "validation": {
+    "scheme": "loao",
+    "group": "dataset/animal_id",
+    "held_out": "one animal; training = every other animal of the loaded datasets",
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "headline_seed": 42
+  }
+}

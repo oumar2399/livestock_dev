@@ -1,0 +1,73 @@
+{
+  "comparison_name": "cmp_matched_active_inactive_v2",
+  "created_at": "2026-10-11T01:35:00+09:00",
+  "command": "python -m ml.step2.compare --name cmp_matched_active_inactive_v2 --a jb_loao_rf200_binmatched_active_inactive_v2 --b jb_loao_rf200_lp1c5p1_active_inactive_v2",
+  "git": {
+    "commit": "66d68020411f3971f0b205f93fa09c35d68b173a",
+    "dirty": true,
+    "n_changed_paths": 8
+  },
+  "code_sha256": {
+    "step2/__init__.py": "886a02b2e8433899cb53de2f57bbb1874fa8dccbd3d638d3c1bb34e3dca7f2fb",
+    "step2/compare.py": "cd90d1ea73946fe63af857025709fb22981a4c6b3ec1f967aa62048202cb422e",
+    "step2/datasets.py": "fba45e6c53af8f79e6b0a0690ce391a7ebf08be5c054b68bdbc0028c130a27dc",
+    "step2/evaluate.py": "a2098f74314b8c18f1bee400a623210ebe23565f59dbdc4e068471e0f77e8052",
+    "step2/labels.py": "fe932f5a0bc0831a0ce5665c0f96ba95a3d4804564e68d151f8e2944b29a88b5",
+    "step2/preprocess.py": "c958d1f41390bff236e7b32d07c26e2ba538c54308ccca891dc9d377314ac723",
+    "step2/run.py": "ac27af96897e4be2e13e7372921594ef62d57c006d8e35ac59ce46eeadbdb614",
+    "step2/windows.py": "233745e7dac07e91a7f2e4bb83b4ffc8d8d2d3e5157a6c30f95030ee538d110b",
+    "step2/label_maps/active_inactive_v1.json": "b372eeabed38bebaaa5312e16c232d5b21dff9512b134b721a906415de8f83bf",
+    "step2/label_maps/active_inactive_v2.json": "3f772bb3da23db89d7f19bc420eec892d8bfd59a0113df6355310652fcac9719",
+    "step2/label_maps/active_resting_v1.json": "6d4df278d60ce6200e61c3e2822870e41f36227a609271e25b17d7f637e83fbd",
+    "train_v2.py": "d443c825bee57d6f54cb1856eaba954434846975d551c07e51508e8caf682bba"
+  },
+  "a": {
+    "run": "jb_loao_rf200_binmatched_active_inactive_v2",
+    "preprocess": {
+      "japanese_black": {
+        "method": "binmean_matched",
+        "windows": "the device_lp_point plan: same blocks, 100 ms ticks, point-sampled labels, purity and windows as --preprocess device_lp_point (the plan does not depend on the filter)",
+        "features": "M0's transform on those windows: mean of the raw, unfiltered samples within +-50 ms of each tick (100 ms bins centred on the ticks); no other filter",
+        "purpose": "matched-window comparison: same windows and labels as device_lp_point, only the preprocessing differs",
+        "target_hz": 10
+      }
+    }
+  },
+  "b": {
+    "run": "jb_loao_rf200_lp1c5p1_active_inactive_v2",
+    "preprocess": {
+      "japanese_black": {
+        "method": "device_lp_point",
+        "filter": {
+          "type": "Butterworth low-pass, order 1, causal (scipy.signal.sosfilt)",
+          "cutoff_hz": 5.1,
+          "design": "scipy.signal.butter at fs = 25 Hz (bilinear, pre-warped: -3 dB at the cutoff)",
+          "initial_state": "steady state at the first sample of each block",
+          "approximation": "The exact MPU6886 DLPF response is not known. This filter only matches its documented 3 dB bandwidth (5.1 Hz for A_DLPF_CFG=6 [to verify] against the datasheet). Order 1 is chosen because the documented noise bandwidth / 3 dB ratio (7.8 / 5.1 = 1.53) is close to a first-order filter (pi/2 = 1.57), not a 2nd-order Butterworth (1.11). The chip filters a ~1 kHz signal; content above the dataset's Nyquist frequency cannot be reproduced. Raw samples are treated as evenly spaced."
+        },
+        "point_sampling": {
+          "grid_ms": 100,
+          "rule": "nearest raw sample to each 100 ms tick (value and native label); no averaging",
+          "max_offset_ms": 20,
+          "missed_tick": "ends the block (the firmware drops a window with a sample > 20 ms late)"
+        },
+        "gap_ms": 300,
+        "target_hz": 10
+      }
+    }
+  },
+  "matched_on": [
+    "dataset",
+    "animal_id",
+    "day",
+    "segment_id",
+    "t_start_ms",
+    "label_native",
+    "label",
+    "test_group",
+    "label map",
+    "scheme",
+    "seeds",
+    "data files"
+  ]
+}

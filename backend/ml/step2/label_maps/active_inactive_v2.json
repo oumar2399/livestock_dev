@@ -1,0 +1,29 @@
+{
+  "name": "active_inactive_v2",
+  "description": "Decided 2026-10-11, replaces active_inactive_v1. Same Active / Inactive split for the behaviours kept, but pen-only behaviours and being mounted are excluded. Not comparable with active_resting_v1 or active_inactive_v1 (different classes or different windows).",
+  "classes": ["Active", "Inactive"],
+  "maps": {
+    "japanese_black": {
+      "MOV": "Active",
+      "ATT": "Active",
+      "ESC": "Active",
+      "GRZ": "Active",
+      "DRN": "Active",
+      "LCK": "Active",
+      "RES": "Inactive",
+      "RUS": "Inactive",
+      "URI": "Inactive",
+      "REL": "Inactive"
+    }
+  },
+  "excluded": {
+    "japanese_black": ["BLN", "ETC", "", "BMN", "SLT", "FES"]
+  },
+  "reasons": {
+    "BMN": "Excluded. Being mounted: the cow is jolted by the mounting animal and it is an oestrus event, neither rest nor activity of the collared cow.",
+    "SLT": "Excluded. Salt licking at a fixed lick block in the pen: absent from the extensive-pasture target, and seen in one cow only (cow3), so not learnable under leave-one-animal-out (0/24 correct in R5).",
+    "FES": "Excluded. Feeding in a stancheon (head locked in a feeding rail): pen-only, absent from the extensive-pasture target, and seen in two cows only (cow1, cow5; 1/12 correct in R5).",
+    "DRN": "Kept as Active, with grazing: drinking (head down, at a water point) also happens on pasture.",
+    "GRZ": "Active: grazing is the main pasture activity and is recognised in every cow that grazes (24/24 in R5)."
+  }
+}

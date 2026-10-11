@@ -1,0 +1,64 @@
+{
+  "42": {
+    "japanese_black/cow1": [
+      [
+        5,
+        0
+      ],
+      [
+        1,
+        95
+      ]
+    ],
+    "japanese_black/cow2": [
+      [
+        4,
+        1
+      ],
+      [
+        7,
+        150
+      ]
+    ],
+    "japanese_black/cow3": [
+      [
+        7,
+        1
+      ],
+      [
+        0,
+        82
+      ]
+    ],
+    "japanese_black/cow4": [
+      [
+        17,
+        0
+      ],
+      [
+        1,
+        51
+      ]
+    ],
+    "japanese_black/cow5": [
+      [
+        4,
+        0
+      ],
+      [
+        5,
+        21
+      ]
+    ],
+    "japanese_black/cow6": [
+      [
+        7,
+        1
+      ],
+      [
+        1,
+        48
+      ]
+    ]
+  }
+}

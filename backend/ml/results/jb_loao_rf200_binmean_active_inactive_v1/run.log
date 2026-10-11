@@ -1,0 +1,32 @@
+2026-10-11 00:45:18,253 [INFO] ml.train_v2: Loading cow1.csv …
+2026-10-11 00:45:18,519 [INFO] ml.train_v2:   →  311,876 rows
+2026-10-11 00:45:18,519 [INFO] ml.train_v2: Loading cow2.csv …
+2026-10-11 00:45:18,758 [INFO] ml.train_v2:   →  269,772 rows
+2026-10-11 00:45:18,759 [INFO] ml.train_v2: Loading cow3.csv …
+2026-10-11 00:45:18,980 [INFO] ml.train_v2:   →  269,903 rows
+2026-10-11 00:45:18,980 [INFO] ml.train_v2: Loading cow4.csv …
+2026-10-11 00:45:19,185 [INFO] ml.train_v2:   →  224,912 rows
+2026-10-11 00:45:19,185 [INFO] ml.train_v2: Loading cow5.csv …
+2026-10-11 00:45:19,310 [INFO] ml.train_v2:   →  134,904 rows
+2026-10-11 00:45:19,310 [INFO] ml.train_v2: Loading cow6.csv …
+2026-10-11 00:45:19,469 [INFO] ml.train_v2:   →  179,857 rows
+2026-10-11 00:45:19,487 [INFO] ml.train_v2: Total raw rows: 1,391,224
+
+2026-10-11 00:45:19,564 [INFO] ml.train_v2: Data quality: 1,391,224 rows kept, 0 dropped (0.00% of raw data).
+2026-10-11 00:46:08,188 [WARNING] ml.train_v2:   cow1: 90553/215310 label bins are empty (42.1%) — annotation coverage may be lower than expected.
+2026-10-11 00:46:08,210 [INFO] ml.train_v2:   cow1: 124,757 samples @ 10 Hz — 11 continuous segments detected (recording gap(s) found)
+2026-10-11 00:46:41,460 [WARNING] ml.train_v2:   cow2: 90389/198354 label bins are empty (45.6%) — annotation coverage may be lower than expected.
+2026-10-11 00:46:41,482 [INFO] ml.train_v2:   cow2: 107,965 samples @ 10 Hz — 12 continuous segments detected (recording gap(s) found)
+2026-10-11 00:47:16,965 [WARNING] ml.train_v2:   cow3: 90486/198464 label bins are empty (45.6%) — annotation coverage may be lower than expected.
+2026-10-11 00:47:16,985 [INFO] ml.train_v2:   cow3: 107,978 samples @ 10 Hz — 8 continuous segments detected (recording gap(s) found)
+2026-10-11 00:47:49,148 [WARNING] ml.train_v2:   cow4: 90451/180413 label bins are empty (50.1%) — annotation coverage may be lower than expected.
+2026-10-11 00:47:49,168 [INFO] ml.train_v2:   cow4:  89,962 samples @ 10 Hz — 8 continuous segments detected (recording gap(s) found)
+2026-10-11 00:48:00,472 [INFO] ml.train_v2:   cow5:  53,984 samples @ 10 Hz — 7 continuous segments detected (recording gap(s) found)
+2026-10-11 00:48:31,206 [WARNING] ml.train_v2:   cow6: 108457/180416 label bins are empty (60.1%) — annotation coverage may be lower than expected.
+2026-10-11 00:48:31,222 [INFO] ml.train_v2:   cow6:  71,959 samples @ 10 Hz — 10 continuous segments detected (recording gap(s) found)
+2026-10-11 00:48:32,898 [INFO] ml.step2.run: Windows: 3083 with purity >= 0.80, 509 mapped to ('Active', 'Inactive')
+2026-10-11 00:48:35,604 [INFO] ml.step2.run: seed 42: mean fold BA 0.8575, macro-F1 0.8114, pooled BA 0.8108
+2026-10-11 00:48:38,180 [INFO] ml.step2.run: seed 43: mean fold BA 0.8586, macro-F1 0.8134, pooled BA 0.8120
+2026-10-11 00:48:41,018 [INFO] ml.step2.run: seed 44: mean fold BA 0.8501, macro-F1 0.8012, pooled BA 0.8021
+2026-10-11 00:48:43,843 [INFO] ml.step2.run: seed 45: mean fold BA 0.8558, macro-F1 0.8087, pooled BA 0.8095
+2026-10-11 00:48:46,648 [INFO] ml.step2.run: seed 46: mean fold BA 0.8497, macro-F1 0.7959, pooled BA 0.7983

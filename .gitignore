@@ -75,4 +75,6 @@ backend/ml/data/*
 Thumbs.db
 Desktop.ini
 .ipynb_checkpoints/
+
 !docs/audit_logs/*.log
+!backend/ml/results/**/run.log

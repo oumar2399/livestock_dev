@@ -87,6 +87,7 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 - Ablation at 15 s (pooled): purity 0.70 → 0.9413 · **0.80 → 0.9519** · 0.90 → 0.9210
 - Active windows kept: 47 (0.80) vs 32 (0.90). 30/60 s windows left some folds without both classes.
 - Historical 5 s model: balanced accuracy 0.9212 (not loaded). 4-class experiment ≈ 0.817 ± 0.044 (not deployed).
+- Step 2 runs (evaluation only, deployed model unchanged): every model and run, with results per class and per cow, in `docs/ml/model_registry.md`.
 
 ### Hardware (bench and outdoor, reported by project owner)
 
@@ -196,6 +197,7 @@ Feature freeze: no new large features.
 | Data flows, contracts, components | `project_architecture.md` |
 | LoRaWAN regulation and radio proposals | handoff §13–15 · architecture §20–29 |
 | Business hypotheses | handoff §16–18 |
+| ML model registry (model cards, Step 2 runs, commands) | `docs/ml/model_registry.md` |
 | Literature review (Oct 2026): African sensor studies, public datasets, evaluation protocols | `docs/research/review_2026_10_10.md` |
 | Article strategy and datasets | `scientific_article_development_dossier_livestock_monitoring.docx` |
 | Test evidence | `docs/validation_*` |

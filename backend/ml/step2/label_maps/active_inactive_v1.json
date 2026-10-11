@@ -1,0 +1,25 @@
+{
+  "name": "active_inactive_v1",
+  "description": "Decided 2026-10-10. Active = moving or head-active behaviours (grazing, feeding, drinking, salt licking, licking); Inactive = standing or lying rest and rumination, plus urinating and being mounted. Not comparable with active_resting_v1 (different classes).",
+  "classes": ["Active", "Inactive"],
+  "maps": {
+    "japanese_black": {
+      "MOV": "Active",
+      "ATT": "Active",
+      "ESC": "Active",
+      "GRZ": "Active",
+      "FES": "Active",
+      "DRN": "Active",
+      "SLT": "Active",
+      "LCK": "Active",
+      "RES": "Inactive",
+      "RUS": "Inactive",
+      "URI": "Inactive",
+      "BMN": "Inactive",
+      "REL": "Inactive"
+    }
+  },
+  "excluded": {
+    "japanese_black": ["BLN", "ETC", ""]
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "reference": "ml/models/loao_metrics.json",
+  "six_fold_balanced_accuracies_equal": true,
+  "all_equal": true,
+  "checks": [
+    {
+      "item": "cow1 balanced_accuracy",
+      "ours": 0.9948,
+      "reference": 0.9948,
+      "equal": true
+    },
+    {
+      "item": "cow1 n_train",
+      "ours": 408,
+      "reference": 408,
+      "equal": true
+    },
+    {
+      "item": "cow1 n_test",
+      "ours": 101,
+      "reference": 101,
+      "equal": true
+    },
+    {
+      "item": "cow2 balanced_accuracy",
+      "ours": 0.8777,
+      "reference": 0.8777,
+      "equal": true
+    },
+    {
+      "item": "cow2 n_train",
+      "ours": 347,
+      "reference": 347,
+      "equal": true
+    },
+    {
+      "item": "cow2 n_test",
+      "ours": 162,
+      "reference": 162,
+      "equal": true
+    },
+    {
+      "item": "cow3 balanced_accuracy",
+      "ours": 0.9375,
+      "reference": 0.9375,
+      "equal": true
+    },
+    {
+      "item": "cow3 n_train",
+      "ours": 419,
+      "reference": 419,
+      "equal": true
+    },
+    {
+      "item": "cow3 n_test",
+      "ours": 90,
+      "reference": 90,
+      "equal": true
+    },
+    {
+      "item": "cow4 balanced_accuracy",
+      "ours": 0.9904,
+      "reference": 0.9904,
+      "equal": true
+    },
+    {
+      "item": "cow4 n_train",
+      "ours": 440,
+      "reference": 440,
+      "equal": true
+    },
+    {
+      "item": "cow4 n_test",
+      "ours": 69,
+      "reference": 69,
+      "equal": true
+    },
+    {
+      "item": "cow5 balanced_accuracy",
+      "ours": 0.9038,
+      "reference": 0.9038,
+      "equal": true
+    },
+    {
+      "item": "cow5 n_train",
+      "ours": 479,
+      "reference": 479,
+      "equal": true
+    },
+    {
+      "item": "cow5 n_test",
+      "ours": 30,
+      "reference": 30,
+      "equal": true
+    },
+    {
+      "item": "cow6 balanced_accuracy",
+      "ours": 0.9273,
+      "reference": 0.9273,
+      "equal": true
+    },
+    {
+      "item": "cow6 n_train",
+      "ours": 452,
+      "reference": 452,
+      "equal": true
+    },
+    {
+      "item": "cow6 n_test",
+      "ours": 57,
+      "reference": 57,
+      "equal": true
+    },
+    {
+      "item": "pooled balanced_accuracy",
+      "ours": 0.9519,
+      "reference": 0.9519,
+      "equal": true
+    },
+    {
+      "item": "mean per-fold balanced_accuracy",
+      "ours": 0.9386,
+      "reference": 0.9386,
+      "equal": true
+    },
+    {
+      "item": "std per-fold balanced_accuracy",
+      "ours": 0.0467,
+      "reference": 0.0467,
+      "equal": true
+    },
+    {
+      "item": "pooled confusion matrix",
+      "ours": [
+        [
+          44,
+          3
+        ],
+        [
+          15,
+          447
+        ]
+      ],
+      "reference": [
+        [
+          44,
+          3
+        ],
+        [
+          15,
+          447
+        ]
+      ],
+      "equal": true
+    }
+  ]
+}

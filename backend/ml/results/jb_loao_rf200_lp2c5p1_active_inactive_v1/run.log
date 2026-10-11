@@ -1,0 +1,21 @@
+2026-10-11 00:52:32,633 [INFO] ml.train_v2: Loading cow1.csv …
+2026-10-11 00:52:32,910 [INFO] ml.train_v2:   →  311,876 rows
+2026-10-11 00:52:32,910 [INFO] ml.train_v2: Loading cow2.csv …
+2026-10-11 00:52:33,143 [INFO] ml.train_v2:   →  269,772 rows
+2026-10-11 00:52:33,145 [INFO] ml.train_v2: Loading cow3.csv …
+2026-10-11 00:52:33,370 [INFO] ml.train_v2:   →  269,903 rows
+2026-10-11 00:52:33,372 [INFO] ml.train_v2: Loading cow4.csv …
+2026-10-11 00:52:33,572 [INFO] ml.train_v2:   →  224,912 rows
+2026-10-11 00:52:33,572 [INFO] ml.train_v2: Loading cow5.csv …
+2026-10-11 00:52:33,704 [INFO] ml.train_v2:   →  134,904 rows
+2026-10-11 00:52:33,704 [INFO] ml.train_v2: Loading cow6.csv …
+2026-10-11 00:52:33,869 [INFO] ml.train_v2:   →  179,857 rows
+2026-10-11 00:52:33,895 [INFO] ml.train_v2: Total raw rows: 1,391,224
+
+2026-10-11 00:52:33,970 [INFO] ml.train_v2: Data quality: 1,391,224 rows kept, 0 dropped (0.00% of raw data).
+2026-10-11 00:52:55,860 [INFO] ml.step2.run: Windows: 2946 with purity >= 0.80, 487 mapped to ('Active', 'Inactive')
+2026-10-11 00:52:58,818 [INFO] ml.step2.run: seed 42: mean fold BA 0.8374, macro-F1 0.7874, pooled BA 0.8025
+2026-10-11 00:53:01,644 [INFO] ml.step2.run: seed 43: mean fold BA 0.8363, macro-F1 0.7869, pooled BA 0.8025
+2026-10-11 00:53:04,555 [INFO] ml.step2.run: seed 44: mean fold BA 0.8344, macro-F1 0.7825, pooled BA 0.7999
+2026-10-11 00:53:07,431 [INFO] ml.step2.run: seed 45: mean fold BA 0.8350, macro-F1 0.7843, pooled BA 0.8012
+2026-10-11 00:53:10,285 [INFO] ml.step2.run: seed 46: mean fold BA 0.8318, macro-F1 0.7784, pooled BA 0.7953
