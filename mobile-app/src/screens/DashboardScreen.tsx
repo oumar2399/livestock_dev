@@ -25,6 +25,7 @@ import { useAnimals } from '../hooks/useAnimals';
 import { useActiveAlerts, useAcknowledgeAlert } from '../hooks/useAlerts';
 import { useTelemetryLatest } from '../hooks/useTelemetry';
 import { useFarmDevices } from '../hooks/useDevices';
+import { useFarmStore } from '../store/farmStore';
 import {
   StatCard,
   SectionTitle,
@@ -229,6 +230,9 @@ function AnimalRow({ animal, telemetry, collar }: { animal: Animal; telemetry?: 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const farmName = useFarmStore(
+    (state) => state.farms.find((farm) => farm.id === state.currentFarmId)?.name,
+  );
   const [clockTick, setClockTick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => setClockTick((value) => value + 1), 30_000);
@@ -381,9 +385,23 @@ export default function DashboardScreen() {
     <View style={[styles.screen, { backgroundColor: Colors.bg.primary }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <View>
+        <View style={styles.headerTextBox}>
           <Text style={styles.headerGreeting}>Pastoral Overview 👋</Text>
-          <Text style={styles.headerTitle}>Dashboard</Text>
+          {farmName ? (
+            <View style={styles.headerFarmRow}>
+              <Ionicons
+                name="business-outline"
+                size={Typography.xl}
+                color={Colors.primary}
+                style={styles.headerFarmIcon}
+              />
+              <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
+                {farmName}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.headerTitle}>Dashboard</Text>
+          )}
         </View>
         <TouchableOpacity
           style={styles.alertsBtn}
@@ -562,7 +580,11 @@ const styles = StyleSheet.create({
     height: 90,
   },
   headerGreeting: { fontSize: Typography.sm, color: Colors.text.secondary, fontWeight: '500' },
+  headerTextBox: { flex: 1, minWidth: 0, marginRight: Spacing.sm },
+  headerFarmRow: { flexDirection: 'row', alignItems: 'center' },
+  headerFarmIcon: { marginRight: Spacing.xs },
   headerTitle: {
+    flexShrink: 1,
     fontSize: Typography['2xl'],
     fontWeight: '800',
     color: Colors.text.primary,
