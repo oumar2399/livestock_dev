@@ -8,6 +8,8 @@ Plan: `docs/fix_plan_2026-10.md`. Audit reports: `docs/audit_conformance_2026-10
 Rules for a new session: read-only git unless asked; never `.env`, `device_config.py`,
 `livestock_dev`, `livestock_bench`; tests only through the test guard (disposable DB).
 
+Current state (2026-10-13): commit 1406496, clean tree · backend 761 passed, 0 failed, 0 skipped, alembic check clean (DATABASE_URL=<guard URL> PYTHONDONTWRITEBYTECODE=1 venv/Scripts/python.exe scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short, 08:18–08:19 +0900) · mobile 167 passed, 0 failed, tsc clean (node --test tests/*.test.cjs; npx tsc --noEmit, 08:20 +0900).
+
 ## 0a. Update 2026-10-09 (evening) — Phase 4
 
 Phase 4 (user experience, A14–A21): groups A–C done and committed (`8a54fb7`, `001d99a`).
