@@ -1,0 +1,13 @@
+label,outcome,events,windows_alone_ge142,windows_alone_eq150,windows_merged_ge142,windows_merged_eq150
+Walking,moving,217,99,99,98,98
+Grazing,grazing,105,504,504,502,502
+Resting,resting,10,751,751,750,750
+Standing,resting,59,235,235,235,235
+Trotting,moving,3,0,0,0,0
+Drinking,drinking,3,2,2,2,2
+Licking,excluded:other_miscellaneous,9,0,0,0,0
+LyingDown,excluded:other_miscellaneous,4,0,0,0,0
+Pitching,excluded:other_miscellaneous,8,0,0,0,0
+Rising,excluded:other_miscellaneous,10,0,0,0,0
+Scratching,excluded:other_miscellaneous,5,0,0,0,0
+Shaking,excluded:other_miscellaneous,8,0,0,0,0

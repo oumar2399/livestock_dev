@@ -1,0 +1,4 @@
+2026-10-23 01:50:28,828 [INFO] ml.step2.summarise_external: versluijs: 6395193 samples loaded
+2026-10-23 01:50:36,328 [INFO] ml.step2.summarise_external: versluijs: 4155 valid windows
+2026-10-23 01:50:37,129 [INFO] ml.step2.summarise_external: morales_vargas: 270428 samples loaded
+2026-10-23 01:50:37,915 [INFO] ml.step2.summarise_external: morales_vargas: 1587 valid windows
