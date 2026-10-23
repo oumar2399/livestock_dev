@@ -55,6 +55,7 @@ mobile-app/.kotlin/
 backend/ml/data/*
 !backend/ml/data/.gitkeep
 !backend/ml/data/README.md
+backend/ml/results_private/
 
 # Bases et fichiers générés localement
 *.db

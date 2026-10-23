@@ -86,6 +86,7 @@ Loaders stop on any hash mismatch. Label mappings are the tables at commit time 
 - Versluijs rows where an animal grazes while walking are excluded as conflicts (216,866 rows), so its "moving" class is walking without grazing.
 - Ito covers one recording day; Morales-Vargas walking events are short (about 98 valid walking windows).
 - Versluijs dominates the pooled training sets (4,155 of 6,226 windows).
+- Morales-Vargas contains annotated events only: its gravity-alignment mean vector per animal-day (§4) is computed over event samples, not over a continuous recording as for Ito and Versluijs (Amendment 1).
 
 ## 10. Run rules
 
@@ -106,3 +107,17 @@ Loaders stop on any hash mismatch. Label mappings are the tables at commit time 
 [5] G. Forman and M. Scholz, "Apples-to-apples in cross-validation studies: Pitfalls in classifier performance measurement," *SIGKDD Explor. Newsl.*, vol. 12, no. 1, pp. 49–57, 2010, doi: 10.1145/1882471.1882479.
 
 [6] G. C. Cawley and N. L. C. Talbot, "On over-fitting in model selection and subsequent selection bias in performance evaluation," *J. Mach. Learn. Res.*, vol. 11, pp. 2079–2107, 2010.
+
+## Amendment 1 — clarifications before any run (2026-10-23)
+
+Written before any step-3 run, after the protocol was frozen at commit `7f082aa`. It settles points the protocol left open; it changes no factor, metric, comparison or decision rule. Every step-3 run records the protocol version it used ("Amendment 1" from here on).
+
+1. **Bootstrap resample without a class (§7).** A resample of held-out animals in which a class of the scheme has no window is discarded; balanced accuracy is not computed on it. The number of discarded resamples is reported per scheme, tier, dataset and configuration. An interval for which more than 5 % of the 1000 resamples were discarded is flagged **unreliable**. The two configurations of a paired comparison have the same held-out windows, so a resample is discarded for both or for neither.
+2. **Scope of the decision rule (§8).** The rule is applied separately to each label scheme. Effect of B = (B, off) − (A, off); effect of alignment = (A, aligned) − (A, off), both against the reference configuration. (B, aligned) is reported descriptively only. "Positive" refers to the seed-averaged point difference in pooled balanced accuracy.
+3. **No harmonisation after alignment (§3).** The order of §3 is kept: aligned samples are not clipped or quantised again. They may lie off the 0.016 g grid and outside [−2.048, 2.032] g; their norm is unchanged.
+4. **Training fold without a class (§6).** If the training set of any fold, in T1 or T2, lacks a class of the scheme, the run stops. No fold is skipped.
+5. **Sensitivity analysis 1 (§8)** (reference configuration, quantisation off) is run in both label schemes.
+6. **T1 outputs (§7–8).** Per-animal balanced accuracy and the paired-difference intervals (B − A, aligned − off) are also reported for T1, descriptively. The decision rule uses T2 only.
+7. **Transfer gap (§7)** is reported as a seed-averaged point estimate only, without an interval.
+8. **Per-window predictions** are stored only in `backend/ml/results_private/`, covered by the `.gitignore` rule `backend/ml/results_private/`. Committed results folders hold aggregated results only.
+9. **Morales-Vargas and gravity alignment (§4).** The dataset contains annotated events only, so its mean vector per animal-day is computed over the samples of those events (every label, including excluded ones and shared samples kept as unused), not over a continuous recording as for Ito and Versluijs. Labels are still not used. This is recorded in each run's `config.json` and in §9.
