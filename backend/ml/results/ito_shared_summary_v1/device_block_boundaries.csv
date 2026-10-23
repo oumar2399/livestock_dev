@@ -1,0 +1,4 @@
+kind,boundaries,step_le_1000ms,inside_shared_segment,valid_windows_containing
+missed_tick,555,555,127,54
+filter_restart,52,22,3,1
+all,607,577,130,54

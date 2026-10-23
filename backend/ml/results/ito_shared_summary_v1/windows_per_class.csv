@@ -1,0 +1,10 @@
+dataset,scheme,class,windows_ge142,windows_eq150
+japanese_black,base,drinking,5,5
+japanese_black,base,grazing,26,24
+japanese_black,base,moving,51,44
+japanese_black,base,resting,402,356
+japanese_black,2-class,active,82,73
+japanese_black,2-class,resting,402,356
+japanese_black,3-class,grazing,26,24
+japanese_black,3-class,moving,51,44
+japanese_black,3-class,resting,402,356

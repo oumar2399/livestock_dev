@@ -1,0 +1,16 @@
+dataset,item,rows
+japanese_black,raw_rows,1391224
+japanese_black,dropped_by_loader_cleaning,0
+japanese_black,rows_25hz_loaded,1391224
+japanese_black,samples_10hz,556065
+japanese_black,excluded:body_care,521
+japanese_black,excluded:excretion,249
+japanese_black,excluded:feeding_stanchion,3149
+japanese_black,excluded:other,221722
+japanese_black,excluded:salt_licking,4342
+japanese_black,excluded:social_interaction,219
+japanese_black,excluded:unlabeled,216168
+japanese_black,mapped:drinking,991
+japanese_black,mapped:grazing,7034
+japanese_black,mapped:moving,20064
+japanese_black,mapped:resting,81606

@@ -1,0 +1,167 @@
+{
+  "name": "ito_shared_summary_v1",
+  "started": "2026-10-23T11:01:29+09:00",
+  "finished": "2026-10-23T11:01:54+09:00",
+  "command": "python -m ml.step2.summarise_ito",
+  "git": {
+    "commit": "deb510fdf0b4537122924273e91918732b179a61",
+    "dirty": true,
+    "n_changed_paths": 1
+  },
+  "code_sha256": {
+    "step2/ito_shared.py": "a21b4c3306a73104eec17950793f23626529bcd4fcc256290d4bc48a976eed7a",
+    "step2/summarise_ito.py": "cb981bf08dc0f47bafdd72b012ccc198a0d233f434c7fe4806edad65fc2f5d9a",
+    "step2/summarise_external.py": "9644b6fb0181cf32c7eb01e6b45e1851217871f1c2e30d33b0c8fbd271c42f4e",
+    "step2/external_datasets.py": "dda001be4c00ffabeddf868e2663be9fc30f31da4600ab7b6634e4e084c33636",
+    "step2/segments.py": "b558006beceee7a95662c51de63782663ab00226229fdfc8628a431c45195ce6",
+    "step2/harmonise.py": "68c16e41aea03abf4a1cee03b105e70460f4c1d3bc61c1fae4eeafd04737dda9",
+    "step2/windows.py": "233745e7dac07e91a7f2e4bb83b4ffc8d8d2d3e5157a6c30f95030ee538d110b",
+    "step2/preprocess.py": "c958d1f41390bff236e7b32d07c26e2ba538c54308ccca891dc9d377314ac723",
+    "step2/datasets.py": "1623b543a43d8e9e1f9f6ae2d6cba9983d8e4562fd20a61ec621adfb2b92ebbd",
+    "train_v2.py": "d443c825bee57d6f54cb1856eaba954434846975d551c07e51508e8caf682bba"
+  },
+  "data": {
+    "japanese_black": {
+      "files": 6,
+      "sha256": [
+        {
+          "dataset": "japanese_black",
+          "file": "cow1.csv",
+          "bytes": 16274857,
+          "sha256": "92cbb5a1691e16397358a1cefd3225c818843f7b6ecdfe97382afc2ea90e46e5"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow2.csv",
+          "bytes": 14230432,
+          "sha256": "4a7808e88939445fdb933928c3234cecab38cd2c2e08fa93832282f8abed83b7"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow3.csv",
+          "bytes": 14178907,
+          "sha256": "ec78f8e4574ac8e506273b3b7d5619fd8796ff0b0ab94900f867dc478d922036"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow4.csv",
+          "bytes": 11728280,
+          "sha256": "3f433b9ebb90aada5ca885898136bcdba2d0861ef9ee7bc53de71cea695c7ad4"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow5.csv",
+          "bytes": 7104203,
+          "sha256": "a4e6df9a5d2a0782397e1b9f298dea5ae8bbb594fee95d04e613dfae72ca9e9c"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow6.csv",
+          "bytes": 9536358,
+          "sha256": "55484465db6ab6ade47ae6862ff0bcaa8c174229bb5ab153d8577e5bbd42c306"
+        }
+      ],
+      "hash_check": {
+        "source": "docs/ml/model_registry.md",
+        "status": "all files match (bytes and SHA-256)"
+      }
+    }
+  },
+  "preprocess": {
+    "function": "preprocess.device_lp_point_10hz",
+    "arguments": {
+      "timezone": "Asia/Tokyo",
+      "native_hz": 25,
+      "cutoff_hz": 5.1,
+      "order": 1
+    },
+    "description": {
+      "method": "device_lp_point",
+      "filter": {
+        "type": "Butterworth low-pass, order 1, causal (scipy.signal.sosfilt)",
+        "cutoff_hz": 5.1,
+        "design": "scipy.signal.butter at fs = 25 Hz (bilinear, pre-warped: -3 dB at the cutoff)",
+        "initial_state": "steady state at the first sample of each block",
+        "approximation": "The exact MPU6886 DLPF response is not known. This filter only matches its documented 3 dB bandwidth (5.1 Hz for A_DLPF_CFG=6 [to verify] against the datasheet). Order 1 is chosen because the documented noise bandwidth / 3 dB ratio (7.8 / 5.1 = 1.53) is close to a first-order filter (pi/2 = 1.57), not a 2nd-order Butterworth (1.11). The chip filters a ~1 kHz signal; content above the dataset's Nyquist frequency cannot be reproduced. Raw samples are treated as evenly spaced."
+      },
+      "point_sampling": {
+        "grid_ms": 100,
+        "rule": "nearest raw sample to each 100 ms tick (value and native label); no averaging",
+        "max_offset_ms": 20,
+        "missed_tick": "ends the block (the firmware drops a window with a sample > 20 ms late)"
+      },
+      "gap_ms": 300,
+      "target_hz": 10
+    }
+  },
+  "time": "relative only: t_rel_ms = ms since the first 10 Hz sample of each animal-day; day = the loader's local day (Asia/Tokyo); epoch t_ms is dropped after conversion",
+  "harmonise": {
+    "axes": [
+      "ax",
+      "ay",
+      "az"
+    ],
+    "unit": "g",
+    "clip_g": [
+      -2.048,
+      2.032
+    ],
+    "quantise": true,
+    "step_g": 0.016,
+    "rounding": "nearest multiple of step_g, ties to even (numpy rint); the collar's exact rounding is [to verify]"
+  },
+  "harmonise_gravity": "gravity_resting.csv has both quantise=True and quantise=False",
+  "windows": {
+    "segment": "consecutive samples of one animal-day with the same base class; a change of class, an unused sample, or a time step > 1000 ms starts a new segment",
+    "grid_ms": 100,
+    "window_slots": 150,
+    "window": "fixed, non-overlapping, from the segment start, fully inside the segment",
+    "min_samples": 142,
+    "strict": "subset of valid windows with all 150 slots filled",
+    "features": "windows.window_features on the samples present",
+    "schemes": {
+      "class_2": {
+        "moving": "active",
+        "grazing": "active",
+        "drinking": "active",
+        "resting": "resting"
+      },
+      "class_3": {
+        "moving": "moving",
+        "grazing": "grazing",
+        "drinking": "",
+        "resting": "resting"
+      }
+    }
+  },
+  "device_blocks": "device_lp_point blocks are not segments here; device_block_boundaries.csv counts missed ticks (filter continues) and filter restarts (raw gap > 300 ms) separately",
+  "mapping": {
+    "labels": {
+      "MOV": "moving",
+      "GRZ": "grazing",
+      "RES": "resting",
+      "RUS": "resting",
+      "REL": "resting",
+      "DRN": "drinking",
+      "SLT": "excluded:salt_licking",
+      "FES": "excluded:feeding_stanchion",
+      "LCK": "excluded:body_care",
+      "URI": "excluded:excretion",
+      "ATT": "excluded:social_interaction",
+      "ESC": "excluded:social_interaction",
+      "BMN": "excluded:social_interaction",
+      "ETC": "excluded:other",
+      "": "excluded:unlabeled"
+    },
+    "notes": [
+      "the ReadMe's BLN appears as an empty string in the data",
+      "ReadMe URI count for cow1 is 239; the data have 238 (URI total 621 matches)"
+    ]
+  },
+  "versions": {
+    "python": "3.11.9",
+    "pandas": "3.0.2",
+    "numpy": "2.4.4"
+  },
+  "outputs": "aggregated counts and means only; no per-sample rows, no per-window features"
+}
