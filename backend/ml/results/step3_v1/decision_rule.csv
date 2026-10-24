@@ -1,0 +1,5 @@
+scheme,comparison,new,reference,n_directions,n_positive,n_interval_excludes_0,any_interval_unreliable,verdict
+class_2,B_minus_A,2class_B_off_qon,2class_A_off_qon,3,2,2,False,no consistent effect
+class_2,aligned_minus_off,2class_A_aligned_qon,2class_A_off_qon,3,3,2,False,improvement in transfer
+class_3,B_minus_A,3class_B_off_qon,3class_A_off_qon,3,2,2,False,no consistent effect
+class_3,aligned_minus_off,3class_A_aligned_qon,3class_A_off_qon,3,3,2,False,improvement in transfer

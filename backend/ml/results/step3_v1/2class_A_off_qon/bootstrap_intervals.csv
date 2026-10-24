@@ -1,0 +1,7 @@
+config,config_role,tier,dataset,n_animals,balanced_accuracy,ci_low,ci_high,n_resamples,n_discarded,unreliable,exploratory
+2class_A_off_qon,reference,T1,japanese_black,6,0.9561825021235286,0.9127592500414801,0.9818360993467494,1000,0,False,False
+2class_A_off_qon,reference,T1,morales_vargas,10,0.9113206401672933,0.8187599898084164,0.9836962627175663,1000,0,False,False
+2class_A_off_qon,reference,T1,versluijs,37,0.921164620597958,0.8899228427060059,0.9428611893281624,1000,0,False,False
+2class_A_off_qon,reference,T2,japanese_black,6,0.820264531003519,0.7780762068471565,0.8491228070175438,1000,0,False,False
+2class_A_off_qon,reference,T2,morales_vargas,10,0.8926787189908427,0.8130426965348958,0.955775940393444,1000,0,False,False
+2class_A_off_qon,reference,T2,versluijs,37,0.8803428847249133,0.8489107906683923,0.9071666622786164,1000,0,False,False

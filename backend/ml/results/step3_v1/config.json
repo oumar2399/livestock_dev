@@ -1,0 +1,3067 @@
+{
+  "started": "2026-10-24T08:48:30+09:00",
+  "finished": "2026-10-24T09:19:45+09:00",
+  "command": "python -m ml.step3.run",
+  "protocol": {
+    "path": "docs/ml/protocol_step3.md",
+    "version": "Amendment 1",
+    "last_commit": "98a26ee90d1440354f8ab194c9c10a7af16bd544",
+    "git_blob": "089b29a0f5f565fa3c7747c1584c95825cf50ac7",
+    "sha256": "253987dc67545f7fd711b2e4963f019c4800a85e63194d6044e6c0bac6071b15"
+  },
+  "git": {
+    "commit": "f696f87c658ae580fa127101509122720ac94b4a",
+    "dirty": true,
+    "n_changed_paths": 1
+  },
+  "code_sha256": {
+    "step3/__init__.py": "4d35eae0dde1006e27cdd9f3bf0469e33107b99d250146d64edad10a9e3d426c",
+    "step3/align.py": "0ee20831200dc88ca840129d4d477fa332becba1f2335b4a472ff6edbd0b7d28",
+    "step3/features.py": "07b40724eb6658fa8724025ae52482691771db0e3a3575a5caf479d61810e34f",
+    "step3/pipeline.py": "4295f2d9ae5380a222fdf5cf88aa4a390f5c0604cc5f98171f8d897df3a953a8",
+    "step3/tiers.py": "8f148e3f010c72646b25959a412d2ca447b83130d1d902f386303040f316ea09",
+    "step3/metrics.py": "db54cb339571aacb37fd4f661b1bcb4a14632740b437b5d2debc3bec262ffc05",
+    "step3/run.py": "1921198ac7e36106cfafaa88029ecde9f5e10e978e76f48a664aa0398c2d2485",
+    "step2/segments.py": "b558006beceee7a95662c51de63782663ab00226229fdfc8628a431c45195ce6",
+    "step2/harmonise.py": "68c16e41aea03abf4a1cee03b105e70460f4c1d3bc61c1fae4eeafd04737dda9",
+    "step2/external_datasets.py": "dda001be4c00ffabeddf868e2663be9fc30f31da4600ab7b6634e4e084c33636",
+    "step2/ito_shared.py": "a21b4c3306a73104eec17950793f23626529bcd4fcc256290d4bc48a976eed7a",
+    "step2/windows.py": "233745e7dac07e91a7f2e4bb83b4ffc8d8d2d3e5157a6c30f95030ee538d110b",
+    "step2/evaluate.py": "a2098f74314b8c18f1bee400a623210ebe23565f59dbdc4e068471e0f77e8052",
+    "step2/preprocess.py": "c958d1f41390bff236e7b32d07c26e2ba538c54308ccca891dc9d377314ac723",
+    "step2/datasets.py": "1623b543a43d8e9e1f9f6ae2d6cba9983d8e4562fd20a61ec621adfb2b92ebbd",
+    "step2/run.py": "ac27af96897e4be2e13e7372921594ef62d57c006d8e35ac59ce46eeadbdb614",
+    "train_v2.py": "d443c825bee57d6f54cb1856eaba954434846975d551c07e51508e8caf682bba"
+  },
+  "data": {
+    "japanese_black": {
+      "files": 6,
+      "sha256": [
+        {
+          "dataset": "japanese_black",
+          "file": "cow1.csv",
+          "bytes": 16274857,
+          "sha256": "92cbb5a1691e16397358a1cefd3225c818843f7b6ecdfe97382afc2ea90e46e5"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow2.csv",
+          "bytes": 14230432,
+          "sha256": "4a7808e88939445fdb933928c3234cecab38cd2c2e08fa93832282f8abed83b7"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow3.csv",
+          "bytes": 14178907,
+          "sha256": "ec78f8e4574ac8e506273b3b7d5619fd8796ff0b0ab94900f867dc478d922036"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow4.csv",
+          "bytes": 11728280,
+          "sha256": "3f433b9ebb90aada5ca885898136bcdba2d0861ef9ee7bc53de71cea695c7ad4"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow5.csv",
+          "bytes": 7104203,
+          "sha256": "a4e6df9a5d2a0782397e1b9f298dea5ae8bbb594fee95d04e613dfae72ca9e9c"
+        },
+        {
+          "dataset": "japanese_black",
+          "file": "cow6.csv",
+          "bytes": 9536358,
+          "sha256": "55484465db6ab6ade47ae6862ff0bcaa8c174229bb5ab153d8577e5bbd42c306"
+        }
+      ],
+      "hash_check": {
+        "source": "docs/ml/model_registry.md",
+        "status": "all files match (bytes and SHA-256)"
+      },
+      "preprocess": {
+        "function": "preprocess.device_lp_point_10hz",
+        "arguments": {
+          "timezone": "Asia/Tokyo",
+          "native_hz": 25,
+          "cutoff_hz": 5.1,
+          "order": 1
+        },
+        "description": {
+          "method": "device_lp_point",
+          "filter": {
+            "type": "Butterworth low-pass, order 1, causal (scipy.signal.sosfilt)",
+            "cutoff_hz": 5.1,
+            "design": "scipy.signal.butter at fs = 25 Hz (bilinear, pre-warped: -3 dB at the cutoff)",
+            "initial_state": "steady state at the first sample of each block",
+            "approximation": "The exact MPU6886 DLPF response is not known. This filter only matches its documented 3 dB bandwidth (5.1 Hz for A_DLPF_CFG=6 [to verify] against the datasheet). Order 1 is chosen because the documented noise bandwidth / 3 dB ratio (7.8 / 5.1 = 1.53) is close to a first-order filter (pi/2 = 1.57), not a 2nd-order Butterworth (1.11). The chip filters a ~1 kHz signal; content above the dataset's Nyquist frequency cannot be reproduced. Raw samples are treated as evenly spaced."
+          },
+          "point_sampling": {
+            "grid_ms": 100,
+            "rule": "nearest raw sample to each 100 ms tick (value and native label); no averaging",
+            "max_offset_ms": 20,
+            "missed_tick": "ends the block (the firmware drops a window with a sample > 20 ms late)"
+          },
+          "gap_ms": 300,
+          "target_hz": 10
+        }
+      }
+    },
+    "morales_vargas": {
+      "files": 441,
+      "sha256": [
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/101_Grazing_2016_20240515_133048.csv",
+          "bytes": 289375,
+          "sha256": "9c29a95ab186eff2ee06a4601ab13114b7c491261f6e94892488cabd4af8f920"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/106_Grazing_2016_20240515_133821.csv",
+          "bytes": 200234,
+          "sha256": "09979e193ddc77062eb22af1c1298cefdacec7ddde126674c0b9f8a5d7d94b19"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/108_Grazing_2016_20240515_134123.csv",
+          "bytes": 38129,
+          "sha256": "0c9904dce086602a124545256f62341ddb5eadf4ea84473d669197b39fcd1b12"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/110_Grazing_2016_20240515_134706.csv",
+          "bytes": 53795,
+          "sha256": "ffd13ee71c54a44de198a61b272eb38d2a35d95de24c4e1209a40c3cc187e63c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/113_Grazing_2016_20240515_134943.csv",
+          "bytes": 162018,
+          "sha256": "25badd21811e41644e1a52440e61b6ed6e131726bd3e36b9eac330abdc5a6a8d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/116_Grazing_1319_20240517_111857.csv",
+          "bytes": 358170,
+          "sha256": "932345e783909453220d1675417d87bd7209d65c958fcb00ed73469fdeca5b7f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/119_Grazing_1319_20240517_112757.csv",
+          "bytes": 278704,
+          "sha256": "b7d500cce6f33f043c46ae874e915fe5b26dd933c16f55b6ca361800a537dd0d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/121_Grazing_1217_20240517_113740.csv",
+          "bytes": 383580,
+          "sha256": "bafea00fe84be8451562405c2a2201a7c3b56698ab7dac3500b1bd161466f243"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/127_Grazing_1217_20240517_121023.csv",
+          "bytes": 56048,
+          "sha256": "7295ae87437587776589fd3b815e40328842aba112bacce43dbdbe2183fbbb23"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/129_Grazing_1217_20240517_121103.csv",
+          "bytes": 191154,
+          "sha256": "325acf6a6050abf5b5701ef5649a0f577e56063f7aa3c8ce493813cb135402d8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/132_Grazing_1319_20240517_120031.csv",
+          "bytes": 57022,
+          "sha256": "60214a64e63f75d912fcc306d3009731683c38408a640bea1ffa0940e695ea8f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/133_Grazing_1319_20240517_120057.csv",
+          "bytes": 181247,
+          "sha256": "897da387f6aee1171ed329745a3ca037dac32089f4e82bd6b76f1d94f7538243"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/134_Grazing_1319_20240517_120219.csv",
+          "bytes": 317364,
+          "sha256": "49b2a76ef784a30fad4d8bb06cdc26c8443384f55630d982f61441f8c2cd7dcc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/137_Grazing_1319_20240517_120747.csv",
+          "bytes": 54282,
+          "sha256": "de90ce55361b396ffa690722a9e8dc8cfd48b5cc8bee90c7fab1cc01e50e4183"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/143_Grazing_2016_20240517_122838.csv",
+          "bytes": 107209,
+          "sha256": "25cc9ad435342788cd11c514a9447fe5b67aa83ca567683ab95ca2ab40438caa"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/145_Grazing_2016_20240517_123307.csv",
+          "bytes": 70566,
+          "sha256": "781ff709d0b290d8771cb8b81ce0afcab0183016eceb058011a9031d55749a36"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/158_Grazing_1217_20240517_130959.csv",
+          "bytes": 256540,
+          "sha256": "1cb375c4cee0eb9b1b37cf225c53c5dfc468d679a91f2713463a01ee2fd94604"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/167_Grazing_1217_20240517_142050.csv",
+          "bytes": 54232,
+          "sha256": "37ef133577753ce322687fe53c12559f1190f645892d85d28e2616717cec9048"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/169_Grazing_1217_20240517_142129.csv",
+          "bytes": 76319,
+          "sha256": "85f2cba26c7440d99c7112fc64c12bdeca0c58b3be33a0a77a757b91e43ccd8b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/170_Grazing_1217_20240517_152509.csv",
+          "bytes": 88303,
+          "sha256": "35d2f009cb9d78a74146b99c0bc6914700296c75f7fdf1038fa94e1bf3c118f9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/174_Grazing_3321_20240601_105809.csv",
+          "bytes": 94502,
+          "sha256": "8d37cea7a99593bba323ac8bd92d9af20249c5fc84e433a1aacf2999fc54569b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/175_Grazing_3321_20240601_110952.csv",
+          "bytes": 42914,
+          "sha256": "cbd139d713072ec57c5693d21074c52d537eccffcc19270bfbd8df992821a55b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/176_Grazing_3321_20240601_111018.csv",
+          "bytes": 308789,
+          "sha256": "e8d2bc6dbfb0203015d25f08e3de699b2c7d032351413a8b655661c40762644e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/182_Grazing_4119_20240601_120518.csv",
+          "bytes": 13978,
+          "sha256": "d1b9e9d9e1ac562de8b7911d4bb904ff825b85a7dd0363c02da59b13d34f3ee9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/183_Grazing_4119_20240601_120534.csv",
+          "bytes": 168896,
+          "sha256": "b0dba232405942e3565eae86be1130ba2667485c8996886ce923825e43ecfe06"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/184_Grazing_4119_20240601_120700.csv",
+          "bytes": 363975,
+          "sha256": "7850b2812cb366be15a7ff54c0ba11a7f72dc31613761fc0aff0bf7fa458945e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/193_Grazing_6319_20240601_120826.csv",
+          "bytes": 53172,
+          "sha256": "3aca71cddceebe64d2c550f6a499c3ce8ab3e245ac001c042503b73d28dea270"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/194_Grazing_6319_20240601_120857.csv",
+          "bytes": 95448,
+          "sha256": "2a0275d6dd4032e83574bb206c231452afce4cd1a3e6df36033c599ebe56c3b8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/195_Grazing_6319_20240601_122000.csv",
+          "bytes": 51779,
+          "sha256": "ea67db638a9d896c839cc8ab1909363479845b9e423ca9ec535b9a16e881021f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/196_Grazing_6319_20240601_122031.csv",
+          "bytes": 133563,
+          "sha256": "ddd50b6caf9d0e0f947c3f3a47285c8a56c29b32ab1705ba6551aed51918982d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/197_Grazing_6319_20240601_122208.csv",
+          "bytes": 91470,
+          "sha256": "ea3fdf5e661106108a538950d0e41be88f95d5578744c6ebce91c77f0c101534"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/199_Grazing_6319_20240601_125017.csv",
+          "bytes": 136709,
+          "sha256": "ff8164fb63ffbf51a4ccd8bdc80fedf531cadad345bef47e088300620adf19be"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/200_Grazing_6319_20240601_125124.csv",
+          "bytes": 105051,
+          "sha256": "cf92f3daded0846f93aedbc89d097d0ce7b87d8c9ffb0fded245c31fa669414a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/201_Grazing_6319_20240601_125221.csv",
+          "bytes": 122877,
+          "sha256": "2c0b545dabc4e82e25c4e1ea9e33957d57cc980f4cfc9c57f8dda01a5b394622"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/202_Grazing_6319_20240601_125319.csv",
+          "bytes": 112084,
+          "sha256": "d0adb6eb912304162e36b87b4266cbaae7988a49d1466a3caa1692dfbc982405"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/203_Grazing_6319_20240601_125424.csv",
+          "bytes": 56105,
+          "sha256": "e22b1deb1ec45e23ab58db0108c264052d40dc4c7136b595b74bc97d06b997ec"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/204_Grazing_6319_20240601_125453.csv",
+          "bytes": 162452,
+          "sha256": "1d8325846600532a813f3dd87d62a41d5e661f214fbfdcabaa07386fe2f8debb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/205_Grazing_6319_20240601_125610.csv",
+          "bytes": 44910,
+          "sha256": "5d54910ddb5d8d315f8dee01bc12b1ea1cb93406a5110cb4f977582e59691b8c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/206_Grazing_6319_20240601_125636.csv",
+          "bytes": 36308,
+          "sha256": "d2e6d8a0243f8627c42b19637742cc3763983d29aeecc5ba16be05a9ea1f7aa3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/207_Grazing_6319_20240601_125656.csv",
+          "bytes": 144922,
+          "sha256": "5152c0d2789db36dd4e5f3e2b5e4d8aa9fb32e89a0e70cb3bf9f32c3619da307"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/214_Grazing_3321_20240601_121119.csv",
+          "bytes": 349385,
+          "sha256": "60bf2c633a071b329d9d241f6055b8fad5312a52f5c6386c7d50b12d95275ff2"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/215_Grazing_3321_20240601_121401.csv",
+          "bytes": 101511,
+          "sha256": "a38fa3cfc82746d49e4e581c5202ac3e4d20826ca750c2d860844463e9bee0eb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/216_Grazing_3321_20240601_121511.csv",
+          "bytes": 88163,
+          "sha256": "fc70db25198f3aa2ad0fd8904027ae6e7c4acdbfda3ccc3855119cc1222e3419"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/217_Grazing_3321_20240601_121552.csv",
+          "bytes": 249362,
+          "sha256": "beaf2b5f2db3104cbd20e653a0cc523d9174a4f7fba481918a0cc7a4e3017d3f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/218_Grazing_3321_20240601_121747.csv",
+          "bytes": 371653,
+          "sha256": "eb73cec92032314ea390c020d5529e487cdb32296eacd9a4a8222d7f76cb701c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/220_Grazing_3321_20240601_122052.csv",
+          "bytes": 132096,
+          "sha256": "8c98c7d22dd75c9dee5cce31c6733b5e5ca7ab7d84bcc7d003432edcfd6b2f45"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/229_Grazing_4119_20240602_102113.csv",
+          "bytes": 259272,
+          "sha256": "bd9316740a7ea0d4dbe3380c007e30a8a2ee855c1f8f580eb46380f070a09d68"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/230_Grazing_4119_20240602_102637.csv",
+          "bytes": 80182,
+          "sha256": "e0e8cc3266598d961c2f9b9965b19c9b1c7490cb39df6d571218885726270f0e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/231_Grazing_4119_20240602_102910.csv",
+          "bytes": 207527,
+          "sha256": "2deac2c5ead8a718e1ef779b8aaf33fa3dbe00501a100f4888a5687bc2e7503d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/232_Grazing_4119_20240602_103144.csv",
+          "bytes": 100636,
+          "sha256": "babae303a5de4466fc038552658cb71a09e75554682440666e28ca15a680aa25"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/233_Grazing_4119_20240602_103240.csv",
+          "bytes": 37498,
+          "sha256": "fad5294d85e08902fc5b0373b208275fcf67eaa417c68f7fd8326d858ef2c47d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/234_Grazing_4119_20240602_103302.csv",
+          "bytes": 237387,
+          "sha256": "cb13883b5fd7c05534a466addcf22002117fbd88efbf33f05b4f175589347de8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/235_Grazing_4119_20240602_104111.csv",
+          "bytes": 76302,
+          "sha256": "58bc914bd4762ed6ab891829e7ddf5e08f23b616f9339734f61f701bbebadecf"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/236_Grazing_4119_20240602_104201.csv",
+          "bytes": 90620,
+          "sha256": "e7a11b367d73f18b64f3bff128bdea6ae9bff1fb688311e5d99d904fbce9c21b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/237_Grazing_4119_20240602_114622.csv",
+          "bytes": 197122,
+          "sha256": "bd5ea2e0abd2879d4f7ab4b833be17cc76d34b0a448adb41d3cece61c354f163"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/238_Grazing_4119_20240602_114758.csv",
+          "bytes": 246338,
+          "sha256": "6b44292560495de53c6181f22fab4cd469bc615fc9e131a05602efe74d7fe512"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/239_Grazing_4119_20240602_115008.csv",
+          "bytes": 113026,
+          "sha256": "d0a4a65d3077be065af42e334bf3dc783df4b1238399d7aedc7b0d349b417040"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/241_Grazing_4119_20240602_115110.csv",
+          "bytes": 78418,
+          "sha256": "32d8bffcf1b249f0089e7e564678fa67a9f1866e234ced557cc87e0e8a4fb493"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/242_Grazing_4119_20240602_115151.csv",
+          "bytes": 45613,
+          "sha256": "b9c1bfbb40bdae63ea1d9d524ae64992e2121cffd103aa90ce6abc0dbd2050ec"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/244_Grazing_4119_20240602_115244.csv",
+          "bytes": 145843,
+          "sha256": "e99cad15037278fa060014071a397ca7d5402ca7d3ecb47812b3c53867a95c55"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/253_Grazing_4119_20240602_154041.csv",
+          "bytes": 232892,
+          "sha256": "2e8c900bca816dff61ab4fe6db7ddf302670130b987ccb7b5fc16ba733259736"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/256_Grazing_4119_20240602_154353.csv",
+          "bytes": 99497,
+          "sha256": "57c38e5bab62c4b860bd0c373994fbe6445a555c39c108baab4f10591f1afa06"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/260_Grazing_4119_20240602_154613.csv",
+          "bytes": 32864,
+          "sha256": "3372f178b409052a23d2d3ffae14323ff19e70058199ec514acca54b3f800dad"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/272_Grazing_3321_20240605_104211.csv",
+          "bytes": 143228,
+          "sha256": "8eb79bcfde3f1e2972c446ced5898f61ed84a9bfcc77b66de6acf19cb9ef1622"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/273_Grazing_3321_20240605_104320.csv",
+          "bytes": 24662,
+          "sha256": "76cf062953936df112b9f999110ca5f2bc1485bf8d7459788ab4124d4d9ae3e1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/274_Grazing_3321_20240605_104333.csv",
+          "bytes": 254748,
+          "sha256": "2d82f49bef8b1648852298e6b7c992fb6cefa1724b30ed6b1d36c45b102e94e6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/275_Grazing_3321_20240605_104621.csv",
+          "bytes": 30852,
+          "sha256": "ef7868177098226f9aba7686dfb572ce08c205bb7ead979a2838865463c58f7d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/276_Grazing_3321_20240605_104638.csv",
+          "bytes": 594986,
+          "sha256": "ea05aa57489f7d8c0a5f5cf2ecc8b11064a7952af84850782fd51b8617cd7cdd"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/282_Grazing_3321_20240605_110525.csv",
+          "bytes": 115204,
+          "sha256": "53dea7ded8a18d53ddd30098628899265bdb97662d49edf00b61dbaf16de4619"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/295_Grazing_6319_20240606_103109.csv",
+          "bytes": 372972,
+          "sha256": "b006ac1db90bfadcf2abd16a15c971d17bc9f1af1ad1df2170b78054f60c043a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/297_Grazing_6319_20240606_103420.csv",
+          "bytes": 426709,
+          "sha256": "36ba657b50bf0b43278778b4550f7c94d28ab03fd35c86edbc59246d2e6fc89a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/298_Grazing_6319_20240606_103918.csv",
+          "bytes": 238714,
+          "sha256": "bcafecc16cb929d291ecee3413ed607aa30e11abb7a1787912e7be4eb34994dc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/29_Grazing_4821_20240514_103227.csv",
+          "bytes": 112524,
+          "sha256": "2c0d7025689a424f92fd1903a181002ca267a240817c0a2a4995d031e209eaf5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/300_Grazing_6319_20240606_104611.csv",
+          "bytes": 124408,
+          "sha256": "1452ae3e4934f8c045b6c56215c78d475e9c4c59c3a44c2482a6ec5813be1010"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/302_Grazing_6019_20240930_134750.csv",
+          "bytes": 14714,
+          "sha256": "b624d5fe55c8afab38ed7b31383359f79b89ebf6dbfe5ed8e8a063f8543058f4"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/31_Grazing_4821_20240514_103429.csv",
+          "bytes": 661590,
+          "sha256": "3881e6df3e1ec45818f7538f86ce58943e2d2452e0a257fd454f79d1beaacbd5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/328_Grazing_6019_20240930_142611.csv",
+          "bytes": 81061,
+          "sha256": "228ca6e00867dc0ea406cf18e42bd05ff59947f1a51b6464d7daaba9ee62b4bc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/354_Grazing_3120_20241001_131022.csv",
+          "bytes": 93660,
+          "sha256": "3d2e2d24e8b6f499c69459f0f0d281b332cef44c94fd620ac3211949502e784d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/355_Grazing_3120_20241001_131222.csv",
+          "bytes": 195994,
+          "sha256": "756a5e3599e5b137a06244a0745ae5eb2ac02a82f4f224bad923da8a1662e5b2"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/35_Grazing_2016_20240514_131516.csv",
+          "bytes": 126472,
+          "sha256": "b7c1cd558bd977d6d1e1eab783a5183f65541da94f39edc47fdec5629677a6d7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/364_Grazing_3120_20241006_142111.csv",
+          "bytes": 182401,
+          "sha256": "073777539591a7fe0ff4c8a7c7ffa055acf79e18185600ba728c8254f5b09440"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/365_Grazing_3120_20241006_142248.csv",
+          "bytes": 145932,
+          "sha256": "247c2cd94454af8d80998224dce00a3a09d6458b83852ab4e65a0c2ce0333bc3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/377_Grazing_3120_20241008_092026.csv",
+          "bytes": 30849,
+          "sha256": "6616323b49502b09846bdebed37324c24c973d27614205e6ef138ed1cbc89395"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/387_Grazing_3120_20241008_150244.csv",
+          "bytes": 77683,
+          "sha256": "f98df44c2afe3ccc9d515431c38dee5ccd157729218c6bd6ea300cc9961168d9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/389_Grazing_3120_20241008_150344.csv",
+          "bytes": 99228,
+          "sha256": "97f9a8e0c6de8c544421041739452f6f754529a9006670861ad3a151aaedad8c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/403_Grazing_1219_20241015_123245.csv",
+          "bytes": 313100,
+          "sha256": "9a1e10e5e231f34132e785a0880bc2a348996880267824409235f39c8e293429"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/415_Grazing_1219_20241021_115913.csv",
+          "bytes": 36735,
+          "sha256": "9e78d6609936446c13180cc03b112881433aed006bcfdc24b970ec2cd3d23bbd"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/430_Grazing_1219_20241023_121150.csv",
+          "bytes": 241502,
+          "sha256": "d3b5f82142caa1bc72d4c1d6eaa91dacd926b0d8c6258193ebacdcd2862353ba"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/50_Grazing_4821_20240514_143337.csv",
+          "bytes": 48760,
+          "sha256": "f18865ed45c4a80f3e2bec2f60835f51c3a12ed01644f633654c01b81e7500a4"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/64_Grazing_2016_20240514_144952.csv",
+          "bytes": 38462,
+          "sha256": "c79f5700b56146177fe9a6e7062482847839a08f909f7fbc72a1be3cb6d43ee9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/66_Grazing_2016_20240514_145024.csv",
+          "bytes": 183743,
+          "sha256": "8641833655e03712ddbcebf7f7968c2cd48abe1895298fc04786b346b6d33221"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/67_Grazing_1319_20240514_152230.csv",
+          "bytes": 189318,
+          "sha256": "16736eb74774734e33e19850283cc4e80d951a7ad604c6287384e3dfc6994d68"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/6_Grazing_4821_20240513_142048.csv",
+          "bytes": 91100,
+          "sha256": "4402c567f83659bca29e605cdbb6849a92ce56781adc22822fbecd03a0e8199d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/70_Grazing_1319_20240514_152446.csv",
+          "bytes": 168376,
+          "sha256": "7e60b6c8a3100d8741c2008a0ee8e7d85737433ac00476a5fb66b91617d11b29"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/77_Grazing_4821_20240515_130953.csv",
+          "bytes": 32797,
+          "sha256": "92cdb0b030527d699075808ccc808173994b6572a5c3bf5a992f849387c4b2cd"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/79_Grazing_4821_20240515_131019.csv",
+          "bytes": 224716,
+          "sha256": "bffc2e47173b74ddb0b93378de9600c6a60b8cb71454c4775c86f525da87c346"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/81_Grazing_4821_20240515_133221.csv",
+          "bytes": 16557,
+          "sha256": "0f2b845b25b912660c3ff62ed4f6526bb7687bf1d53a3f5c90c46a09ab4a611a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/83_Grazing_4821_20240515_133309.csv",
+          "bytes": 440777,
+          "sha256": "4789c4e73703de43666e1e4b7b3c1bb49201b92a218f8c5639eef9255e999798"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/86_Grazing_4821_20240515_133843.csv",
+          "bytes": 77222,
+          "sha256": "25895c81d1555293859e42552f1c05e4ac8fcb5523ce3ff91419a31b40a34877"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/8_Grazing_1217_20240513_144410.csv",
+          "bytes": 846093,
+          "sha256": "67c27c840ba28c920d09414d87bf9c1c30b6ee37cca5669555d5949b40a4eba0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/91_Grazing_4821_20240515_135051.csv",
+          "bytes": 44841,
+          "sha256": "8dac29d861248a583ad9fa95db4f4e8bc7d82834ad3f319c2772c1433a13099a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/94_Grazing_4821_20240515_135219.csv",
+          "bytes": 144318,
+          "sha256": "443a3058a114d222cb76c19d5f93ccf71c69118813b81267ec280d1988810b4d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/97_Grazing_2016_20240515_130301.csv",
+          "bytes": 111437,
+          "sha256": "a0d4c551f116e9509c8227ced0f50b0f45e59e127953088a37131a7e8b069b7c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/99_Grazing_2016_20240515_130417.csv",
+          "bytes": 233653,
+          "sha256": "7d45ce00e401e48a1a9e5261ce4f374caf491969217870f01c577962881e410d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Grazing/9_Grazing_4821_20240514_101318.csv",
+          "bytes": 751504,
+          "sha256": "63ca33c1bba6ce09c3fcd6f2705fb80c684478cd72c08ccff7db8ac30956bb47"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/100_Licking_2016_20240515_132659.csv",
+          "bytes": 28266,
+          "sha256": "604ec246aeb0f9ef039c29ce530002505b10618945ac89baf65f63e8510b9564"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/103_Standing_2016_20240515_133857.csv",
+          "bytes": 10399,
+          "sha256": "3cb4afbb013de18bb7f327e4058235bd71b8f7873e50eed60bf374f3c70a471a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/10_Standing_4821_20240514_102311.csv",
+          "bytes": 10358,
+          "sha256": "83dc2466fed2711c65c162664f440502d1dcc2e8f50066b648cf10faac54be7b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/117_Standing_1319_20240517_112458.csv",
+          "bytes": 17969,
+          "sha256": "5612ba4012586ada72485c4b1f2401af5f0dabaa10f3ebe59090b585decf2f80"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/11_Standing_4821_20240514_102320.csv",
+          "bytes": 39533,
+          "sha256": "81a90d1e9cf5e1b572a3029f953ad75097ae4e58215f1d9767a8ff8337813267"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/124_Standing_1217_20240517_120946.csv",
+          "bytes": 35988,
+          "sha256": "c212b5fef70f72890ba7178cd5dc297fb9b1bd73485a619829f74aa5a1e2daa8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/125_Standing_1217_20240517_121007.csv",
+          "bytes": 10332,
+          "sha256": "dd185722540c2ba720dd5c0002d496acff53429484b11e6af37a7b519d415ab3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/128_Standing_1217_20240517_121052.csv",
+          "bytes": 18181,
+          "sha256": "eaa7d1339b6ea29465533a833e648342435bf32cb2b693cf154625ae99fde4e0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/136_Standing_1319_20240517_120733.csv",
+          "bytes": 15979,
+          "sha256": "1f8421dac093f859b8b96422e5b512142de00ac7fb8ffc4d0af05ea6f5441802"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/140_Standing_1319_20240517_120943.csv",
+          "bytes": 26954,
+          "sha256": "1c48c8836829ed5e9fbd9da15a9cb4a2c1fcdfd965225a901836d605ebac5e6a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/142_Trotting_2016_20240517_122404.csv",
+          "bytes": 10444,
+          "sha256": "d2acf7418395fa9b13503dcbcb20aa708b2bebfd1e75c81a0c3c05b7c085b212"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/144_Standing_2016_20240517_122931.csv",
+          "bytes": 128929,
+          "sha256": "0a6d598a0c70a8420c8ad60380ee70fcd303e8dc645b501084f81bac8f3931aa"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/146_Standing_2016_20240517_123342.csv",
+          "bytes": 12432,
+          "sha256": "a7b75f07c2926199d24d2a3fdaecff036f74bfac149530f52e265ed1fc350b48"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/147_Standing_2016_20240517_123459.csv",
+          "bytes": 14472,
+          "sha256": "e58fb476d33391fe230ae5f89f4e5d36127ba60a99c55251f6dc2b61b83e74c3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/148_Standing_2016_20240517_123541.csv",
+          "bytes": 32198,
+          "sha256": "de8ebce209d175fd9c3022f4a3d0a211d6fc992cbdf9c04393ff1255bc636870"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/150_Standing_2016_20240517_123607.csv",
+          "bytes": 12460,
+          "sha256": "8b49d19d93b1a9ff545b7f1e466a270944f28b9be3bf742d4dbaeff267693b36"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/151_Standing_2016_20240517_123622.csv",
+          "bytes": 29777,
+          "sha256": "ce831f60f2e72d6d5fb7298218f45a4561495e6b7f9ac537eac136e81d088798"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/155_Pitching_2016_20240517_133654.csv",
+          "bytes": 10519,
+          "sha256": "1e696d66ca8b79961ad6b1f6b688a14f38045d0ba28b779dde67cfa329f29d3a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/156_Standing_2016_20240517_134626.csv",
+          "bytes": 20228,
+          "sha256": "541afb131b0384520cdbdea56a2419da577b01d71c187ee6f45375db3711127c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/157_Standing_1217_20240517_130954.csv",
+          "bytes": 10483,
+          "sha256": "30e7c7453b845b4193c48734b5463b0b29fa3886d88732c7be910bfe477263bd"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/160_Pitching_1217_20240517_133456.csv",
+          "bytes": 10587,
+          "sha256": "f061b78f3cb45323637ca16e38a6d3b138e2c032b3ddb4b440588483cd4e43b6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/163_LyingDown_1217_20240517_134614.csv",
+          "bytes": 10464,
+          "sha256": "4d09a2955dcab73d764e81835f0c18086c837e9c37c6683181303a55f4c9e1d0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/165_Rising_1217_20240517_142004.csv",
+          "bytes": 12454,
+          "sha256": "6dfbf966544651869d678231e1318398e29335a202b4d5ba8b62fdfabbbceabd"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/166_Standing_1217_20240517_142011.csv",
+          "bytes": 68023,
+          "sha256": "8ba17d145074fd9b71eec370ef79a1eec2f2551c0a076632d7ffbaecf6ef245e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/168_Standing_1217_20240517_142117.csv",
+          "bytes": 24054,
+          "sha256": "9be1459076f3ef800bb92d590c9913c7958b57174a8f168f0851b2a2a69b472f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/173_Rising_3321_20240601_105749.csv",
+          "bytes": 13789,
+          "sha256": "f91b672162b6524a5b0f3eabbf123d4c1adc4f3aa3a97845e3708448062ca65c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/17_Standing_4821_20240514_102616.csv",
+          "bytes": 132818,
+          "sha256": "c16bab20dfdca2886e943bda55e02fcb7eaef0304fc02b47e067209e2ec04125"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/19_Standing_4821_20240514_102748.csv",
+          "bytes": 92461,
+          "sha256": "59d2d37df67455f7d2d31f90852bd62988d08dd9098cdae60b5d91201036e563"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/20_Pitching_4821_20240514_102837.csv",
+          "bytes": 10360,
+          "sha256": "21014f202c87f3ed0917f1104f8992a4075bbdf4758fa6e63284476778edb0d9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/219_Pitching_3321_20240601_122034.csv",
+          "bytes": 7332,
+          "sha256": "1913ee3223bf1bbda370dc47b8808a148b675e97ad0a1e92d1149469cbb9ddbc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/21_Pitching_4821_20240514_102850.csv",
+          "bytes": 22657,
+          "sha256": "8d8fc6e9d315d8348e82c404c8bab3849716cf060d903efb947f6b45a346ed15"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/22_Standing_4821_20240514_102901.csv",
+          "bytes": 41419,
+          "sha256": "04daccb98aab6acd9075053599d89acaf7e8414ccc99d64f253791af5a83f630"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/23_Pitching_4821_20240514_102945.csv",
+          "bytes": 12391,
+          "sha256": "71c42c2c2d116e09e92c215f41b63b802caa946e74521c6f6af2df536fa0c339"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/249_Rising_4119_20240602_153652.csv",
+          "bytes": 6570,
+          "sha256": "3309933685c36c495e1a20c745194d6785919449fe09f202983902d4cbe5dc5d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/24_Standing_4821_20240514_102951.csv",
+          "bytes": 19962,
+          "sha256": "c298d3fd459990e9ff5cc69b4c14d3877062f60e5da64465583528397ecd946e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/258_Licking_4119_20240602_154519.csv",
+          "bytes": 59189,
+          "sha256": "521ff6bf38bc8f466c2bd3b3216a08ad7434e9c9506fe926aafee7b2c482f390"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/26_Standing_4821_20240514_103013.csv",
+          "bytes": 25578,
+          "sha256": "48b110a906a87f93e75b7b66c53c82aba239bf2709fff270248cefba33eb7169"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/27_Standing_4821_20240514_103031.csv",
+          "bytes": 204255,
+          "sha256": "db017e55f622f81d02f3292cc4ac96175bc7d815b6752ab188bb73563ccfe19e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/288_Shaking_6319_20240605_105502.csv",
+          "bytes": 10510,
+          "sha256": "0ca6e677dbb21193dd223f67e7219db431661c4c5a19873c96cdf1c312db41f2"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/303_Standing_6019_20240930_134758.csv",
+          "bytes": 46398,
+          "sha256": "90e51aaa50a20c69621ebf67ec8090a3ddb2237e67ca1cffce57f165f27cb32c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/304_Standing_6019_20240930_134854.csv",
+          "bytes": 80066,
+          "sha256": "eb717169ff3a1d15c30f5bb41af21ca92f84f514fd9ff147c5f6afd267f3484f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/305_Licking_6019_20240930_134934.csv",
+          "bytes": 8650,
+          "sha256": "3a062fee51cad552584c610d54f3e7133dc69bfff7893ba97414db9ea544ba3e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/306_Standing_6019_20240930_134938.csv",
+          "bytes": 307260,
+          "sha256": "27d292103c588d0e62a265f72acf4b722332e3da81f82be4e87d68c9d774eea5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/308_Standing_6019_20240930_135234.csv",
+          "bytes": 149345,
+          "sha256": "3576e8d2d8fad42c11b86b222a38b3f5c3876586800c0d3e49a00442df6acd81"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/309_Pitching_6019_20240930_135349.csv",
+          "bytes": 10454,
+          "sha256": "17da44b592a49a7670216e734716bd216d729cb217e03c8b5cadc76c44d6c2b1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/310_Standing_6019_20240930_135354.csv",
+          "bytes": 24253,
+          "sha256": "cd2587e74c7cfec2401aa634bbff4ecdaaa0824bad024ee4d48acaee93cd2fca"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/311_Shaking_6019_20240930_135406.csv",
+          "bytes": 10810,
+          "sha256": "14ec87dbaeb9e4f96f64bb4c681fbb817f9a7f4005c527c0922f65c834ba45dc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/312_Scratching_6019_20240930_135412.csv",
+          "bytes": 14839,
+          "sha256": "c698d316c99a3cc5d3230f39b6a8b70f719c547b42f80fed7645bc5e24f6fe50"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/313_Standing_6019_20240930_135430.csv",
+          "bytes": 517264,
+          "sha256": "bb9476772883c794713371ac84626c2da2949055910a1b1b89acac206b116b02"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/314_Scratching_6019_20240930_135857.csv",
+          "bytes": 12629,
+          "sha256": "f66c36627fb58413f22387f9df39a64e8b21190f81b2fa1e0bd4bbab5fb4043c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/315_Standing_6019_20240930_135909.csv",
+          "bytes": 99664,
+          "sha256": "72559502c433032c88e575c6a26f0b24a0c149f2270f77e63489a41eeb840677"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/316_Standing_6019_20240930_140018.csv",
+          "bytes": 599633,
+          "sha256": "6844c35da075c0ce06bcda99b1b37ffd40599793a5247d3a0824d0585225e36c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/317_Shaking_6019_20240930_140519.csv",
+          "bytes": 10606,
+          "sha256": "04b1cdb895007a1661468468bbf17ed3e42ba4653ae061e07eb9d0a5a0080f1a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/318_Standing_6019_20240930_140524.csv",
+          "bytes": 560149,
+          "sha256": "bbf8ca60124efcd74039ce0e8dfbee40a386e65272d96a6e0ac84db8ed307871"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/319_Standing_6019_20240930_141011.csv",
+          "bytes": 198086,
+          "sha256": "c7d29b41c52c1c27228729e1b4cc3d340da1ad0f552ee67563dd0a455c7ae54c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/320_Standing_6019_20240930_141202.csv",
+          "bytes": 183358,
+          "sha256": "28329279715c7febfb8f42fcfe3f8142c1d3b812e19084f09ebf791d6c020164"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/321_Pitching_6019_20240930_141420.csv",
+          "bytes": 16505,
+          "sha256": "6bfad919dffee8a0dc091ae864386f613f290075401ec63f28394ae8246dac66"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/322_Standing_6019_20240930_141428.csv",
+          "bytes": 61978,
+          "sha256": "c337f47b987e8d3a8b4246887acd8c04fc1b1539a413d3e0ca3cd07008f04e22"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/323_Standing_6019_20240930_141529.csv",
+          "bytes": 223386,
+          "sha256": "b43571c77c3a0714e035ea646836fa30d6e062eb3851888150340203c0d00629"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/324_Standing_6019_20240930_141755.csv",
+          "bytes": 87479,
+          "sha256": "32051385ad9d1816587020781a537f2e055ca0c9352a0a89295d69e4d978c0b6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/325_Shaking_6019_20240930_142322.csv",
+          "bytes": 10860,
+          "sha256": "1e53104a85468bd4d5df50d6ba214f2704c4c874cd483684b97d7b91e30f1659"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/326_Standing_6019_20240930_142327.csv",
+          "bytes": 87367,
+          "sha256": "2704562c8dbc9f00b0c18a725db3f9c2cc8e5047aa081fffe80be7749f2bd26b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/327_Scratching_6019_20240930_142410.csv",
+          "bytes": 23139,
+          "sha256": "30b8902c4646973e36a6f1647aa89c91ac843129fc0c1196b52c7d1f1cf76275"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/32_LyingDown_4821_20240514_133638.csv",
+          "bytes": 10572,
+          "sha256": "6d8c1d47a9bcae701d373a6cbd70e5d5ee6dd1fa87120027ae868be439e755cf"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/331_Standing_6019_20240930_145733.csv",
+          "bytes": 71832,
+          "sha256": "92c19ae11421cdaf4b205ce02e3c63c477748c62fa1eb57140993e80533e72d5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/332_Scratching_6019_20240930_145809.csv",
+          "bytes": 18811,
+          "sha256": "3849f7b0078145d16003d153fa6bcbf1764bdc7e4219e7c05cf69baaccbd5201"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/334_Standing_6019_20240930_145830.csv",
+          "bytes": 71917,
+          "sha256": "f85a796d14ac280735894529ac94b0899957c977b20f975ff7a64ecdd8ce49ba"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/335_Licking_6019_20240930_145906.csv",
+          "bytes": 12665,
+          "sha256": "5d6bf486707fa97b2114cbbf3f9b59d8c953dc1e604de67672f7b58b3d4d6fcc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/336_Shaking_6019_20240930_150034.csv",
+          "bytes": 10604,
+          "sha256": "11287a3fc850e4e3ff99591a774602758747a749fb4d8b05095c46affbd6919f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/337_Drinking_6019_20240930_150101.csv",
+          "bytes": 12303,
+          "sha256": "0cc2596561ddfc5a174520cbbd5d79e03cf4b1fbbeb3e56b23004f7dbbf97e53"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/338_Drinking_6019_20240930_150120.csv",
+          "bytes": 10384,
+          "sha256": "1ec420992f7da6f22b7c6b8da186cd2b0d4753923be6dcdb96b6c1eeca08c7c1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/340_Shaking_6019_20240930_151430.csv",
+          "bytes": 10784,
+          "sha256": "19aa961e7c57818cb1e1b13385fac2dcbf80977a5e5410aee3f6d055eab76017"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/341_Standing_6019_20240930_151435.csv",
+          "bytes": 90341,
+          "sha256": "c17401498d9567d102193fc3e42533efcfb6c950ef3bbdfca2cc61b96ce16d28"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/342_Shaking_6019_20240930_151900.csv",
+          "bytes": 13041,
+          "sha256": "2b3d8f35ce3ba4f532ab7c58ad2c21f39eff0ad08843a6938af654aaaa1672cf"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/345_Standing_6019_20240930_152353.csv",
+          "bytes": 93480,
+          "sha256": "cdba78fbaff26b381f805940b3ced52a9aeb4e6445233a9e1d8de7e1f30ce323"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/346_Shaking_6019_20240930_152451.csv",
+          "bytes": 10762,
+          "sha256": "1e85718e9134e8f6baa741a055736d593f95cfd41fd0bd19db913218c99facda"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/350_Rising_3120_20241001_130448.csv",
+          "bytes": 10605,
+          "sha256": "0573a375f4e4e187fbb31830c894b1cf62bc998d8c53ecc922040e9ab6a479d1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/351_Standing_3120_20241001_130454.csv",
+          "bytes": 98025,
+          "sha256": "bbc037475c23a33ff6d0c03d793c4451557af32337ea5ed2195d1b2067704494"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/353_Scratching_3120_20241001_131015.csv",
+          "bytes": 10293,
+          "sha256": "bf4336eb8083eaac394578212385014a014d80a22c42efe31212c9a2d2406e36"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/360_Standing_3120_20241006_110426.csv",
+          "bytes": 345908,
+          "sha256": "afcf13e3e6a939caa1ed2885ae8841a0ef8ff8ef41e645d3e96db864ff090842"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/361_Licking_3120_20241006_120642.csv",
+          "bytes": 12669,
+          "sha256": "da2fb272a5f11f97dd1280b3a6735fa5fe6921ce09a3cf8140d8e192933b7d51"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/367_Standing_3120_20241006_142522.csv",
+          "bytes": 640260,
+          "sha256": "5705ba315901cad48e795e2cfecb3e6e3d98e1703fa0403e48c63591a4d10c36"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/36_Standing_2016_20240514_133356.csv",
+          "bytes": 20242,
+          "sha256": "ede890d15ae1b0157d0a5c3171d81b87990958380a0db22c4c728d6c871c561a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/372_Standing_3120_20241007_130656.csv",
+          "bytes": 87976,
+          "sha256": "0900118d051fa70f87b33bd6af7be6d4339c371ab1132bc01667c91800c00e1f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/375_Standing_3120_20241007_151539.csv",
+          "bytes": 18237,
+          "sha256": "0577f9480eb2c52e8177b780b944afaf7fab8390122ac3dac001c3efc9e975c2"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/384_Rising_3120_20241008_121116.csv",
+          "bytes": 10645,
+          "sha256": "22aed81e1c785716e85c5b78c1148ac6526cdd736373332ddd87937d457a35cb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/394_Standing_1219_20241015_103916.csv",
+          "bytes": 24326,
+          "sha256": "ed4c510609f0acd033c105dbc12885702c0f56c784973a1e8c1c4bad6e19e368"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/395_Trotting_1219_20241015_114928.csv",
+          "bytes": 10532,
+          "sha256": "774d1d457243fd63369c62c1a18881adae09e533557aa4944885597d5949765a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/39_Rising_1319_20240514_131510.csv",
+          "bytes": 10780,
+          "sha256": "13dcab668d3cf32863c3b9d1de81fc5018b9be252cd802050c823f60fda3bdb6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/401_Standing_1219_20241015_122730.csv",
+          "bytes": 12642,
+          "sha256": "e77025cf9a7012f55edf88243160a12c7c4c361e19e1bb69b11931c18b8ea0ef"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/409_Trotting_1219_20241015_142337.csv",
+          "bytes": 10284,
+          "sha256": "77ad908382e0eee84c0b7d96ecc17e4a54ba66725fdc53ef7d2f49ed62eece2d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/40_Standing_1319_20240514_131516.csv",
+          "bytes": 22172,
+          "sha256": "1ef8bf6382e307fba4d14340aa8a8975a3154e40f584d355ee0a7d417ef88b6c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/410_Standing_1219_20241015_142342.csv",
+          "bytes": 118674,
+          "sha256": "bd79776ec03141f3dc6ebffb762d88a968281fe93fe55662a45802651ca4c54c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/416_Standing_1219_20241021_124457.csv",
+          "bytes": 1463144,
+          "sha256": "d6e137df57d2c3866e5685cf117e3f6a91f3ab314c2166f34de1348d68ff4daa"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/417_LyingDown_1219_20241021_125725.csv",
+          "bytes": 10595,
+          "sha256": "55d51de6c3a0f2e47afc37ce8cbd16281a59dc6de32a83c64b6dcf1835c4c7bb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/419_Rising_1219_20241021_134250.csv",
+          "bytes": 10557,
+          "sha256": "c58ab38e6f19903bb5e18e7caae0ee56ceab322fbbf436b0f04a4cc469764e75"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/41_Standing_1319_20240514_131535.csv",
+          "bytes": 184592,
+          "sha256": "e9599c7bd92351753f8c760866b4c80eee7ae0423729ec917a0fb47ec34f758f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/42_LyingDown_1319_20240514_131720.csv",
+          "bytes": 10730,
+          "sha256": "15b310ce9f6fcb8e9447106a87f52c91aefe614ce60a3702473822ed52effc8f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/438_Drinking_1219_20241023_191640.csv",
+          "bytes": 72114,
+          "sha256": "5b067ea389bdcd3522c2a3216e407029bd61b5b136e900e46353e1615647a1d3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/44_Rising_4821_20240514_140119.csv",
+          "bytes": 10424,
+          "sha256": "60091a6ac6d6069fd1ae4aee9426cb3fbaff443d232a7970e292cdd83c180c53"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/54_Rising_1319_20240514_141855.csv",
+          "bytes": 10664,
+          "sha256": "315b1e77f90ed402306d3f132d05df599005787130fe058fc7596bcc32cce0ec"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/55_Standing_1319_20240514_141901.csv",
+          "bytes": 66254,
+          "sha256": "a80bd0f0cc6250c6a67a71a6ac6d5eb050bda3c04a6f3b139381e6fa1eda3e2f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/56_Standing_1319_20240514_141942.csv",
+          "bytes": 35642,
+          "sha256": "1ca31991a6d9bc52b3aed447f6a3bc58f66a15ddd0c51f9dc088df2f858a0821"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/57_Licking_1319_20240514_142001.csv",
+          "bytes": 16626,
+          "sha256": "19326bf52ec4f773e46a50cc7579d68aa8a978b0f9fa67c2399fda30ab5b0ed1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/58_Licking_1319_20240514_142014.csv",
+          "bytes": 23130,
+          "sha256": "180925a0948b7f11ed91878b517901bd73d1e0b7925054cb2b5b1d3b9672c7b1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/59_Licking_1319_20240514_142027.csv",
+          "bytes": 12893,
+          "sha256": "2dca1c69acf6d7c0e82e5559ed362fc7e0bc491d39eca4f255fe2171a4212a59"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/62_Rising_2016_20240514_142946.csv",
+          "bytes": 10681,
+          "sha256": "00ee90a562aa79df67372e6a11ba544779b3d6bafca8a202d3cdfd218ead24a8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/69_Licking_1319_20240514_152434.csv",
+          "bytes": 12903,
+          "sha256": "01bcf99f3c021b8f4cb50d2eaf4ce94b7b0a9daa4a3230743654d4d85e9a1ab8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Miscellaneous behaviors/98_Standing_2016_20240515_130357.csv",
+          "bytes": 39836,
+          "sha256": "6a9b80aa92283053ff57d5a400cf9a401d30c28bfe7b6c835ffb55ff44bb320f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/164_Resting_1217_20240517_134620.csv",
+          "bytes": 1535066,
+          "sha256": "9e254a6c7b95462845e188a1b76237a9f3c8f88db67577d47af5c64175fd5f5b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/172_Resting_3321_20240601_103054.csv",
+          "bytes": 3481548,
+          "sha256": "e3e9a39b84baaefea2c337bd9d31597637de53d9108f45f76fa11ffd18a2dc03"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/248_Resting_4119_20240602_150013.csv",
+          "bytes": 4337852,
+          "sha256": "c188464c3776af8d5167204955e01a7e29111da867ad204f388ec09cabb0b932"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/33_Resting_4821_20240514_133644.csv",
+          "bytes": 2667107,
+          "sha256": "3cb502d19c99f90e6a6129fd6a8a37b260e49debc7c4651673b3774a09d99ef3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/349_Resting_3120_20241001_130244.csv",
+          "bytes": 247550,
+          "sha256": "b35c7638f340e5a048ee207d9619ed7f9546166a5f5a5fca681f552149a68699"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/383_Resting_3120_20241008_120011.csv",
+          "bytes": 1313437,
+          "sha256": "ccb1eae549131199d65806d0e1c16634e64a4f5506cdaa72f02001b2b4dc35c0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/38_Resting_1319_20240514_131147.csv",
+          "bytes": 401743,
+          "sha256": "e9fc3e25a604ab117cb6ec931886a7428997eb76fc8d141f8a916f2fcb0881bb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/418_Resting_1219_20241021_125730.csv",
+          "bytes": 36010,
+          "sha256": "122b7fdaa7d6bf54067f7928de210ca73ecd77891480618f5c494bc7abacf5a1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/43_Resting_1319_20240514_131725.csv",
+          "bytes": 5026850,
+          "sha256": "a87321fef71a960cbcec8f3eddd5432e72dbd0158740d5fd7ea82873035d7c08"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Resting/61_Resting_2016_20240514_140000.csv",
+          "bytes": 3594728,
+          "sha256": "b6be29456124729f9a05bf0b24bdbbf5006029cf1c57d45a1e36c8bc42ac9504"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/102_Walking_2016_20240515_133317.csv",
+          "bytes": 14464,
+          "sha256": "ca2c47f3b4f256824c065ec065e36803ba38b8b10148a9e445fb8cf9ea415aa4"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/104_Walking_2016_20240515_133902.csv",
+          "bytes": 16196,
+          "sha256": "cab99f34634ca9f139df72641ee74f3644b6779beb153abb35a21c6e06e9324d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/105_Walking_2016_20240515_133916.csv",
+          "bytes": 10362,
+          "sha256": "f13be983603b429ab0d4ccc7bb74bb5a7ef0709fbe372e9f0eb4021a4fc3996a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/107_Walking_2016_20240515_134116.csv",
+          "bytes": 12449,
+          "sha256": "01af4ac20676ccd8c72a1d202f315d2cab25749fded38737abd5a20678c36ffd"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/109_Walking_2016_20240515_134701.csv",
+          "bytes": 10491,
+          "sha256": "a94a71fe710d85e57bccd539b15b60d5537fa78d953ae1100c75f4260781ec38"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/111_Walking_2016_20240515_134734.csv",
+          "bytes": 16442,
+          "sha256": "b2a4e5e791de5cb1e8bb0be2e73afaf17e6c82a57684477cf897d0427212657a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/112_Walking_2016_20240515_134928.csv",
+          "bytes": 28580,
+          "sha256": "9a1b036b53136cfbe4cd510ddd3f22ef83b8d6e530b7eb5711dcd2ebd3401d54"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/114_Walking_2016_20240515_135105.csv",
+          "bytes": 20592,
+          "sha256": "e334cee149342eeef1fe254748aba6ec99d50fdadfb48b7ef5b6b43f87ad8ced"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/115_Walking_1319_20240517_111849.csv",
+          "bytes": 16018,
+          "sha256": "9c68acd9bdcacf29c0152bb14fd0a0cfdb675c3bf899343ff784ea42da38b693"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/118_Walking_1319_20240517_112740.csv",
+          "bytes": 38780,
+          "sha256": "9d0a627e0a5d55ce2b888fd38c57d331dd0ff52d90f40eb9da0f9e9d80b48da7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/120_Walking_1319_20240517_115208.csv",
+          "bytes": 33810,
+          "sha256": "713844f90548a4012665c3e8710f127ac31a6931c2107f31b04116934837c5ec"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/122_Walking_1217_20240517_114051.csv",
+          "bytes": 12574,
+          "sha256": "a8cd03a458432ebafb881e779e454c07808158aa8de6e02378221b5bd66cc157"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/123_Walking_1217_20240517_114358.csv",
+          "bytes": 16477,
+          "sha256": "a52b2471255427dd8080dcb1666a3271b3519adb248e8a6467bc04c2f01266f0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/126_Walking_1217_20240517_121015.csv",
+          "bytes": 14443,
+          "sha256": "c973634fda2e50c1c26f9f2c047c1cb6756fa590ad78ff356b6d2fc9792384f2"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/12_Walking_4821_20240514_102341.csv",
+          "bytes": 52127,
+          "sha256": "ebb1384f0e0c41c4e0e7399e3fb46693da4361c5fc4d1062322c1f1260401911"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/130_Walking_1217_20240517_124604.csv",
+          "bytes": 36684,
+          "sha256": "ad5693bacd83064df8473162030f2cae7931ee82c035c1a844a324aa53436ab3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/131_Walking_1319_20240517_120021.csv",
+          "bytes": 23058,
+          "sha256": "907a45630ec1b8ee632ef015f4def29d5a9c853799e16cdf75b3953617ad3a1b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/135_Walking_1319_20240517_120439.csv",
+          "bytes": 23126,
+          "sha256": "f07cdebf0a46f90f2bc8bb220b448051ca01fb4362a5ba066d80643464a18cf9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/138_Walking_1319_20240517_120856.csv",
+          "bytes": 27511,
+          "sha256": "783417f220b28b6a8c91956ca47d68bf84da2d7a5dd34abb4555f3ab7af8bcf1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/139_Walking_1319_20240517_120914.csv",
+          "bytes": 43043,
+          "sha256": "bf5264b7e2fb21b07e6460ea75e8a4df51a0c58da9bf6d074e0a60769b347d24"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/13_Walking_4821_20240514_102531.csv",
+          "bytes": 12577,
+          "sha256": "5d97d3ebc17b7c7176572fe01a89f93c422de35452e862cf1acd4bfbaf8896f0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/141_Walking_1319_20240517_120955.csv",
+          "bytes": 18424,
+          "sha256": "62ca54fb50473cc4c3f86253fd7f9d35831121581fd3b70c78e1a2a85a8c3e6b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/149_Walking_2016_20240517_123558.csv",
+          "bytes": 18535,
+          "sha256": "ba9c4591f7771a0bd0a17b07dcde49a369eadd90303a0438fd617d2b333b7953"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/14_Walking_4821_20240514_102540.csv",
+          "bytes": 22662,
+          "sha256": "df836937e35d77d3fc39b517e147850f3e2da66c184654eb67b1c028355fe9ec"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/152_Walking_2016_20240517_133554.csv",
+          "bytes": 16250,
+          "sha256": "6710c39b6850d6cc6d0688801195709a154d48b017357934550d3ce74235b2bb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/153_Walking_2016_20240517_133612.csv",
+          "bytes": 26253,
+          "sha256": "e3e08f5f85b6d0af6cbf9b21df41aa986c134fd60a8501364a8dc7059702d0eb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/154_Walking_2016_20240517_133629.csv",
+          "bytes": 50174,
+          "sha256": "b3a8a10d87727aee059ec56581e3cb7b5b35dac36671a6ee60cde44d576107cc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/159_Walking_1217_20240517_131207.csv",
+          "bytes": 22325,
+          "sha256": "5c6ebfb1094ae733037d919643412fed3f964f6ffd93c67bdd0c06f0c4bd01f1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/15_Walking_4821_20240514_102555.csv",
+          "bytes": 20564,
+          "sha256": "9e5e836a4cee4c298c70636b83157f437c2d414e301a1430ac0724121d2c54e6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/161_Walking_1217_20240517_133501.csv",
+          "bytes": 48955,
+          "sha256": "71ac5405d5163b1df80a04676746e3a7dc8efe89ca8448c617b5e729d592aa4e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/162_Walking_1217_20240517_133656.csv",
+          "bytes": 10582,
+          "sha256": "e68b91f6e3488cf285520636620ff568a6a54f11c356e3459b4a0ead538fe82e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/16_Walking_4821_20240514_102610.csv",
+          "bytes": 10470,
+          "sha256": "9e4ff1d3455581f9f3c2982dc1f06d7721d27330b3dda774351aa6f69432c235"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/171_Walking_1217_20240517_152618.csv",
+          "bytes": 26203,
+          "sha256": "ed92127b1b2dca12df690761ce2c50ba03ee6b84b35ed874916e847896beb8ea"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/177_Walking_3321_20240601_110945.csv",
+          "bytes": 13921,
+          "sha256": "0c1aac93ae44a7d110eae02b2b19fe93a36270816e99a1b42cb429a99d051636"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/178_Walking_3321_20240601_111012.csv",
+          "bytes": 11621,
+          "sha256": "6c0d0f39987397f7934a883ac54704f6ec380acd25ea2d2452e500d18759442e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/179_Walking_4119_20240601_120510.csv",
+          "bytes": 18418,
+          "sha256": "c6c94bbc7750940760fb5d165fe939ad414bc630b2ed6e4d2378c84f8362416a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/180_Walking_4119_20240601_120525.csv",
+          "bytes": 16185,
+          "sha256": "a0b8aba51c1c50c2f9b8696f8708fccc21a0e1dc99e7ee05bb3244a9ee938a41"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/181_Walking_4119_20240601_120649.csv",
+          "bytes": 22914,
+          "sha256": "90f3ea18a3435893fd6dfa47005e1b0415726296aab739634d0137b4ca0e15b5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/185_Walking_6319_20240601_120726.csv",
+          "bytes": 123237,
+          "sha256": "aebeab4f0bd251bcb28e0538faed1d279148e3838b3fc21beff1cda77cc78f80"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/186_Walking_6319_20240601_121932.csv",
+          "bytes": 24705,
+          "sha256": "58e4cb2948b02da682d9439cc47b471fc2310c15735e50ba9f75e42d90a21c8b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/187_Walking_6319_20240601_121944.csv",
+          "bytes": 26990,
+          "sha256": "9fa545f5f48393005ff55459d7db6ea16724ce9fc384405e26346d8c47c8c9df"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/188_Walking_6319_20240601_122023.csv",
+          "bytes": 15905,
+          "sha256": "dee87d0ffdb404269626ddaf20371ad95d86843257ead9d02b26e572c9634957"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/189_Walking_6319_20240601_122132.csv",
+          "bytes": 11482,
+          "sha256": "c63c4e9f6ad71160c7c77797baa65bce40df68508db9aa6ebd04e6cc18359bc3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/18_Walking_4821_20240514_102725.csv",
+          "bytes": 44352,
+          "sha256": "741387bd41d18489d8b4e0cb3381e6aada71c138bf49ad6cf70656d839c7a73e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/190_Walking_6319_20240601_122143.csv",
+          "bytes": 22658,
+          "sha256": "e6c6e8ac184ae1bc531df18b771d777d8a6f8ab3193fe40c73f4d3b857e3f751"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/191_Walking_6319_20240601_122154.csv",
+          "bytes": 31438,
+          "sha256": "6215d17f609e757d5a0361c85c04e78e0349ce9ef4a026f55e06140d352543e6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/192_Walking_6319_20240601_122250.csv",
+          "bytes": 36117,
+          "sha256": "b5fd677348a8b8b5a39375ff9ae6a8db6b828aa14065d93debd7a6001b686106"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/198_Walking_6319_20240601_125006.csv",
+          "bytes": 22810,
+          "sha256": "29fd4b422954c91890f8513adae9c8baebe562cc884954ffd052b2b6dabc6d25"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/1_Walking_1319_20240513_120009.csv",
+          "bytes": 40788,
+          "sha256": "0e01d46e1a66e90ec20621c20fdabca69c5d4a4dc473a302a530c23155fdc2cc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/208_Walking_6319_20240601_125410.csv",
+          "bytes": 29454,
+          "sha256": "72a9f73c580218678a87de3cdda2b6ab02ca4f5a8b5a7b6ba5c1ef74cdc86e4a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/209_Walking_3321_20240601_121106.csv",
+          "bytes": 29263,
+          "sha256": "a135bd620782705471a693cb80756b2cfdce118bd56f7fe8ef98301611153dad"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/210_Walking_3321_20240601_121355.csv",
+          "bytes": 11692,
+          "sha256": "9fad8bb48a400009239158938e676065eccd915e0e0bff2b802c1bb8767158f8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/211_Walking_3321_20240601_121447.csv",
+          "bytes": 31899,
+          "sha256": "3e059bfe879a281f00ad8db4032cb6546860cebfa086b8482baa929aac046958"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/212_Walking_3321_20240601_122044.csv",
+          "bytes": 18225,
+          "sha256": "727674582adca1be2ceaddbdf20391933fdf9977a9617c73851a93af6bc33de0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/213_Walking_3321_20240601_122153.csv",
+          "bytes": 42662,
+          "sha256": "a6d47ad5eec81248fc61ad7b0c31096f6c0796650b912120f3f3db341d148be7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/221_Walking_3321_20240601_122214.csv",
+          "bytes": 36056,
+          "sha256": "1f51a85f8bc236fd6814f3dea39db702f837171cff26b910c51187731c6f0b3c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/222_Walking_6319_20240601_132418.csv",
+          "bytes": 31594,
+          "sha256": "a2b07aefa3ac2948d0e50a84ee3147ea40a7793f852da0bc170bd61c23d20727"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/223_Walking_3321_20240601_134631.csv",
+          "bytes": 54455,
+          "sha256": "a8363076ec7c10e9104d84f80a6752ae2e7d108219c9ab14355bf72c2e51fbe3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/224_Walking_4119_20240602_102107.csv",
+          "bytes": 12764,
+          "sha256": "4d3ecc179dffd453e67b6a8646e0b20d947e029050f7d39d31127f1dd8c892e0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/225_Walking_4119_20240602_103234.csv",
+          "bytes": 12784,
+          "sha256": "d7ffdead151890293031edf1bf34fdf92cbc0ec8ba23410ff8b697967bda8ac7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/226_Walking_4119_20240602_103829.csv",
+          "bytes": 27229,
+          "sha256": "5a44be286f8f4e2ff4fac3d98d4b58de1965115371cee4d3911175c0a82b0b1f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/227_Walking_4119_20240602_104055.csv",
+          "bytes": 32998,
+          "sha256": "4bb97d97306bb5bb5ff34bf9248bc4c1272b339d27e33883f0be867f43108162"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/228_Walking_4119_20240602_104148.csv",
+          "bytes": 27207,
+          "sha256": "ce40daa73af998a215c66ae54d808dbbfcaf8c9d277619ac5a82f68d4107cf94"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/240_Walking_4119_20240602_115104.csv",
+          "bytes": 12840,
+          "sha256": "a587c03943dcaf06cb5103f2dc785932e799cd9576a0a3cf04a45b83774b9f2d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/243_Walking_4119_20240602_115213.csv",
+          "bytes": 64014,
+          "sha256": "0e7d2fda0d97dbc73e577122b65c6aa9fe58b1a5d638cbcf89301bf31fdc8ee9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/245_Walking_4119_20240602_114613.csv",
+          "bytes": 18983,
+          "sha256": "bb687f39b5868d8d2579a51d2d1565fe6bd4fc9d0162253c0f4a1d787ee559be"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/246_Walking_4119_20240602_115213.csv",
+          "bytes": 55849,
+          "sha256": "4858e4eeaaa528ae7385700e4ae28c4cec14a31caf0e5afadc1b5cbc7bff71d7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/247_Walking_3321_20240604_112946.csv",
+          "bytes": 42577,
+          "sha256": "0b7205169d67bd36755e08f050c02be832354c9698b0b195875d5e14feab650d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/250_Walking_4119_20240602_153726.csv",
+          "bytes": 12766,
+          "sha256": "907432272ad72bc018a3055c8168280413b60a0d2cccfb80e5f0d25b55b25dcf"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/251_Walking_4119_20240602_153906.csv",
+          "bytes": 129830,
+          "sha256": "d6ec88df3a44af7e6fea164b223f92964b5ae96fd2f34dd003bc0a6279548a39"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/252_Walking_4119_20240602_154033.csv",
+          "bytes": 16644,
+          "sha256": "030b44c5c46be2df934bbddd6e2ce8e485efa81cf4e10ac03ff7c465c71a763a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/254_Walking_4119_20240602_154237.csv",
+          "bytes": 49085,
+          "sha256": "c93b32c59f23b0b35743e92d73868acc8d5d9985b547fafc44d97bac4f3ed0af"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/255_Walking_4119_20240602_154342.csv",
+          "bytes": 20684,
+          "sha256": "9612500ed7c3154da527fd9dde4fd4cd0f0760288d8fd68ff5358810454db08f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/257_Walking_4119_20240602_154443.csv",
+          "bytes": 12542,
+          "sha256": "2ae8ed1cce534ef47a3d346c6f475acd87e633d36eab0ecfb0b87989f1ab8a1f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/259_Walking_4119_20240602_154557.csv",
+          "bytes": 33071,
+          "sha256": "a4b9ecae3eb2236b2dd403efe7e7bbd9489da6aaf83b19e78a9c4764a93842ad"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/25_Walking_4821_20240514_103002.csv",
+          "bytes": 20346,
+          "sha256": "c9fe1bc9f0284e588304e21c85fbdec9b98c2000e62ae4a135af7819798eddc3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/261_Walking_4119_20240602_154738.csv",
+          "bytes": 132013,
+          "sha256": "0d7873f2299e2fc6637994986a6481146752fb16acfb7885b199269f7e7e6b8a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/262_Walking_4119_20240604_140953.csv",
+          "bytes": 24889,
+          "sha256": "ba272d7a227f9723d5f9f5c71264d25f48794c8875a04c8df627a3d011da45c7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/263_Walking_4119_20240604_141051.csv",
+          "bytes": 30892,
+          "sha256": "ca976a2a2757c5f9ddd56052cd5b01d5ccc7af221b558d47fb7eb2475bd4f9f8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/264_Walking_4119_20240604_142216.csv",
+          "bytes": 21028,
+          "sha256": "87fff284c0a9f016156c6a8475f09ca46f65549553f58a82a7988fd2adfc44f6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/265_Walking_4119_20240604_142629.csv",
+          "bytes": 31208,
+          "sha256": "07a6a6b3a3cc609c686d6c11143961038961c856b0583fb24fbeb5333bcf71c2"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/266_Walking_4119_20240604_142750.csv",
+          "bytes": 14753,
+          "sha256": "70b8efb5374f0309a2e365ec412193e314ac3df8fecc935314c54d2b99852194"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/267_Walking_4119_20240604_144351.csv",
+          "bytes": 20906,
+          "sha256": "f4a0c8d56689a2adac471e629c0d7dfd0ca05da39f58aadec79cc7bd26b1d90a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/268_Walking_4119_20240604_144439.csv",
+          "bytes": 16800,
+          "sha256": "aca654a0207a1628ea293e8e5c68a8fff0cd2a8de61dcff2ff97852518f85889"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/269_Walking_4119_20240604_144821.csv",
+          "bytes": 37434,
+          "sha256": "cffd16a371a09b8fc3735c38039ea95cca6fca1b1be593ea472db2672730b81f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/270_Walking_4119_20240604_154958.csv",
+          "bytes": 39244,
+          "sha256": "ada9ae3a6585f9c44954d9af05cc03878f7ab68b7229904c5082c3e4ae0830a6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/271_Walking_6319_20240605_105928.csv",
+          "bytes": 26361,
+          "sha256": "f1c9ccf8be37b66815b849be975325211a8cb1e7244a3024b2bfabcf5e71a680"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/277_Walking_3321_20240605_110650.csv",
+          "bytes": 24181,
+          "sha256": "2ea07881ac0f5889e864dbab0023bd9fddef0dfaec53d7268357ce96765b649a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/278_Walking_3321_20240605_110750.csv",
+          "bytes": 19950,
+          "sha256": "35773df56d80e3b818db6b7187157fad45ef430da4f7b6cc827473145888f7b9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/279_Walking_3321_20240605_110945.csv",
+          "bytes": 15525,
+          "sha256": "2920f5d25761db149fd6375fd9dd20f0181c414c5bcd06b710655fdbc32af38d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/280_Walking_3321_20240605_111114.csv",
+          "bytes": 41565,
+          "sha256": "d8fd23bd57f3674947fdd6e52686ba55412595f6695b03692167b7a4922310d3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/281_Walking_3321_20240605_110435.csv",
+          "bytes": 11366,
+          "sha256": "260942a3305477f22e04dfc3a4b6abcc7d891626419e2b3d93e0c2cb94b3e01c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/283_Walking_3321_20240605_110749.csv",
+          "bytes": 22136,
+          "sha256": "c59f3c01c1c96a399f59d40167a85a2ba9f52a0cfdf047759e6273e31044d9cb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/284_Walking_3321_20240605_111308.csv",
+          "bytes": 26728,
+          "sha256": "38bae559cb144dcb1499e3bc3b9cf1d43c2823a080532d9d22b74e019adbe3ff"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/285_Walking_6319_20240605_105415.csv",
+          "bytes": 29100,
+          "sha256": "a73fe3bcab946bac36be55d77b85551fa0e7155f433e20cdf8087546ec3725af"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/286_Walking_6319_20240605_105432.csv",
+          "bytes": 26948,
+          "sha256": "c144921befd80ba94c6176181e77ec2a5d84d47c3ce803b29fa78f79401d5369"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/287_Walking_6319_20240605_105451.csv",
+          "bytes": 10480,
+          "sha256": "e42ec4307a3e360ffa59a117fc72cdb0da32842618d96889fa17a8ef472ba799"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/289_Walking_6319_20240605_105928.csv",
+          "bytes": 22391,
+          "sha256": "087bb488e4eae9d84313b47c2e85fa2c22cb2d8c47eb8b0c2fe78cd9cdd0dbfb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/28_Walking_4821_20240514_103218.csv",
+          "bytes": 16374,
+          "sha256": "2795a2f63a680e158e9cf1171f5614e3b771bdabbd04bebae9fe29f99096caae"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/290_Walking_6319_20240605_112230.csv",
+          "bytes": 28600,
+          "sha256": "bdc2528ed618f72b939b46b596b9507c98c83b45951bbe38321a2ba8f99d0864"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/291_Walking_6319_20240605_112230.csv",
+          "bytes": 28600,
+          "sha256": "bdc2528ed618f72b939b46b596b9507c98c83b45951bbe38321a2ba8f99d0864"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/292_Walking_6319_20240605_110807.csv",
+          "bytes": 10601,
+          "sha256": "b9e98126a3399acc9bd710c16650181c28bff7b66a037de98bb33f7de8f2fea7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/293_Walking_6319_20240606_102922.csv",
+          "bytes": 49295,
+          "sha256": "297915b14e2b23fa412b7b80ce66c311e133acb8824a32caabf91d97de91e4d8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/294_Walking_6319_20240606_103058.csv",
+          "bytes": 22426,
+          "sha256": "3863e4d19676f0e8597f92cbe559319e5ba2acc3372a0067f2bf31ea024f5593"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/296_Walking_6319_20240606_103409.csv",
+          "bytes": 22609,
+          "sha256": "a6b42e1c8dd077e04560a15dc19618911432beb639b3bc24b33c4a295ecd6b3c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/299_Walking_6319_20240606_104602.csv",
+          "bytes": 18242,
+          "sha256": "ccc5cbbb23059c8f6868c56d25c878da14a6b628b89ebed257ec39be67c0db8f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/2_Walking_1319_20240513_120121.csv",
+          "bytes": 58893,
+          "sha256": "b2048892914fd8ff16d7d7dc2d1b720a5db95efeb468489ea01a27f1fac847d5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/301_Walking_6019_20240930_134728.csv",
+          "bytes": 24742,
+          "sha256": "fa2814ca76ec1e17ee87fac1c741576c6063c0a02e9cb5d73ec0ef2f2a497558"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/307_Walking_6019_20240930_135224.csv",
+          "bytes": 18804,
+          "sha256": "0d053c76f4e0a50f46b87f95ad329eb6b900af7c3b8dea656b23e62591af9a28"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/30_Walking_4821_20240514_103420.csv",
+          "bytes": 16634,
+          "sha256": "dad2f89e265319cfbbf4c1b30a747f3d3e90c6a76aab7415417a0aad8ee27138"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/329_Walking_6019_20240930_142654.csv",
+          "bytes": 30496,
+          "sha256": "d4ec9d310d8d9ecfdc9ba8401c9d955a72e6586480b7188258fd038aa7ecb961"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/330_Walking_6019_20240930_145717.csv",
+          "bytes": 14561,
+          "sha256": "3c6aafbec35c9e4caf060a3ed48d9e04bd7a2a24a478576da29da4a6f939441a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/333_Walking_6019_20240930_145819.csv",
+          "bytes": 22563,
+          "sha256": "85f32e9d5df5c4355d42edbf68c223a374f2f580070bf2a61a599cbecc3b9cef"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/339_Walking_6019_20240930_150131.csv",
+          "bytes": 24623,
+          "sha256": "7bb639dbd607ac8b3fc8b8687550944ab58565fbda098832dd1e72f70686032f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/343_Walking_6019_20240930_151917.csv",
+          "bytes": 34857,
+          "sha256": "5a48495074b373a26a71766a2517653d1990cd6666924be965443541bd774266"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/344_Walking_6019_20240930_152348.csv",
+          "bytes": 10495,
+          "sha256": "b56fda74a14194bab83d5e6255d0f152f3579ef5be8d38ce47650bd394d7a1d6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/347_Walking_6019_20240930_154406.csv",
+          "bytes": 31105,
+          "sha256": "6d3c8e6fc77abb1661e6773eeb9f20d88ae992973c4955352d12f81c3e06ca28"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/348_Walking_6019_20240930_155311.csv",
+          "bytes": 31168,
+          "sha256": "2c482cfb03fe77444bcd4db10bf817117bbd1bca737e08b035e6df27cb96fd48"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/34_Walking_2016_20240514_131510.csv",
+          "bytes": 12271,
+          "sha256": "799539e55c19da769920e4bc5e7a5a657dd79df59056ff126c61f78c444c1bac"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/352_Walking_3120_20241001_130544.csv",
+          "bytes": 36553,
+          "sha256": "725f030f3bfb946b40e7b20cfce8250b0ab82558f2c95cf01c679a0fc2568061"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/356_Walking_3120_20241001_131401.csv",
+          "bytes": 28285,
+          "sha256": "02be3ac351baa9eee0c4282a56607517fda461eb4289f3952aab2ea6734d3e9f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/357_Walking_3120_20241001_131431.csv",
+          "bytes": 20380,
+          "sha256": "5c2ea7b4eb6eb33ce5cbc27fb8fc523d543236fe1163829f565d4839ec39bd83"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/358_Walking_3120_20241006_110315.csv",
+          "bytes": 12691,
+          "sha256": "9b7a86e5dbf7652bc2b5cea027049af69c8e58d8fb39780b1454f5210ca4c767"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/359_Walking_3120_20241006_110354.csv",
+          "bytes": 26396,
+          "sha256": "7eac8f9c77ad0c38663691039a4136c31962f3ac10ea9a236a3d004256c8f4c7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/362_Walking_3120_20241006_120650.csv",
+          "bytes": 10496,
+          "sha256": "244a8b45031fb761be52033cab61a470461551c95c881f4b1779826f4a6bbeed"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/363_Walking_3120_20241006_121037.csv",
+          "bytes": 29942,
+          "sha256": "23eac4b4d4bc8da8e65390295c86f15a867da15366a41d217ada9e0f70268d05"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/366_Walking_3120_20241006_142427.csv",
+          "bytes": 28195,
+          "sha256": "6fae98c8ece0bdf581c552e033241bdd67e06f47e7024b8c5499d4d335b19276"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/368_Walking_3120_20241006_143342.csv",
+          "bytes": 12304,
+          "sha256": "15754aa996affc62ca78df754c4e0bd7b57d42c0598279b5cf7a38f4710959ad"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/369_Walking_3120_20241006_154120.csv",
+          "bytes": 38905,
+          "sha256": "607a649a4717cc771d432cf239bcf7c85e2efb5425635b38cbdb596e69c7f222"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/370_Walking_3120_20241006_154145.csv",
+          "bytes": 24735,
+          "sha256": "a279fe21c9f4000e1e222a3a9bd1988f590f8e540a1e8629a44d2685dc62886e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/371_Walking_3120_20241007_130609.csv",
+          "bytes": 16396,
+          "sha256": "fc33c02ba3e19a71afb8c5cc2c27ee7069ff6e41b22c8c0adfd21ad5e78a58dc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/373_Walking_3120_20241007_130952.csv",
+          "bytes": 12493,
+          "sha256": "89690de861c3cd639701f59db53d42d923b22ad66c672b87b961cb797219be30"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/374_Walking_3120_20241007_151423.csv",
+          "bytes": 20333,
+          "sha256": "3cc011b84908cb13faecdbd4629945a32f9317afe55c9374baf49ef5d26dfdf2"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/376_Walking_3120_20241007_154815.csv",
+          "bytes": 16720,
+          "sha256": "64b4bcd5ed4973f8c01d25afc339d09b148cd69b97ea35248ab86ff1966517b9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/378_Walking_3120_20241008_092041.csv",
+          "bytes": 43211,
+          "sha256": "3e797863e06ed732fc863918dfcd8f41db247576f687508074291d1cfa76a683"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/379_Walking_3120_20241008_094702.csv",
+          "bytes": 36079,
+          "sha256": "ffd596a679b71df9f4dd58681ff74baa94f63e1b27f692f56e22752c08f9b40c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/37_Walking_2016_20240514_134629.csv",
+          "bytes": 62239,
+          "sha256": "ceff1f7a32db15f56ad3b0da8b0a690d90a4a786f536aaf716bde0b97b681276"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/380_Walking_3120_20241008_095413.csv",
+          "bytes": 12675,
+          "sha256": "9a581081e423753ee99d99699b2a23cd4862ec7b9924c3e144b2f2ffb130914f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/381_Walking_3120_20241008_103032.csv",
+          "bytes": 26784,
+          "sha256": "672762ea9b60bcc43c34878fba930ff1c20cf8bfdd09f9b43e8ccc9ccf70b50b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/382_Walking_3120_20241008_104055.csv",
+          "bytes": 12312,
+          "sha256": "b8f9083f4c46af7d1ed7db3183733ac471c841a0f3c89c27901d0cc8cfcd2030"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/385_Walking_3120_20241008_124613.csv",
+          "bytes": 28237,
+          "sha256": "cbdff128b6e3f38e790f0279f8bcdcd3ab1276e8b96077b1a1f8bba9c084a8c9"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/386_Walking_3120_20241008_150233.csv",
+          "bytes": 14355,
+          "sha256": "e1195c5925af9f7abc024498aa751b455a5c828d64effb9e9f1c4f9d8f9f9088"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/388_Walking_3120_20241008_150325.csv",
+          "bytes": 32073,
+          "sha256": "486694ab984790246be6829b305e7aed104546b02a9cec3bdfa60d9add6e2532"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/390_Walking_3120_20241008_150534.csv",
+          "bytes": 18241,
+          "sha256": "38a733adb574aa85cf8a5b1585bd89d09b63a3fb5ed3f1c5c3c56315a6a71894"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/391_Walking_3120_20241008_154007.csv",
+          "bytes": 27044,
+          "sha256": "1388b60c14c92e48273a30bd4b59f957d09b74facee81a3d8a6d59d900f6151a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/392_Walking_3120_20241008_154038.csv",
+          "bytes": 24955,
+          "sha256": "e5a8b99f9822e7188992c6ede3f615dc2ab7bb21c81400190a564ba2784cafb0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/393_Walking_1219_20241015_103901.csv",
+          "bytes": 22722,
+          "sha256": "27cceddbc45e4e5bfe575084ae785a43eb5dadb2bff85c389012ca2373ea4b4f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/396_Walking_1219_20241015_114941.csv",
+          "bytes": 26713,
+          "sha256": "8ff8e19d36bbe3a54756867ebfb1360ad9eac67835c00f6e770d94a34862fd97"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/397_Walking_1219_20241015_115148.csv",
+          "bytes": 12464,
+          "sha256": "db2e099e0bd0e1e8793c667204e887b84f1ab35323b27ecd52672dd3147c6ffa"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/398_Walking_1219_20241015_121921.csv",
+          "bytes": 24788,
+          "sha256": "3ee4bd7f90c6d25fefc415c21f87145edf7a553f1c08d9fa6f8d41fda3f44ad6"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/399_Walking_1219_20241015_122140.csv",
+          "bytes": 14669,
+          "sha256": "bc1eb6257b1ec9b4aabc7a13484f3159912869cc4fd287f8e721a3fce10ec050"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/3_Walking_1319_20240513_140510.csv",
+          "bytes": 30351,
+          "sha256": "6e4e0ccf8df24942ea6a959c8d07573c9f3b1808eb8a32f4aded9075c243c3bf"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/400_Walking_1219_20241015_122722.csv",
+          "bytes": 14468,
+          "sha256": "773745029cb919d2b7ced2b7ce9303d0307e803bb036a98f1d168659b3669be8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/402_Walking_1219_20241015_123217.csv",
+          "bytes": 28939,
+          "sha256": "33537b5127d8968695fc2fce551a705ac94444b025dc287e0edbafdd355c4e8a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/404_Walking_1219_20241015_123544.csv",
+          "bytes": 28935,
+          "sha256": "d692a96d4ae899cfe7a9c22e6a8674b7b6009f34354d99e97dc4fa391cef8da8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/405_Walking_1219_20241015_123750.csv",
+          "bytes": 10390,
+          "sha256": "8920ce4ee3ae35776577fb9030ffcd9b322adecc1af8b8c45253e1ac8428b3d4"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/406_Walking_1219_20241015_123948.csv",
+          "bytes": 10667,
+          "sha256": "a007b84d7ee3f962fd53d465989a60c80d89f9049ac2939821186fb8c36b4173"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/407_Walking_1219_20241015_124353.csv",
+          "bytes": 35161,
+          "sha256": "9d6a5582fec1af4e15db5fedd0138e1c13470835d9e9fa76905aec9703fd5374"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/408_Walking_1219_20241015_142306.csv",
+          "bytes": 62571,
+          "sha256": "d7c58e36baeda6eaf6aadbdba63301248645c7d8e01777a6b091a2e2b075ffd3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/411_Walking_1219_20241015_142557.csv",
+          "bytes": 29111,
+          "sha256": "f7d1cf13e1b9e289345c8b2cfe4ace29837f95ab458065e03053d0c6d9fbd523"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/412_Walking_1219_20241016_143107.csv",
+          "bytes": 108270,
+          "sha256": "09ea88f410d58ee0769264f1a91556f2a1ae35ed696e4724e8eafcdfaa2d66c7"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/413_Walking_1219_20241021_104507.csv",
+          "bytes": 28951,
+          "sha256": "7b05c5700ace81a2a6a048606731d64d35e0e2953f05a93754e2d579cd45f96b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/414_Walking_1219_20241021_115855.csv",
+          "bytes": 36830,
+          "sha256": "7a485859e6d26dda450b71f0252c60f831fac06d7ff8a73ed8b371046d989aa5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/420_Walking_1219_20241021_162954.csv",
+          "bytes": 92102,
+          "sha256": "55cee5d544bc12e5ce74721bac357aa82806bf0652e1570d8b98cf6a70e184a3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/421_Walking_1219_20241022_143133.csv",
+          "bytes": 12683,
+          "sha256": "87c3908b2e13a6744e15a3107ab2819d71d613fa907a8543a17c5c9dc8e3a18e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/422_Walking_1219_20241022_144733.csv",
+          "bytes": 16784,
+          "sha256": "0bef4c04ec7d5b84dda1c6b10444bcb0650e337a4558a9172334d27c0d67a677"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/423_Walking_1219_20241022_144807.csv",
+          "bytes": 676581,
+          "sha256": "6a78e02504848d53faaa2c2c4b7c4a94a2c85b0f1214ff0298bbf4f4ba7d63aa"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/424_Walking_1219_20241022_151300.csv",
+          "bytes": 18878,
+          "sha256": "0042f7612a867750994ba6f70d0c1c12184b66eaf32f08d4f3483da575a9c789"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/425_Walking_1219_20241022_160957.csv",
+          "bytes": 29090,
+          "sha256": "cbf891b1923a9092b4cd2c9b05277ba0804ec0cf29571e706621501d325bf249"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/426_Walking_1219_20241022_162524.csv",
+          "bytes": 12603,
+          "sha256": "fbe1648616f54b0867dc993435db928fe78ae570b3a0f8221fbb1630e538a4bb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/427_Walking_1219_20241022_162807.csv",
+          "bytes": 12541,
+          "sha256": "060fc60883e4ffb45f6444b4a5dc9d40d91dea5b688bb4f87825b27bd5c90861"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/428_Walking_1219_20241022_162825.csv",
+          "bytes": 33133,
+          "sha256": "7b602a71b484886ab15451dc0f643392427eda1a834882e1a96aed2520ee0a99"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/429_Walking_1219_20241022_203243.csv",
+          "bytes": 12635,
+          "sha256": "9038ee6db1304a61fbeb0114f9d75da418964d4c0a8a27062bcfaa28e16c8d2d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/431_Walking_1219_20241023_150646.csv",
+          "bytes": 39016,
+          "sha256": "504194019e35e4426cbdfb78a87eea386e10c7d6ad30387abfd279be1a7f3cfc"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/432_Walking_1219_20241023_153326.csv",
+          "bytes": 16834,
+          "sha256": "cbd3b6cc8aa4e6d664a33808643d97d61f87e291dbdd71370e1beee24a04e388"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/433_Walking_1219_20241023_153339.csv",
+          "bytes": 18806,
+          "sha256": "59cb9ffdaa5b1dea06b0b853ea991365cd000553e8e3be233d0ae114c189f338"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/434_Walking_1219_20241023_154153.csv",
+          "bytes": 37242,
+          "sha256": "9364769009d0a8a2bcb5f980ebd38cb878c393e5580b16e067d7f5daa4ef210a"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/435_Walking_1219_20241023_154245.csv",
+          "bytes": 16814,
+          "sha256": "e7fc04eb960ef3ea13a43d7ae5a4adc6c1e6826650b236e690e090593fb88670"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/436_Walking_1219_20241023_180235.csv",
+          "bytes": 19173,
+          "sha256": "d01fc1fa399ee039ba05da4547e160c7d0d2f1c5f5c404773861f814e4966361"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/437_Walking_1219_20241023_191600.csv",
+          "bytes": 58448,
+          "sha256": "c35befaf1c285fbef123ab3ac1e63c7a6c95ccd2a52415948646eb59e7c7a2ce"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/439_Walking_1219_20241023_191751.csv",
+          "bytes": 66984,
+          "sha256": "b7e090bdf31835316e03179d9121372a015b4fa221a038e79b366dd59ca58501"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/440_Walking_1219_20241023_201546.csv",
+          "bytes": 10668,
+          "sha256": "bc8455440c68787d58215d98d01da43ffd8e27d2ec13ed8c703edbf6d24b14c5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/441_Walking_1219_20241023_201617.csv",
+          "bytes": 33150,
+          "sha256": "26a76c7bf4210c910a105e2c5185dd01affb9a3870a103dcf4edf0c91bbc749f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/45_Walking_4821_20240514_140124.csv",
+          "bytes": 16340,
+          "sha256": "59b80ffc4769da8ebfa0b8d12f9f877c6bc34994ca22852e059d3e34a92df9ce"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/46_Walking_4821_20240514_143033.csv",
+          "bytes": 52840,
+          "sha256": "19e55400db00dd85d18c7cca7e4016ba0e2a5691ed592ce9460d1006401919c1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/47_Walking_4821_20240514_143234.csv",
+          "bytes": 24573,
+          "sha256": "7123e69c7ec605648d3d751b97b1ad842246042c3c37d740be1d88a69cd97429"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/48_Walking_4821_20240514_143309.csv",
+          "bytes": 12441,
+          "sha256": "bd5df4f3a788840936a6b02676910e33d763534e40adc8a4f125d4c3b20cb82c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/49_Walking_4821_20240514_143328.csv",
+          "bytes": 18494,
+          "sha256": "3f478c54e22cead9dd178c5f135c9ebb7cebc687c318f485e4cba1430d3d0c0e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/4_Walking_4821_20240513_142029.csv",
+          "bytes": 13654,
+          "sha256": "04720dd5e291b33d9fafcbccd6a374b465bdd676ac80c6a578c8ca98f05a1777"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/51_Walking_4821_20240514_143413.csv",
+          "bytes": 16443,
+          "sha256": "74dff8b11a22716585e6018aa167b7c9dcd214e0c8af8e9d245d9318fadf70b8"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/52_Walking_4821_20240514_143449.csv",
+          "bytes": 12473,
+          "sha256": "3e3377baf57e90aa002f68ec52d4c9f0d641797fccce3cc5879044d35d5addc0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/53_Walking_4821_20240514_143525.csv",
+          "bytes": 14440,
+          "sha256": "fb2f9f233ce9cc67dd382719eb8d7829cc10a803bccc5365f26c4d65f2b82667"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/5_Walking_4821_20240513_142040.csv",
+          "bytes": 15814,
+          "sha256": "5247384692e4d23eff79874dba81190f39f8ae16be107746d6f1939c85307cab"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/60_Walking_1319_20240514_142035.csv",
+          "bytes": 74327,
+          "sha256": "aaffeb0af0de62843fd2ee5b589834391a14ac6a98dc6a200ba79f104aa144ad"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/63_Walking_2016_20240514_144932.csv",
+          "bytes": 40581,
+          "sha256": "5654dbfbded64fce6ae5180e4c9064134db43f3303b8ad2a657430430cc3bfb5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/65_Walking_2016_20240514_145011.csv",
+          "bytes": 26620,
+          "sha256": "99d206a030e28ab1788bfee3cac8a4aadc612ff862d6cd24c556f046bceb63ec"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/68_Walking_1319_20240514_152403.csv",
+          "bytes": 28805,
+          "sha256": "c5cf20e74cb7b3de5d402e37ea18683e8ed2a882aadeb7e42fc2df1242a587fb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/71_Walking_1319_20240514_152609.csv",
+          "bytes": 24825,
+          "sha256": "cf180a4cabb138df5acab809f745631ec912653241abeead2b3f3b4309e7222d"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/72_Walking_1319_20240514_152727.csv",
+          "bytes": 12646,
+          "sha256": "7fde9ada40d4bcdc1589537a2e43859439021448a984c72442cc4a4ce7d71e17"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/73_Walking_1319_20240515_130212.csv",
+          "bytes": 31556,
+          "sha256": "eb4ccb3bda9a5a3dc3ef90c41a117d4e935a7bd1e60e2c0af75cc25097f63f0e"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/74_Walking_4821_20240515_130152.csv",
+          "bytes": 36685,
+          "sha256": "8d3a521b152d76e38e83fd9f6074375aa7e949b5931d56f5e1f6b17fb2e042ac"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/75_Walking_4821_20240515_130214.csv",
+          "bytes": 38895,
+          "sha256": "9f4158f8ed40504252d4047d74a51eeaa8ec227cbb5b12eb46b8af36111ac7f5"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/76_Walking_4821_20240515_130943.csv",
+          "bytes": 20642,
+          "sha256": "2c4dec06a5acbebd91f8d9d288b77261bf72a92763319ad17649e408c994d7b3"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/78_Walking_4821_20240515_131011.csv",
+          "bytes": 16584,
+          "sha256": "a8d5bb09c1a166b1dccbd3ae42f21633d20251873a11127e0805b13e68710a1c"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/7_Walking_1217_20240513_144400.csv",
+          "bytes": 20109,
+          "sha256": "6c762f9fb51951b8025ce37ac84005087e33cc3f57062722a926d0461b9f0d6f"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/80_Walking_4821_20240515_133200.csv",
+          "bytes": 40647,
+          "sha256": "d67647f81f4c9ca8e8247b6778ed69a865662eabc13b8d9bf0b8d25621ecbfaf"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/82_Walking_4821_20240515_133301.csv",
+          "bytes": 14552,
+          "sha256": "e80a80b2b358b0f06d285042a174b39b4642bcc0020ca4d8670911e729c2971b"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/84_Walking_4821_20240515_133821.csv",
+          "bytes": 10563,
+          "sha256": "3aacf96ab71e44d1f14c379792c9d5368ced06163980ae79f422aa99db903213"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/85_Walking_4821_20240515_133830.csv",
+          "bytes": 24497,
+          "sha256": "a66bc83c10f7f6163207be1dab40366663dfc5c635b1cd622e8333e38b5c5115"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/87_Walking_4821_20240515_133921.csv",
+          "bytes": 10507,
+          "sha256": "8fcd4ffbacf47a43116c3bc6ba5acf889ea7043019f0b81a9991cc24902ddab0"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/88_Walking_4821_20240515_133946.csv",
+          "bytes": 54585,
+          "sha256": "da405ace07336ee89aa44e75303ad87c579dcf8464e83e3f4820e6e4ea2772ed"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/89_Walking_4821_20240515_134748.csv",
+          "bytes": 26814,
+          "sha256": "a41bdfca0332f825711ae557f828cdec2eb1a5f676f50f0ddc0d0f7fc64b8ede"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/90_Walking_4821_20240515_135034.csv",
+          "bytes": 34892,
+          "sha256": "cc77c91c20a4ce41bb0c08d13a0d4e1da98e82d6099b08d4fae65f47fc40e843"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/92_Walking_4821_20240515_135132.csv",
+          "bytes": 14551,
+          "sha256": "1e830aab11ff8bdeab3dad092ccd507b417afc6cd51839588762dca04ace0fc1"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/93_Walking_4821_20240515_135209.csv",
+          "bytes": 20659,
+          "sha256": "9e0f45d9a9bb536ba45c2d779a7af36949535e88b75b89c7434a6b088083ad81"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/95_Walking_2016_20240515_130216.csv",
+          "bytes": 24798,
+          "sha256": "0d5a2a9cef6c13df86ad1c4a4aa836c9a8b554f42746c289ec57d093737b2dbb"
+        },
+        {
+          "dataset": "morales_vargas",
+          "file": "morales_vargas/Walking/96_Walking_2016_20240515_130247.csv",
+          "bytes": 28870,
+          "sha256": "11d623a15f5377b78f36b73e1e6ea02460ba5cc3f851e548ee16a1d282c9843d"
+        }
+      ]
+    },
+    "versluijs": {
+      "files": 1,
+      "sha256": [
+        {
+          "dataset": "versluijs",
+          "file": "versluijs/annotated_acc_data.txt",
+          "bytes": 771962870,
+          "sha256": "9c13376f5585fb1160a2e88d7dd71a78a06c4c06b15cf9dfae5c21545fa32be5"
+        }
+      ]
+    }
+  },
+  "settings": {
+    "configurations": [
+      {
+        "name": "2class_A_off_qon",
+        "scheme": "class_2",
+        "features": "A",
+        "orientation": "off",
+        "quantise": true,
+        "role": "reference"
+      },
+      {
+        "name": "2class_A_aligned_qon",
+        "scheme": "class_2",
+        "features": "A",
+        "orientation": "aligned",
+        "quantise": true,
+        "role": "comparison"
+      },
+      {
+        "name": "2class_B_off_qon",
+        "scheme": "class_2",
+        "features": "B",
+        "orientation": "off",
+        "quantise": true,
+        "role": "comparison"
+      },
+      {
+        "name": "2class_B_aligned_qon",
+        "scheme": "class_2",
+        "features": "B",
+        "orientation": "aligned",
+        "quantise": true,
+        "role": "descriptive"
+      },
+      {
+        "name": "3class_A_off_qon",
+        "scheme": "class_3",
+        "features": "A",
+        "orientation": "off",
+        "quantise": true,
+        "role": "reference"
+      },
+      {
+        "name": "3class_A_aligned_qon",
+        "scheme": "class_3",
+        "features": "A",
+        "orientation": "aligned",
+        "quantise": true,
+        "role": "comparison"
+      },
+      {
+        "name": "3class_B_off_qon",
+        "scheme": "class_3",
+        "features": "B",
+        "orientation": "off",
+        "quantise": true,
+        "role": "comparison"
+      },
+      {
+        "name": "3class_B_aligned_qon",
+        "scheme": "class_3",
+        "features": "B",
+        "orientation": "aligned",
+        "quantise": true,
+        "role": "descriptive"
+      },
+      {
+        "name": "2class_A_off_qoff",
+        "scheme": "class_2",
+        "features": "A",
+        "orientation": "off",
+        "quantise": false,
+        "role": "sensitivity"
+      },
+      {
+        "name": "3class_A_off_qoff",
+        "scheme": "class_3",
+        "features": "A",
+        "orientation": "off",
+        "quantise": false,
+        "role": "sensitivity"
+      }
+    ],
+    "comparisons": {
+      "B_minus_A": {
+        "new": [
+          "B",
+          "off"
+        ],
+        "reference": [
+          "A",
+          "off"
+        ]
+      },
+      "aligned_minus_off": {
+        "new": [
+          "A",
+          "aligned"
+        ],
+        "reference": [
+          "A",
+          "off"
+        ]
+      }
+    },
+    "feature_sets": {
+      "A": [
+        "accel_x_mean",
+        "accel_x_std",
+        "accel_x_min",
+        "accel_x_max",
+        "accel_y_mean",
+        "accel_y_std",
+        "accel_y_min",
+        "accel_y_max",
+        "accel_z_mean",
+        "accel_z_std",
+        "accel_z_min",
+        "accel_z_max"
+      ],
+      "B": [
+        "accel_x_mean",
+        "accel_x_std",
+        "accel_x_min",
+        "accel_x_max",
+        "accel_y_mean",
+        "accel_y_std",
+        "accel_y_min",
+        "accel_y_max",
+        "accel_z_mean",
+        "accel_z_std",
+        "accel_z_min",
+        "accel_z_max",
+        "msa_mean",
+        "msa_std"
+      ]
+    },
+    "forest": {
+      "n_estimators": 200,
+      "max_depth": 20,
+      "min_samples_leaf": 5,
+      "max_features": "sqrt",
+      "class_weight": "balanced",
+      "random_state": [
+        42,
+        43,
+        44,
+        45,
+        46
+      ],
+      "n_jobs": -1
+    },
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "tiers": {
+      "T1": "leave one animal out within each dataset",
+      "T2": "leave one dataset out; training = all windows of the two other datasets, no weighting"
+    },
+    "bootstrap": {
+      "n_resamples": 1000,
+      "rng": "numpy default_rng(0) per (scheme, tier, dataset)",
+      "unit": "held-out animal",
+      "percentiles": [
+        2.5,
+        97.5
+      ],
+      "discard": "resample without a window of some class (Amendment 1 item 1)",
+      "unreliable_if_discarded_share_above": 0.05
+    },
+    "per_animal_min_windows_per_class": 5,
+    "harmonise": {
+      "quantise_on": {
+        "axes": [
+          "ax",
+          "ay",
+          "az"
+        ],
+        "unit": "g",
+        "clip_g": [
+          -2.048,
+          2.032
+        ],
+        "quantise": true,
+        "step_g": 0.016,
+        "rounding": "nearest multiple of step_g, ties to even (numpy rint); the collar's exact rounding is [to verify]"
+      },
+      "quantise_off": {
+        "axes": [
+          "ax",
+          "ay",
+          "az"
+        ],
+        "unit": "g",
+        "clip_g": [
+          -2.048,
+          2.032
+        ],
+        "quantise": false,
+        "step_g": null,
+        "rounding": "none (clip only)"
+      }
+    },
+    "alignment": {
+      "tolerances": {
+        "parallel": 1e-12,
+        "antiparallel": 1e-09,
+        "min_norm_g": 1e-06
+      },
+      "per_dataset": {
+        "japanese_black": {
+          "animal_days": 6,
+          "cases": {
+            "rodrigues": 6
+          },
+          "angle_deg": {
+            "min": 38.03248851633714,
+            "median": 57.07284419424167,
+            "max": 75.86105777756843
+          }
+        },
+        "morales_vargas": {
+          "animal_days": 31,
+          "cases": {
+            "rodrigues": 31
+          },
+          "angle_deg": {
+            "min": 122.76475450422782,
+            "median": 151.43116361440332,
+            "max": 168.38030448318915
+          }
+        },
+        "versluijs": {
+          "animal_days": 83,
+          "cases": {
+            "rodrigues": 83
+          },
+          "angle_deg": {
+            "min": 0.38063343062044264,
+            "median": 8.165075366107038,
+            "max": 43.04670950758295
+          }
+        }
+      }
+    },
+    "windows": {
+      "segment": "consecutive samples of one animal-day with the same base class; a change of class, an unused sample, or a time step > 1000 ms starts a new segment",
+      "grid_ms": 100,
+      "window_slots": 150,
+      "window": "fixed, non-overlapping, from the segment start, fully inside the segment",
+      "min_samples": 142,
+      "strict": "subset of valid windows with all 150 slots filled",
+      "features": "windows.window_features on the samples present",
+      "schemes": {
+        "class_2": {
+          "moving": "active",
+          "grazing": "active",
+          "drinking": "active",
+          "resting": "resting"
+        },
+        "class_3": {
+          "moving": "moving",
+          "grazing": "grazing",
+          "drinking": "",
+          "resting": "resting"
+        }
+      }
+    },
+    "decision_rule": "improvement in transfer only if the T2 difference is positive in all three directions and its interval excludes 0 in at least two (protocol section 8)"
+  },
+  "notes": [
+    "Morales-Vargas contains annotated events only: its gravity-alignment mean vector per animal-day is computed over the samples of those events (every label, including excluded ones and shared samples kept as unused), not over a continuous recording as for Ito and Versluijs; labels are not used (Amendment 1 item 9).",
+    "Aligned samples are not clipped or quantised again (Amendment 1 item 3).",
+    "Ito (japanese_black) T1 in the 3-class scheme is exploratory (protocol section 6); every output row carries an `exploratory` flag.",
+    "200 trees in every fold; M0's published LOAO figure used 100 trees per fold and is not directly comparable (protocol section 5).",
+    "The decision rule uses T2 only; T1 differences and per-animal balanced accuracy are descriptive (Amendment 1 item 6). An `unreliable` interval is reported as such; the rule itself is unchanged.",
+    "Transfer gap = T1 minus T2 pooled balanced accuracy, seed-averaged point estimate, no interval (Amendment 1 item 7)."
+  ],
+  "timings": {
+    "load_s": 86,
+    "windows_s": 64,
+    "train_and_metrics_s": 1726
+  },
+  "versions": {
+    "python": "3.11.9",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "scipy": "1.17.1",
+    "scikit-learn": "1.8.0"
+  },
+  "outputs": "aggregated results only; per-window predictions in ml/results_private/<name>/ (git-ignored)"
+}

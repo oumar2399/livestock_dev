@@ -1,0 +1,45 @@
+2026-10-24 08:48:30,918 [INFO] ml.train_v2: Loading cow1.csv …
+2026-10-24 08:48:31,173 [INFO] ml.train_v2:   →  311,876 rows
+2026-10-24 08:48:31,173 [INFO] ml.train_v2: Loading cow2.csv …
+2026-10-24 08:48:31,393 [INFO] ml.train_v2:   →  269,772 rows
+2026-10-24 08:48:31,393 [INFO] ml.train_v2: Loading cow3.csv …
+2026-10-24 08:48:31,605 [INFO] ml.train_v2:   →  269,903 rows
+2026-10-24 08:48:31,606 [INFO] ml.train_v2: Loading cow4.csv …
+2026-10-24 08:48:31,795 [INFO] ml.train_v2:   →  224,912 rows
+2026-10-24 08:48:31,795 [INFO] ml.train_v2: Loading cow5.csv …
+2026-10-24 08:48:31,923 [INFO] ml.train_v2:   →  134,904 rows
+2026-10-24 08:48:31,923 [INFO] ml.train_v2: Loading cow6.csv …
+2026-10-24 08:48:32,078 [INFO] ml.train_v2:   →  179,857 rows
+2026-10-24 08:48:32,121 [INFO] ml.train_v2: Total raw rows: 1,391,224
+
+2026-10-24 08:48:32,259 [INFO] ml.train_v2: Data quality: 1,391,224 rows kept, 0 dropped (0.00% of raw data).
+2026-10-24 08:48:45,642 [INFO] ml.train_v2: Loading cow1.csv …
+2026-10-24 08:48:45,938 [INFO] ml.train_v2:   →  311,876 rows
+2026-10-24 08:48:45,938 [INFO] ml.train_v2: Loading cow2.csv …
+2026-10-24 08:48:46,207 [INFO] ml.train_v2:   →  269,772 rows
+2026-10-24 08:48:46,208 [INFO] ml.train_v2: Loading cow3.csv …
+2026-10-24 08:48:46,494 [INFO] ml.train_v2:   →  269,903 rows
+2026-10-24 08:48:46,494 [INFO] ml.train_v2: Loading cow4.csv …
+2026-10-24 08:48:46,711 [INFO] ml.train_v2:   →  224,912 rows
+2026-10-24 08:48:46,713 [INFO] ml.train_v2: Loading cow5.csv …
+2026-10-24 08:48:46,865 [INFO] ml.train_v2:   →  134,904 rows
+2026-10-24 08:48:46,865 [INFO] ml.train_v2: Loading cow6.csv …
+2026-10-24 08:48:47,057 [INFO] ml.train_v2:   →  179,857 rows
+2026-10-24 08:48:47,085 [INFO] ml.train_v2: Total raw rows: 1,391,224
+
+2026-10-24 08:48:54,838 [INFO] ml.step3.pipeline: japanese_black: 556065 samples loaded in 24 s
+2026-10-24 08:49:00,985 [INFO] ml.step3.pipeline: morales_vargas: 270428 samples loaded in 6 s
+2026-10-24 08:49:56,305 [INFO] ml.step3.pipeline: versluijs: 6395193 samples loaded in 55 s
+2026-10-24 08:50:16,402 [INFO] ml.step3.pipeline: variant qon_off: 6226 windows in 20 s
+2026-10-24 08:50:40,464 [INFO] ml.step3.pipeline: variant qon_aligned: 6226 windows in 24 s
+2026-10-24 08:50:59,981 [INFO] ml.step3.pipeline: variant qoff_off: 6226 windows in 20 s
+2026-10-24 08:53:46,531 [INFO] ml.step3.run: 2class_A_off_qon: 56 folds x 5 seeds trained in 166 s
+2026-10-24 08:56:34,813 [INFO] ml.step3.run: 2class_A_aligned_qon: 56 folds x 5 seeds trained in 167 s
+2026-10-24 08:59:19,778 [INFO] ml.step3.run: 2class_B_off_qon: 56 folds x 5 seeds trained in 164 s
+2026-10-24 09:02:05,652 [INFO] ml.step3.run: 2class_B_aligned_qon: 56 folds x 5 seeds trained in 165 s
+2026-10-24 09:05:05,181 [INFO] ml.step3.run: 3class_A_off_qon: 56 folds x 5 seeds trained in 178 s
+2026-10-24 09:08:05,906 [INFO] ml.step3.run: 3class_A_aligned_qon: 56 folds x 5 seeds trained in 180 s
+2026-10-24 09:11:05,846 [INFO] ml.step3.run: 3class_B_off_qon: 56 folds x 5 seeds trained in 179 s
+2026-10-24 09:14:06,879 [INFO] ml.step3.run: 3class_B_aligned_qon: 56 folds x 5 seeds trained in 180 s
+2026-10-24 09:16:49,759 [INFO] ml.step3.run: 2class_A_off_qoff: 56 folds x 5 seeds trained in 162 s
+2026-10-24 09:19:44,617 [INFO] ml.step3.run: 3class_A_off_qoff: 56 folds x 5 seeds trained in 174 s
