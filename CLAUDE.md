@@ -23,3 +23,12 @@
 - Sampling frequency ≠ transmission frequency.
 - A proposal is not a fact until decided and validated.
 - If unsure about a fact in the docs, mark it [to verify] instead of guessing.
+
+## ML rules
+- An evaluation protocol (docs/ml/protocol_step3.md) is frozen once committed;
+  it changes only through a dated amendment at the end of the file.
+- No ML run without a committed protocol; the run checks it and stops otherwise.
+- backend/ml/results_private/ (per-window predictions) is never committed.
+- Every dataset goes through the same harmonisation and windowing
+  (backend/ml/step2/harmonise.py, segments.py).
+- Any analysis not in the protocol is labelled "post hoc" wherever it appears.

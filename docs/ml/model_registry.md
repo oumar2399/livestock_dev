@@ -1,5 +1,5 @@
 # ML model registry
-Last updated: 2026-10-11 (Steps A, B, C; mapping v2, predictions, matched comparison; M2 pending note; device filter boundary)
+Last updated: 2026-10-25 (Versluijs and Morales-Vargas dataset facts; Step B shared pipeline; Step 3 card S3-v1). Previous: 2026-10-11 (Steps A, B, C; mapping v2, predictions, matched comparison; M2 pending note; device filter boundary)
 
 One "model card" per model or evaluation run. M0 is the deployed model; every
 Step 2 run gets an ID (R1, R2, …), a results folder under
@@ -23,6 +23,11 @@ candidate is chosen. Commands run from `backend/`.
 
 Across-cow values = mean ± std (min) over the held-out cows of the headline seed
 (42); every cow weighs the same. Pooled = all test predictions together.
+
+The tables below are Step 2 runs on Japanese Black only. Step 3 (three
+datasets, shared pipeline, pre-registered protocol) has its own card,
+[S3-v1](#s3-v1--cross-dataset-evaluation-step-3-pre-registered), and is not
+comparable with them.
 
 ### Label mapping `active_resting_v1` (M0 classes: Active / Resting)
 
@@ -85,7 +90,7 @@ mapping = R3 (M0's preprocessing).
 
 ---
 
-## Dataset facts (shared by all runs so far)
+## Dataset facts — Japanese Black (used by every run)
 
 **Japanese Black Beef Cow Behavior Classification Dataset** (Ito et al., Zenodo,
 doi:10.5281/zenodo.5849025), files in `backend/ml/data/` (git-ignored).
@@ -128,7 +133,7 @@ Windows per native label (bin mean, 509 windows; device-matched, 487 windows):
 MOV 47/44, RES 285/276, RUS 108/100, GRZ 23/24, SLT 24/24, FES 17/12, DRN 4/4,
 LCK 1/1, REL 0/2. ATT, ESC, URI, BMN: 0 windows (too short to fill 15 s).
 
-**Common to all runs so far:** 15 s non-overlapping windows (150 samples at
+**Common to all Step 2 runs (R1–R16):** 15 s non-overlapping windows (150 samples at
 10 Hz) aligned to each segment start, never across a recording gap (> 300 ms)
 or a day; window kept when its most frequent **native** label covers ≥ 80 %;
 12 features = mean, std (ddof=0), min, max of X, Y, Z; Random Forest with
@@ -141,6 +146,67 @@ pandas 3.0.2, scipy 1.17.1, scikit-learn 1.8.0.
 leave-one-day-out; only 4–17 Active windows per cow, so one cow's Active recall
 moves in steps of 6–25 %; 6 cows only (t-interval with 5 degrees of freedom);
 one breed, one farm, Japan; sensor ±2 g vs device ±4 g.
+
+---
+
+## Dataset facts — Versluijs
+
+**Versluijs et al.**, free-ranging cattle, virtual-fence collars (protocol
+reference [1]; DataverseNO, doi:10.18710/ND4CLL), **CC0 1.0**
+(`docs/ml/protocol_step3.md` §2). File `backend/ml/data/versluijs/annotated_acc_data.txt` (exact on-disk
+name, lowercase; git-ignored); SHA-256 in `backend/ml/data/versluijs_sha256.txt`;
+the loader stops on a mismatch.
+
+From the result files:
+- 6,395,193 rows, one per 10 Hz sample; **5,143,854 (80.4 %) carry no label**
+  in any of the 8 category columns (`external_datasets_summary_v1/row_accounting.csv`).
+- Values already on the 0.016 g grid: the mean x, y, z of every resting kind
+  are identical with quantisation on and off
+  (`external_datasets_summary_v1/gravity_resting.csv`).
+- Missing samples inside windows are frequent: 4,155 valid 2-class windows
+  (≥ 142 of 150 samples) but only 643 with all 150
+  (`external_datasets_summary_v1/windows_per_class.csv`).
+- 216,866 rows where the animal grazes while walking are excluded as
+  conflicts, so "moving" is walking without grazing
+  (`row_accounting.csv`, `excluded:conflict`; protocol §9).
+- 37 animals have at least one window (protocol §2;
+  `external_datasets_summary_v1/windows_per_class_per_animal.csv`).
+
+From the inspection of 2026-10-13 (**outputs not archived, [to verify]**):
+- 8-bit values: 256 levels per axis, 0.016 g steps, −2.048 to +2.032 g; rows at
+  the low / high limit: x 1,410 / 570, y 757 / 30, z 166 / 11,096.
+- Periodic dropouts: 41,312 steps of 0.9 s (8 samples missing in one second),
+  every 7–28 s.
+- 38 collars, 22 dates, 177.6 h of data.
+
+---
+
+## Dataset facts — Morales-Vargas
+
+**Morales-Vargas et al.** (GitHub WASP-lab/db-cow-walking; article
+*Front. Vet. Sci.* 2025, doi:10.3389/fvets.2025.1630083, as cited in
+`project_master_handoff.md` §22).
+**No licence file; permission requested from the authors; results not
+publishable until they confirm** (protocol §2). Files under
+`backend/ml/data/morales_vargas/` (git-ignored); SHA-256 of every CSV in
+`backend/ml/data/morales_vargas_sha256.txt`; the loader stops on a mismatch.
+
+- **One CSV per annotated event**, in four folders: 441 files, 271,351 rows
+  (`external_datasets_summary_v1/row_accounting.csv`). The label comes from the
+  file name, the time from the `Time` column (not the file name); no time zone,
+  relative time only.
+- **Only the MPU9250 body-frame acceleration is used** (`MPU9250_AX/AY/AZ`,
+  m/s² ÷ 9.80665 → g; `external_datasets_summary_v1/config.json`, `mapping`).
+- **Events overlap:** samples shared by several files (same cow and `Time`)
+  are kept once, 923 duplicate rows removed; 307 shared samples carrying two
+  different labels are kept as unused, so they end a segment (`row_accounting.csv`).
+- Valid windows per label, each event file alone → after merging adjacent
+  events: Walking 99 → 98, Grazing 504 → 502, Resting 751 → 750, Standing
+  235 → 235, Drinking 2 → 2, Trotting 0 → 0
+  (`external_datasets_summary_v1/morales_windows_before_after_merge.csv`).
+- 10 cows with windows (protocol §2). The files hold annotated events only, so
+  the gravity-alignment mean vector per animal-day is computed over event
+  samples (protocol Amendment 1, item 9).
 
 ---
 
@@ -677,3 +743,194 @@ into its two class recalls:
   same and is the LOAO headline; the pooled value weighs animals by their
   number of Active windows, here dominated by cow4. Report both, with the
   per-cow table.
+
+---
+
+## Step B — shared pipeline for the three datasets (2026-10-23)
+
+**Commits:** `91fb8d8` (Versluijs and Morales-Vargas loaders, shared
+windowing, harmonisation; 69 tests passed, 2026-10-23 01:40 +0900), `deb510f`
+(Ito through the shared pipeline; test total not recorded), `eb590f4` (Ito
+summary). Code: `backend/ml/step2/segments.py`, `harmonise.py`,
+`external_datasets.py`, `ito_shared.py`, `summarise_external.py`,
+`summarise_ito.py`. These rules apply to every dataset from Step 3 on; M0 and
+R1–R16 are unchanged.
+
+- **Ito only:** `preprocess.device_lp_point_10hz` (first-order low-pass at
+  5.1 Hz, then 10 Hz point sampling). Versluijs and Morales-Vargas are already
+  at 10 Hz.
+- **Harmonisation** (`harmonise.py`): clip to [−2.048, 2.032] g, then round to
+  the nearest multiple of 0.016 g (ties to even; the collar's own rounding is
+  [to verify]). `quantise=False` only clips.
+- **Windowing** (`segments.py`): a segment is a run of consecutive samples of
+  one animal-day with the same base class; a change of class, an unused
+  (unlabelled or excluded) sample or a time step > 1000 ms starts a new one.
+  Fixed non-overlapping 15 s windows on a 100 ms grid (150 slots) from the
+  segment start, fully inside it; **valid with ≥ 142 of 150 samples**;
+  features = `windows.window_features` on the samples present. No purity
+  rule: a window holds one base class by construction. Time is relative only
+  (`t_rel_ms`, never epoch time).
+- **Base classes and schemes:** moving, grazing, resting, drinking.
+  2-class = active (moving + grazing + drinking) / resting; 3-class =
+  moving / grazing / resting (drinking excluded).
+- **Label mappings** (one table at the top of `external_datasets.py` and of
+  `ito_shared.py`, copied into each summary's `config.json`; any label not in
+  a table stops the load):
+
+| Base class | Ito | Versluijs | Morales-Vargas |
+|---|---|---|---|
+| moving | MOV | Locomotion: Walking, Running, Trotting | Walking, Trotting |
+| grazing | GRZ | Intake: Feeding/Grazing_Grazing head low | Grazing |
+| resting | RES, RUS, REL | Intake: Ruminating; Posture alone (Laying or Standing) | Resting, Standing |
+| drinking | DRN | Intake: Drinking | Drinking |
+| excluded | SLT, FES, LCK, URI, ATT, ESC, BMN, ETC, empty (the ReadMe's BLN) | any Social, Excretion, Body care, Alert or Posture-transition value; Chewing head high; two base classes on one row (`conflict`); moving, grazing or drinking with Laying (`posture_conflict`); no label | Licking, LyingDown, Pitching, Rising, Scratching, Shaking; shared samples with two labels |
+
+  Ito ReadMe vs data: URI for cow1 is 239 in the ReadMe, 238 in the data (the
+  URI total, 621, matches) (`ito_shared_summary_v1/config.json`, `mapping`).
+
+**Summary counts** (valid windows, quantisation on; `windows_per_class.csv` and
+`windows_per_class_per_animal.csv` in `ito_shared_summary_v1/` and
+`external_datasets_summary_v1/`):
+
+| Dataset | Animals with windows | 2-class active / resting | Of which all 150 samples | 3-class moving / grazing / resting | Drinking |
+|---|---|---|---|---|---|
+| Ito (japanese_black) | 6 | 82 / 402 | 429 | 51 / 26 / 402 | 5 |
+| Morales-Vargas | 10 | 602 / 985 | 1,587 | 98 / 502 / 985 | 2 |
+| Versluijs | 37 | 1,564 / 2,591 | 643 | 499 / 1,036 / 2,591 | 29 |
+
+Ito device blocks (`ito_shared_summary_v1/device_block_boundaries.csv`): 607
+device block boundaries inside an animal-day; 555 missed ticks (the filter
+keeps running; 127 inside a shared segment, in 54 valid windows) and 52
+filter restarts (22 steps ≤ 1 s; 3 inside a shared segment, 1 valid window).
+
+**Summary runs:** `python -m ml.step2.summarise_external`, 2026-10-23
+01:49:35–01:50:39 +0900, commit `91fb8d8` with 1 uncommitted path;
+`python -m ml.step2.summarise_ito`, 2026-10-23 11:01:29–11:01:54 +0900, commit
+`deb510f` with 1 uncommitted path (both `config.json`).
+
+---
+
+## S3-v1 — cross-dataset evaluation (Step 3, pre-registered)
+
+- **Status:** experimental (evaluation only, no model saved; M0 stays deployed).
+- **Protocol:** `docs/ml/protocol_step3.md`, frozen at `7f082aa`
+  (2026-10-23 11:20 +0900); Amendment 1 at `98a26ee` (2026-10-23 12:03 +0900).
+  The run recorded version "Amendment 1" and the protocol's SHA-256
+  `253987dc67545f7fd711b2e4963f019c4800a85e63194d6044e6c0bac6071b15`.
+- **Code:** `backend/ml/step3/` at `481f09c` (122 tests passed, 2026-10-23
+  12:40 +0900). The run recorded commit `f696f87` with 1 uncommitted path; the
+  SHA-256 of the 17 code files in `config.json` equal the committed files at
+  `481f09c` and `f696f87` (checked 2026-10-25). Results committed at `80894b1`.
+- **Run:** 2026-10-24 08:48:30–09:19:45 +0900, 31 min (load 86 s, windowing
+  64 s, training and metrics 1,726 s); `venv/Scripts/python.exe -m ml.step3.run`
+  from `backend/`. Results: `backend/ml/results/step3_v1/`; per-window
+  predictions in `backend/ml/results_private/step3_v1/` (git-ignored).
+- **Configurations (10):** scheme {2-class, 3-class} × features {A = the 12
+  device features, B = A + mean and std of MSA = \|‖a‖ − 1 g\|} × orientation
+  {off, aligned (per animal-day mean gravity rotated onto +z, Rodrigues)},
+  quantisation on; plus the reference (A, off) with quantisation off in both
+  schemes (sensitivity). Reference = A, off, quantisation on.
+- **Model:** M0's settings (above), 200 trees in every fold, seeds 42–46.
+- **Tiers:** T1 = leave one animal out within each dataset; T2 = leave one
+  dataset out (train on all windows of the two others, no weighting). Ito T1
+  in the 3-class scheme is **exploratory** (26 grazing windows).
+- **Metric:** pooled balanced accuracy (one confusion matrix per tier, dataset
+  and seed), mean over seeds (min–max); 95 % intervals from a paired
+  animal-level bootstrap (1000 resamples, seed 0). No resample was discarded
+  and no interval is unreliable (`effects.csv`, `*/bootstrap_intervals.csv`).
+
+**Reference configuration** (`2class_A_off_qon/` and `3class_A_off_qon/`,
+`metrics_pooled.csv`; gap from `transfer_gap.csv`):
+
+| Scheme | Dataset | Windows | T1 BA | T1 macro-F1 | T2 BA | T2 macro-F1 | Transfer gap |
+|---|---|---|---|---|---|---|---|
+| 2-class | Ito | 484 | 0.956 (0.955–0.962) | 0.929 | 0.820 (0.806–0.835) | 0.851 | 0.136 |
+| 2-class | Morales-Vargas | 1,587 | 0.911 (0.909–0.916) | 0.913 | 0.893 (0.889–0.896) | 0.896 | 0.019 |
+| 2-class | Versluijs | 4,155 | 0.921 (0.920–0.923) | 0.919 | 0.880 (0.875–0.884) | 0.867 | 0.041 |
+| 3-class | Ito | 479 | 0.958 (0.955–0.969), exploratory | 0.933 | 0.431 (0.422–0.441) | 0.448 | 0.527 |
+| 3-class | Morales-Vargas | 1,585 | 0.799 (0.795–0.803) | 0.775 | 0.497 (0.487–0.505) | 0.408 | 0.302 |
+| 3-class | Versluijs | 4,126 | 0.803 (0.799–0.804) | 0.792 | 0.594 (0.588–0.597) | 0.499 | 0.208 |
+
+**All configurations**, pooled BA T1 / T2, mean over seeds (`transfer_gap.csv`):
+
+| Configuration | Role | Ito | Morales-Vargas | Versluijs |
+|---|---|---|---|---|
+| `2class_A_off_qon` | reference | 0.956 / 0.820 | 0.911 / 0.893 | 0.921 / 0.880 |
+| `2class_B_off_qon` | comparison | 0.945 / 0.920 | 0.917 / 0.872 | 0.934 / 0.893 |
+| `2class_A_aligned_qon` | comparison | 0.946 / 0.904 | 0.909 / 0.927 | 0.910 / 0.882 |
+| `2class_B_aligned_qon` | descriptive | 0.949 / 0.931 | 0.923 / 0.908 | 0.931 / 0.897 |
+| `2class_A_off_qoff` | sensitivity | 0.955 / 0.827 | 0.906 / 0.895 | 0.921 / 0.877 |
+| `3class_A_off_qon` | reference | 0.958 / 0.431 | 0.799 / 0.497 | 0.803 / 0.594 |
+| `3class_B_off_qon` | comparison | 0.940 / 0.504 | 0.817 / 0.528 | 0.818 / 0.574 |
+| `3class_A_aligned_qon` | comparison | 0.955 / 0.607 | 0.787 / 0.603 | 0.739 / 0.629 |
+| `3class_B_aligned_qon` | descriptive | 0.958 / 0.643 | 0.794 / 0.643 | 0.756 / 0.634 |
+| `3class_A_off_qoff` | sensitivity | 0.958 / 0.427 | 0.802 / 0.506 | 0.803 / 0.591 |
+
+Ito T1 values in the 3-class rows are exploratory.
+
+**Decision rule** (protocol §8, Amendment 1 item 2; T2 difference in pooled BA,
+point [95 % interval], from `effects.csv`; verdict from `decision_rule.csv`):
+
+| Scheme | Comparison | Ito | Morales-Vargas | Versluijs | Verdict |
+|---|---|---|---|---|---|
+| 2-class | B − A | +0.100 [+0.038, +0.152] | −0.021 [−0.137, +0.040] | +0.013 [+0.005, +0.022] | no consistent effect |
+| 2-class | aligned − off | +0.083 [+0.029, +0.118] | +0.034 [+0.006, +0.076] | +0.001 [−0.007, +0.011] | **improvement in transfer** |
+| 3-class | B − A | +0.074 [+0.017, +0.179] | +0.030 [+0.006, +0.075] | −0.020 [−0.060, +0.003] | no consistent effect |
+| 3-class | aligned − off | +0.176 [+0.063, +0.241] | +0.106 [+0.046, +0.199] | +0.034 [−0.037, +0.093] | **improvement in transfer** |
+
+T1 differences (descriptive, not used by the rule; `effects.csv`): all within
+±0.02 except alignment in the 3-class scheme on Versluijs, −0.063
+[−0.104, −0.024] (alignment lowers within-dataset accuracy there).
+
+- **H1** (cross-dataset < within-dataset): holds for every dataset in both
+  schemes in the reference configuration (all transfer gaps > 0). With
+  alignment, the 2-class gap of Morales-Vargas is −0.018.
+- **2-class** transfers with a loss of 0.02–0.14: T2 BA 0.82–0.89 in the reference, 0.88–0.93
+  with alignment. **3-class does not transfer:** T2 BA 0.43–0.59 in the
+  reference, at most 0.64 in any configuration.
+- **Sensitivity (quantisation off):** every pooled BA within 0.01 of the
+  reference (T2: 0.827 / 0.895 / 0.877 vs 0.820 / 0.893 / 0.880 in 2-class;
+  0.427 / 0.506 / 0.591 vs 0.431 / 0.497 / 0.594 in 3-class). Versluijs T1 is
+  identical, as its values are already on the grid.
+- **Not comparable with M0:** M0's LOAO (0.9519 pooled, 0.9386 mean) used
+  100-tree folds, Step 2 windows (purity 0.80, gap 300 ms, 509 windows) and the
+  `active_resting_v1` labels (grazing = Resting). Step 3 uses 200 trees, the
+  shared windowing and the base-class schemes (protocol §5).
+- **Limitations:** protocol §9 (no West African data; device low-pass not
+  emulated on Versluijs and Morales-Vargas; tilt-only alignment; deploying
+  alignment needs a firmware change; Versluijs dominates the pooled training
+  sets).
+- **Reproduce:** commit the code, then from `backend/`:
+  `venv/Scripts/python.exe -m ml.step3.run --dry-run` and
+  `venv/Scripts/python.exe -m ml.step3.run --name <new_name>`.
+
+### Post hoc analysis (not pre-registered)
+
+Read from `confusion_matrices.json`, T2, 3-class scheme, **seed 42** (rows =
+true class; seeds 43–46 are similar, ranges below). Not part of the protocol;
+no decision is based on it.
+
+| Held-out dataset | True class | Reference `3class_A_off_qon` | Aligned `3class_A_aligned_qon` |
+|---|---|---|---|
+| Ito | grazing | 1/26 correct (12 → moving, 13 → resting) | 4/26 (5 → moving, 17 → resting) |
+| Ito | moving | 13/51 (34 → grazing) | 34/51 (16 → grazing) |
+| Ito | resting | 391/402 | 393/402 |
+| Morales-Vargas | grazing | 22/502 (441 → moving) | 176/502 (289 → moving) |
+| Morales-Vargas | moving | 47/98 | 47/98 |
+| Morales-Vargas | resting | 955/985 | 970/985 |
+| Versluijs | grazing | 142/1036 (853 → moving) | 629/1036 (375 → moving) |
+| Versluijs | moving | 411/499 | 227/499 (232 → grazing) |
+| Versluijs | resting | 2150/2591 | 2102/2591 |
+
+- **Resting transfers:** T2 resting recall 0.83–0.98 in the reference
+  (3-class 0.973 / 0.970 / 0.830; 2-class 392/402 = 0.975, 920/985 = 0.934,
+  2188/2591 = 0.844; Ito / Morales-Vargas / Versluijs).
+- **Grazing collapses in T2:** mostly predicted as moving for Morales-Vargas
+  (441/502) and Versluijs (853/1036); for Ito the error goes the other way,
+  moving predicted as grazing (34/51).
+- **Gravity alignment partly recovers grazing:** Versluijs 142 → 629/1036
+  (14 % → 61 %), Morales-Vargas 22 → 176/502 (4 % → 35 %), Ito 1 → 4/26. It
+  costs Versluijs moving recall (411 → 227/499).
+- **Seeds 42–46** (grazing recall, reference → aligned): Ito 0.038–0.077 →
+  0.115–0.154; Morales-Vargas 0.044–0.092 → 0.345–0.367; Versluijs
+  0.130–0.157 → 0.607–0.633; Versluijs moving with alignment 0.439–0.459.

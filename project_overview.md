@@ -1,5 +1,5 @@
 # Livestock Monitoring IoT — Project Overview
-Last updated: 2026-10-11
+Last updated: 2026-10-25
 
 Short version of the two reference documents, meant to be browsed day to day.
 For full detail, open the reference files:
@@ -55,7 +55,7 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 | Firmware | ✅ | `m5stack/main.py`; cycle 21.2 s (mean over 2 h, endurance 2026-10-06, `docs/validation_endurance_2026-10-06.md`); WDT; v3 archive off by default (`UNTIMED_ARCHIVE_ENABLED=False`); unreadable battery sent as 255 = unknown (stored NULL, LCD `BAT ?`, mobile "Unknown") | handoff §3.2 |
 | Telemetry v2 | ✅ | 45 B, reliable UTC required, GPS may be absent; JSON path refuses timestamps > 300 s ahead (422, same rule as binary) | handoff §4.1 |
 | Telemetry v3 | 🟡 | 58 B, no reliable UTC → separate `untimed_telemetry`; off by default (backend `BINARY_V3_ENABLED=false`); power-loss persistence not validated | handoff §4.2 |
-| ML model | ✅ | RF, Active/Resting, 15 s only loaded; 5 s rejected (422) | handoff §5.2 |
+| ML model | ✅ | M0 still deployed: RF, Active/Resting, 15 s only loaded; 5 s rejected (422). Step 3 cross-dataset evaluation done (evaluation only, M0 unchanged; §4 below) | handoff §5.2, §5.5 |
 | Multi-farm RBAC | ✅ | `admin` platform role; `owner/farmer/vet` per farm; JWT carries no farms; mobile uses the selected farm's role (B5); last selected farm remembered per user, admin starts with no farm, invitations confirmed with the target farm name; nobody changes their own farm role (403, admin excepted). Phase 3 roles: owner = all farm rights incl. members; farmer = operational (herd, devices, geofences, alerts, feedback, observation notes for the vet), no member management; vet = view + full veterinary write, no alert handling or feedback. Farms are created by the admin only; public registration closed (`PUBLIC_REGISTRATION_ENABLED`, default off); first admin with `scripts/create_admin.py` | arch §11 |
 | Geofencing | ✅ | `ST_Covers`; fix ≥ 4 satellites, ≤ 25 km/h, ≤ 300 s old; danger = immediate, resolved by humans only; pasture exit = 2 fixes ≤ 120 s apart, auto-resolved on return; one notification per fix (danger wins over pasture exit); mobile alert card shows "Last detected inside" / "No longer detected inside" | handoff §8.2 |
 | Location / history | ✅ | gaps > 30 min segmented; quality `reliable/degraded`; loss-period points removed from the track; telemetry attributed to the animal holding the collar at reception time; map draws no dashed "uncertain" style; animal status and collar status shown as separate labelled fields, map marker follows the collar status, a lost collar is a separate "Collar <id> — lost" marker | handoff §8.3 |
@@ -72,7 +72,7 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 | LoRaWAN | 💡 | documented, not implemented | handoff §13–15 |
 | Device fleet | 🟡 | current M5 (M5GO) = reference device (development, validated); test devices: M5Stack Core2 v1.0 (MPU6886, AXP192) and M5StickC (model [to verify]); same IMU, different hosts = a "same sensor, different device" test, not identical devices; tests on USB power, battery reported as unknown (255) on those boards for now; firmware plan (💡): one shared core + a small board file per model | handoff §3.1 |
 
-**Software checks:** 761 backend tests passed, 0 failed, 0 skipped; `alembic check` clean (commit `8025bc0` + uncommitted device filter boundary change; `venv/Scripts/python.exe scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short` from `backend/` on a disposable database; 2026-10-11 11:01–11:03 +0900; 760 on the clean commit at 10:58–11:00) · 161 mobile tests passed, 0 failed; TypeScript clean (commit `8025bc0`; from `mobile-app`: `node --test tests/*.test.cjs` and `npx tsc --noEmit`; 2026-10-11 10:58–10:59 +0900) · Alembic reconciled since B1 (`bc03c42`). Details: `docs/work_status_2026-10-11.md`.
+**Software checks:** 846 backend tests passed, 0 failed, 0 skipped; `alembic check` clean (commit `80894b1`, clean tree; `DATABASE_URL=<guard> PYTHONDONTWRITEBYTECODE=1 venv/Scripts/python.exe scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short` from `backend/` on a disposable database; 2026-10-25 06:01 +0900) · 167 mobile tests passed, 0 failed, 0 cancelled, 0 skipped; TypeScript clean, exit 0 (commit `80894b1`, clean tree; from `mobile-app`: `node --test tests/*.test.cjs` and `npx tsc --noEmit`; 2026-10-25) · Alembic reconciled since B1 (`bc03c42`). Details: `docs/work_status_2026-10-11.md`.
 
 **Development data (`livestock_dev`):** tracking periods were backfilled with source `history_backfill` (`backend/scripts/backfill_tracking_periods.py --apply`, 2026-10-04; development data only). Only the dry-run output was saved (`docs/backfill_dryrun.txt`); the `--apply` output was not kept. Test data (owner1/owner2, test-farmer-1, test-vet-1, Test Farm A/B, SIM-001) stays until the cleanup in `docs/acceptance_checklist_roles.md` §7. → architecture §10
 
@@ -88,6 +88,12 @@ device → LoRaWAN 868–870 MHz (EU868 plan) → gateway → ChirpStack → LoR
 - Active windows kept: 47 (0.80) vs 32 (0.90). 30/60 s windows left some folds without both classes.
 - Historical 5 s model: balanced accuracy 0.9212 (not loaded). 4-class experiment ≈ 0.817 ± 0.044 (not deployed).
 - Step 2 runs (evaluation only, deployed model unchanged): every model and run, with results per class and per cow, in `docs/ml/model_registry.md`.
+
+### ML across datasets (Step 3, pre-registered)
+
+Ito (Japan), Versluijs (Norway) and Morales-Vargas (Chile) go through the same harmonisation (clip ±2 g, 0.016 g grid) and windowing (15 s, ≥ 142 of 150 samples), then leave-one-animal-out within each dataset (T1) and leave-one-dataset-out (T2), 200 trees, seeds 42–46 (protocol `docs/ml/protocol_step3.md` + Amendment 1; run 2026-10-24, results `backend/ml/results/step3_v1/`, commit `80894b1`). **2-class (active / resting) transfers with a moderate loss and is the only output that does:** pooled balanced accuracy T1 0.91–0.96, T2 0.82–0.89 (reference configuration). **3-class (moving / grazing / resting) does not transfer:** T1 0.80–0.96 (Ito value exploratory), T2 0.43–0.59 (post hoc, not pre-registered: grazing is mostly confused with moving across datasets). Pre-registered decisions: gravity alignment = **improvement in transfer** in both schemes; MSA features (B) = **no consistent effect**. Not comparable with M0's LOAO figure (100-tree folds, other windows and labels). Card S3-v1 in `docs/ml/model_registry.md`.
+
+Decisions taken: protocol frozen before any run (`7f082aa`), clarified once by Amendment 1 (`98a26ee`) before the run; same harmonisation and windowing for every dataset; aggregated results versioned, per-window predictions in the git-ignored `backend/ml/results_private/`; M0 stays deployed until a deployable 2-class model is chosen.
 
 ### Hardware (bench and outdoor, reported by project owner)
 
@@ -120,11 +126,13 @@ Evidence files (check they exist in `docs/`): `validation_m5stack_avant_lora.md`
 8. `TARGET_TIMEZONE` still `Asia/Tokyo` (→ `Africa/Abidjan` before field); it is a code constant, not an env variable.
 9. Anomaly thresholds not calibrated on real veterinary data.
 10. `ANOMALY_MIN_COVERAGE_SECONDS` not set: every day with a reception time is excluded (target and baseline), so new data never raises anomalies.
-11. No evidence the model generalizes to West African breeds.
+11. No evidence the model generalizes to West African breeds; across three public datasets, only the 2-class output transfers (Step 3).
 12. No willingness-to-pay or validated business model.
 13. No collar-side buffering of v2 windows.
 14. Application tables (alerts, notifications, vet, users…) store naive UTC timestamps; telemetry and provenance tables use timestamptz.
 15. Last known battery may be outdated (no timestamp on the device row).
+16. 3-class output (grazing / moving / resting) does not transfer across datasets (T2 balanced accuracy 0.43–0.59, Step 3).
+17. Gravity alignment improves transfer offline only: deploying it needs a firmware change (the device sends window features, not samples).
 
 ---
 
@@ -158,6 +166,8 @@ Safe gap wording: *"No public IMU dataset matching the targeted West African cat
 | CI radio hardware | 868 MHz + ARTCI compliance before purchase |
 | Target dataset | depends on field partnership; own labelled data in Côte d'Ivoire later = final test set |
 | Own-device recording | possible short labelled recording on real cattle in Japan, to discuss with the supervisor |
+| Deployable 2-class model | choose which 2-class configuration replaces M0, if any, after the device replay (Step 3 results, registry card S3-v1) |
+| Gravity alignment on the device | firmware change needed to align before computing features; decide whether to do it |
 
 ---
 
@@ -167,10 +177,10 @@ Feature freeze: no new large features.
 
 1. **Consistency:** code ↔ docs audit, full test rerun, pinned versions, archived logs.
 2. **System validation:** battery autonomy, network-cut resilience of the new HTTP client, field conditions, multi-device. (Done: 2 h endurance and on-device qualification of the new client, 2026-10-06.)
-3. **Science:** metrics, domain-shift protocol (multi-dataset), technical vs biological separation. Plans (💡, not results; handoff P-SCI-06/07):
-   - **Step 2 (model):** LOAO baseline with 200 trees; device-matched preprocessing (~5 Hz low-pass, then 10 Hz point sampling); per-class and per-animal metrics; orientation-independent features (ablation); multi-dataset training.
-   - **Data:** train and test on several public datasets (Japanese Black, Versluijs 2023, Morales-Vargas 2025, MmCows); ask the authors of the Nellore (Sci Rep 2022) and Brahman-cross (Sensors 2024) studies for their data; own labelled data in Côte d'Ivoire later as the final test set.
-   - **Evaluation (no African data yet), three levels:** leave-one-animal-out within each dataset; leave-one-dataset-out across datasets; own-device test (possible short labelled recording on real cattle in Japan, to discuss with the supervisor).
+3. **Science:** metrics, domain-shift protocol (multi-dataset), technical vs biological separation (handoff P-SCI-06/07).
+   - **Done:** Step 2 (200-tree LOAO, device-matched preprocessing, per-class and per-animal metrics) and Step 3 (three public datasets, shared pipeline, leave-one-animal-out and leave-one-dataset-out, MSA features and gravity alignment tested; §4).
+   - **Next:** device replay of the endurance windows of 2026-10-06 (protocol T3, descriptive only); choice of a deployable 2-class model; gravity alignment would need a firmware change.
+   - **Data:** MmCows not used yet; ask the authors of the Nellore (Sci Rep 2022) and Brahman-cross (Sensors 2024) studies for their data; Morales-Vargas results not published until its authors agree; own labelled data in Côte d'Ivoire later as the final test set; possible short labelled recording on real cattle in Japan, to discuss with the supervisor.
 4. **LoRaWAN:** compact contract, adapter, legal radio bench, airtime/autonomy.
 5. **Business:** structured interviews (later, outside thesis core).
 
@@ -199,10 +209,11 @@ Feature freeze: no new large features.
 | LoRaWAN regulation and radio proposals | handoff §13–15 · architecture §20–29 |
 | Business hypotheses | handoff §16–18 |
 | Current work status (single state: test totals, done / open) | `docs/work_status_2026-10-11.md` |
-| ML model registry (model cards, Step 2 runs, commands) | `docs/ml/model_registry.md` |
+| ML model registry (model cards, Step 2 runs, Step 3 card S3-v1, commands) | `docs/ml/model_registry.md` |
+| Step 3 protocol (frozen) and its amendments | `docs/ml/protocol_step3.md` |
 | Literature review (Oct 2026): African sensor studies, public datasets, evaluation protocols | `docs/research/review_2026_10_10.md` |
 | Article strategy and datasets | `scientific_article_development_dossier_livestock_monitoring.docx` |
 | Test evidence | `docs/validation_*` |
 | Old full versions | `docs/archive/` |
 
-*Overview kept in step with `project_master_handoff.md` and `project_architecture.md` (both revised 2026-10-11); current state and test totals: `docs/work_status_2026-10-11.md`. If they disagree, the reference files win.*
+*Overview kept in step with `project_master_handoff.md` and `project_architecture.md` (both revised 2026-10-25); current state and test totals: `docs/work_status_2026-10-11.md`. If they disagree, the reference files win.*

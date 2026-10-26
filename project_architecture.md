@@ -1,7 +1,7 @@
 # 🏗️ Livestock Monitoring IoT — Architecture de référence
 
 **Complément technique au `project_master_handoff.md`**  
-**Dernière mise à jour : 2026-10-11**
+**Dernière mise à jour : 2026-10-25**
 
 ---
 
@@ -865,7 +865,31 @@ Random Forest
 serialized artifact
 ```
 
-💡 Plan étape 2 (handoff P-SCI-06/07, non réalisé) : 200 arbres, passe-bas ~5 Hz puis échantillonnage ponctuel 10 Hz, métriques par classe et par animal, features indépendantes de l’orientation (ablation), entraînement multi-dataset. Le pipeline ci-dessus reste celui du modèle actif.
+Le pipeline ci-dessus reste celui du modèle actif (M0).
+
+### Évaluation hors production (étapes 2 et 3)
+
+```text
+Ito (25 Hz → passe-bas 5,1 Hz → 10 Hz) · Versluijs (10 Hz) · Morales-Vargas (10 Hz)
+      ↓  chargeurs avec contrôle SHA-256
+harmonisation : écrêtage [−2,048 ; 2,032] g, grille 0,016 g
+      ↓
+(étape 3, facteur) alignement sur la gravité par animal-jour
+      ↓
+segments (même classe de base, trou > 1 s = coupure) · fenêtres 15 s, ≥ 142/150 échantillons
+      ↓
+features A (12) ou B (12 + MSA) · RF 200 arbres · T1 LOAO / T2 leave-one-dataset-out
+```
+
+| Chemin | Rôle | Versionné |
+|---|---|---|
+| `backend/ml/step2/` | chargeurs, prétraitement aligné sur le device, harmonisation, fenêtrage commun, résumés | oui |
+| `backend/ml/step3/` | évaluation inter-datasets selon `docs/ml/protocol_step3.md` (alignement, features, tiers, métriques, bootstrap, règle de décision) | oui |
+| `backend/ml/data/` | datasets bruts et fichiers de hachage | non (ignoré par git) |
+| `backend/ml/results/` | résultats d’analyse agrégés uniquement (comptes, métriques, matrices de confusion) | oui |
+| `backend/ml/results_private/` | prédictions par fenêtre (nécessaires pour recalculer les bootstraps) | non (ignoré par git) |
+
+Ces modules n’écrivent jamais dans `backend/ml/models/` ; le serveur ne les importe pas. Résultats et décisions : `docs/ml/model_registry.md` (carte S3-v1).
 
 Note : malgré son nom, `backend/ml/train_copy_001.py` est une dépendance de `ablation_study.py` et `test_non_regression.py` ; il ne doit pas être archivé.
 

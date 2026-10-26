@@ -3,6 +3,8 @@
 > **SUPERSEDED on 2026-10-11 by `docs/work_status_2026-10-11.md`** (single current
 > state). Kept for history: its sections mix the 2026-10-04 state with later updates,
 > and B5 / B6 below are done although still listed "to do".
+> ML Step B and Step 3 (2026-10-23 to 2026-10-25), with commits and test totals: see
+> `docs/work_status_2026-10-11.md`, section "Update 2026-10-25".
 
 Plan: `docs/fix_plan_2026-10.md`. Audit reports: `docs/audit_conformance_2026-10*.md`.
 Rules for a new session: read-only git unless asked; never `.env`, `device_config.py`,

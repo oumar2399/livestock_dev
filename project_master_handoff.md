@@ -2,7 +2,7 @@
 
 **Master Research — Kobe Institute of Computing (KIC), Graduate School of Information Technology**  
 **Territoire cible : Côte d’Ivoire — élevage bovin extensif / semi-mobile**  
-**Dernière mise à jour : 2026-10-11**
+**Dernière mise à jour : 2026-10-25**
 
 ---
 
@@ -122,12 +122,12 @@ Cette architecture LoRaWAN est **proposée et documentée**, mais **pas encore i
 
 État retenu pour la documentation courante :
 
-- **761 tests backend réussis, 0 échec, 0 ignoré**, `alembic check` propre — commit `8025bc0` + changement non commité de la frontière du filtre (`backend/ml/step2/datasets.py`, un test ajouté) ; commande `venv/Scripts/python.exe scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short` (depuis `backend/`, base jetable) ; 2026-10-11 11:01–11:03 +0900 (760 sur le commit propre, 10:58–11:00) ;
-- **161 tests mobile réussis, 0 échec** — commit `8025bc0` ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-11 10:58–10:59 +0900 ;
-- TypeScript vérifié sans erreur (`npx tsc --noEmit`, commit `8025bc0`, 2026-10-11 10:59 +0900) ;
+- **846 tests backend réussis, 0 échec, 0 ignoré**, `alembic check` propre — commit `80894b1`, arbre propre ; commande `DATABASE_URL=<garde> PYTHONDONTWRITEBYTECODE=1 venv/Scripts/python.exe scripts/run_isolated_tests.py tests -q -p no:cacheprovider -rfEs --tb=short` (depuis `backend/`, base jetable) ; 2026-10-25 06:01 +0900 ;
+- **167 tests mobile réussis, 0 échec, 0 annulé, 0 ignoré** — commit `80894b1`, arbre propre ; commande `node --test tests/*.test.cjs` (depuis `mobile-app`) ; 2026-10-25 ;
+- TypeScript vérifié sans erreur (`npx tsc --noEmit`, code de sortie 0, commit `80894b1`, 2026-10-25) ;
 - schéma / migrations Alembic **réconciliés** depuis B1 (`bc03c42`), `alembic check` propre.
 
-Les anciens nombres de tests (`43`, `54`, `57`, `61`, `73`, `76`, etc.) restent uniquement des **résultats historiques de lots ou de campagnes intermédiaires**. Ils ne doivent pas être utilisés comme total courant.
+Les anciens nombres de tests (`43`, `54`, `57`, `61`, `73`, `76`, `761` backend et `161` mobile du 2026-10-11, etc.) restent uniquement des **résultats historiques de lots ou de campagnes intermédiaires**. Ils ne doivent pas être utilisés comme total courant. Les totaux ML partiels de l’étape B (69, commit `91fb8d8`) et de l’étape 3 (122, commit `481f09c`) sont détaillés dans `docs/work_status_2026-10-11.md`.
 
 ### 🟢 DECISION — règle de précédence documentaire
 
@@ -268,7 +268,7 @@ La fenêtre n’est pas envoyée si un échantillon dépasse ±4 g, arrive avec 
 
 Batterie illisible : envoyée comme 255 = inconnue, stockée NULL côté backend ; LCD `BAT ?` ; l’app mobile affiche « Unknown » (B5).
 
-Cycle mesuré : **21,2 s** en moyenne (max 24,0 s) sur 2 h d’endurance le 2026-10-06 (`docs/validation_endurance_2026-10-06.md`). Historique : des cycles d’environ 19,4 s avaient été rapportés après l’optimisation fast-bytes (`docs/validation_optimisation_gps_m5stack.md`).
+Cycle mesuré : **21,2 s** en moyenne (max 24,0 s) sur 2 h d’endurance le 2026-10-06 (`docs/validation_endurance_2026-10-06.md`).
 
 ### Important
 
@@ -463,6 +463,36 @@ Un résultat expérimental à 4 classes (`lying`, `standing`, `walking`, `runnin
 ⚠️ **Résultat expérimental antérieur, non déployé.**
 
 Il ne doit pas être présenté comme le modèle courant.
+
+---
+
+## 5.5 Évaluation inter-datasets (étape 3)
+
+### ✅ CURRENT — évaluation pré-enregistrée réalisée, modèle actif inchangé
+
+Trois datasets publics — Japanese Black (Ito, Japon), Versluijs (Norvège), Morales-Vargas (Chili) — passent par la même harmonisation (écrêtage à [−2,048 ; 2,032] g, quantification à 0,016 g) et le même fenêtrage (15 s, fenêtre valide avec ≥ 142 échantillons sur 150, coupure aux trous > 1 s). Évaluation : leave-one-animal-out dans chaque dataset (T1) et leave-one-dataset-out (T2), forêt de M0 avec 200 arbres par fold, graines 42–46. Protocole figé `docs/ml/protocol_step3.md` (`7f082aa`) + Amendement 1 (`98a26ee`), exécution le 2026-10-24 (31 min), résultats `backend/ml/results/step3_v1/` (commit `80894b1`), carte S3-v1 dans `docs/ml/model_registry.md`.
+
+Résultat : la **sortie 2 classes (active / repos) se transfère avec une perte modérée et est la seule à se transférer** — balanced accuracy pooled T1 0,91–0,96, T2 0,82–0,89 (configuration de référence) ; la **sortie 3 classes (déplacement / pâturage / repos) ne se transfère pas** — T2 0,43–0,59. Règle de décision pré-enregistrée : l’alignement sur la gravité donne une **amélioration du transfert** dans les deux schémas ; les features MSA (B) **aucun effet cohérent**. Le chiffre LOAO de M0 (folds à 100 arbres, autres fenêtres et labels) n’est pas comparable.
+
+### 🟢 DECISION
+
+- protocole figé avant toute exécution ; modifiable uniquement par amendement daté ;
+- même harmonisation et même fenêtrage pour tous les datasets ;
+- résultats agrégés versionnés ; prédictions par fenêtre uniquement dans `backend/ml/results_private/` (ignoré par git) ;
+- M0 reste déployé tant qu’un modèle 2 classes déployable n’a pas été choisi.
+
+### ⚠️ LIMITATION
+
+- aucune donnée labellisée de races ouest-africaines ;
+- filtre passe-bas du device non émulable sur Versluijs et Morales-Vargas ;
+- l’alignement ne corrige que l’inclinaison et n’est évalué que hors ligne : son déploiement exige une **modification du firmware** (le device envoie des features de fenêtre, pas les échantillons) ;
+- résultats Morales-Vargas non publiables avant l’accord de ses auteurs.
+
+### 🔜 Suite
+
+1. rejeu des fenêtres d’endurance du 2026-10-06 sur le modèle (T3, descriptif uniquement) ;
+2. choix d’un modèle 2 classes déployable ;
+3. décision sur l’alignement côté firmware.
 
 ---
 
@@ -867,11 +897,13 @@ Pour éviter toute ambiguïté avec les sections historiques :
 8. **`TARGET_TIMEZONE = Asia/Tokyo` doit passer à `Africa/Abidjan` avant terrain** (constante du code, pas une variable d’environnement).
 9. **Seuils d’anomalie non calibrés sur données vétérinaires réelles** (seuil Z 3.5 de la littérature ; changement minimum de 5 points provisoire ; palier `critical` à Z ≥ 4.5 heuristique).
 10. **`ANOMALY_MIN_COVERAGE_SECONDS` doit être décidé avant conclusions d’anomalie sur données nouvellement qualifiées** ; non défini, il exclut tous les jours ayant une heure de réception.
-11. **Pas de preuve actuelle de généralisation du modèle aux races ouest-africaines.**
+11. **Pas de preuve actuelle de généralisation du modèle aux races ouest-africaines** ; entre trois datasets publics, seule la sortie 2 classes se transfère (§5.5).
 12. **Pas de preuve de willingness-to-pay ni de business model validé.**
 13. **Pas de mise en mémoire côté collier des fenêtres v2 non envoyées.**
 14. **Les tables applicatives (alertes, notifications, vétérinaire, utilisateurs…) stockent des horodatages UTC naïfs** ; télémétrie et provenance utilisent `timestamptz`.
 15. **La dernière batterie connue peut être ancienne** (pas d’horodatage sur la ligne device).
+16. **La sortie 3 classes (pâturage / déplacement / repos) ne se transfère pas entre datasets** (T2 0,43–0,59, §5.5).
+17. **L’alignement sur la gravité n’est évalué que hors ligne** : son déploiement exige une modification du firmware.
 
 ---
 
@@ -1086,7 +1118,7 @@ Deux axes doivent rester distincts :
 
 ## P-SCI-06 — Plan étape 2 : modèle
 
-**Statut :** 💡 PLAN (2026-10-10), non réalisé — le modèle actif (§5.2) est inchangé.
+**Statut :** ✅ réalisé en évaluation (étape 2 : cartes R1–R16 de `docs/ml/model_registry.md` ; points 4 et 5 traités par l’étape 3, §5.5) — le modèle actif (§5.2) est inchangé. Plan initial (2026-10-10) conservé ci-dessous.
 
 ### Plan
 
@@ -1105,7 +1137,7 @@ Deux axes doivent rester distincts :
 
 ## P-SCI-07 — Stratégie données et évaluation
 
-**Statut :** 💡 PLAN (2026-10-10). Aucune donnée africaine disponible pour l’instant.
+**Statut :** niveaux 1 et 2 ✅ réalisés (étape 3, §5.5, 2026-10-24) sur Japanese Black, Versluijs et Morales-Vargas ; MmCows non utilisé ; niveau 3 à faire sous forme de rejeu des fenêtres d’endurance du 2026-10-06 (T3, descriptif). Aucune donnée africaine disponible pour l’instant. Plan initial (2026-10-10) conservé ci-dessous.
 
 ### Données
 
@@ -1800,7 +1832,9 @@ Aucune nouvelle grosse feature avant :
 ### Priorité 3 — Science
 
 - formaliser métriques ;
-- protocole domain shift ;
+- protocole domain shift : ✅ étape 3 pré-enregistrée réalisée (2026-10-24, §5.5) ;
+- rejeu device (T3) des fenêtres d’endurance du 2026-10-06 ;
+- choix d’un modèle 2 classes déployable ;
 - séparation technique / biologique ;
 - méthode de qualité des données ;
 - limites.
@@ -1835,7 +1869,9 @@ Aucune nouvelle grosse feature avant :
 | cadence uplink | 💡 proposée | comparer périodique / batch / event |
 | matériel CI | ouvert | 868 MHz + conformité ARTCI |
 | multi-device | limité : Core2 v1.0 et M5StickC (modèle [to verify]) = même IMU, hôtes différents (§3.1) | test « même capteur, device différent » ; plan firmware cœur commun + fichier de carte |
-| dataset cible | conditionnel | terrain / partenariat ; d’ici là, multi-dataset public + 3 niveaux d’évaluation (P-SCI-07) |
+| dataset cible | conditionnel | terrain / partenariat ; d’ici là, multi-dataset public + 3 niveaux d’évaluation (P-SCI-07 ; niveaux 1 et 2 réalisés, §5.5) |
+| modèle 2 classes déployable | ouvert (étape 3 réalisée, M0 toujours déployé) | choisir la configuration qui remplacerait M0, après le rejeu device (T3) |
+| alignement gravité sur le device | ouvert (amélioration du transfert hors ligne, §5.5) | décider d’une modification du firmware ou non |
 | enregistrement sur notre device | proposé | court enregistrement labellisé sur bovins au Japon, à discuter avec le superviseur |
 | business model | hypothèse | entretiens et coût réel |
 | timezone terrain | ouvert | basculer vers `Africa/Abidjan` avant déploiement |

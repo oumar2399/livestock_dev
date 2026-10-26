@@ -44,7 +44,11 @@ Done: v2 firmware, ingestion, per-farm roles, geofencing, alerts, mobile app,
 backend and mobile test suites. The device passed a 2-hour endurance run on the
 bench (details in the handoff).
 
-In progress: evaluating the model across datasets (`backend/ml/step3/`).
+Also done: the pre-registered evaluation across three public datasets
+(`backend/ml/step3/`, results in `backend/ml/results/step3_v1/`). The 2-class
+output (active / resting) transfers from one dataset to another (balanced
+accuracy 0.82–0.89 on a dataset never seen in training), the 3-class output
+(moving / grazing / resting) does not; the deployed model is unchanged.
 
 Not done yet, and not to be presented as done: LoRaWAN (planned on EU868), push
 notifications, offline mode in the app, buffering on the collar when the
@@ -59,7 +63,7 @@ trained on Japanese cows only.
 | [project_master_handoff.md](project_master_handoff.md) | Detailed status, decisions, limitations, next step |
 | [project_architecture.md](project_architecture.md) | Data flow and what each component does |
 | [docs/README.md](docs/README.md) | Index of plans, reports and validation levels |
-| [docs/organisation_et_validation.md](docs/organisation_et_validation.md) | Guide to the test benches |
+| [m5stack/README.md § Bancs et historique](m5stack/README.md#bancs-et-historique) | Guide to the device test benches |
 | `docs/ml/model_registry.md` | Datasets, file hashes, and one card per training run |
 | `docs/ml/protocol_step3.md` | Pre-registered evaluation protocol and its amendments |
 | [m5stack/README.md](m5stack/README.md) | Firmware: the four deployable modules and how to transfer them |
